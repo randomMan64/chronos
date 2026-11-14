@@ -137,6 +137,17 @@ export async function PATCH(req: Request) {
     };
 
     try {
+      if (updates.displayName !== undefined && updates.displayName !== null) {
+        try {
+          await db
+            .update(users)
+            .set({ fullName: updates.displayName })
+            .where(eq(users.id, sessionUser.userId));
+        } catch (userErr) {
+          console.warn("Could not update users table with displayName:", userErr);
+        }
+      }
+
       const [existing] = await db
         .select({ id: userPreferences.id })
         .from(userPreferences)

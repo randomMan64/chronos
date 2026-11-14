@@ -16,9 +16,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DismissibleAlert } from "@/components/shared/dismissible-alert";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Settings, Globe, Clock, Calendar } from "lucide-react";
+import { Settings, Globe, Clock, Calendar, CheckCircle2 } from "lucide-react";
+import { formatDate } from "@/lib/utils";
 
 const settingsSchema = z.object({
   displayName: z.string().trim().max(100, "Display name cannot exceed 100 characters").optional(),
@@ -86,7 +86,6 @@ function SettingsSkeleton() {
           <Skeleton className="h-3 w-36" />
           <Skeleton className="h-8 w-full" />
         </div>
-        <Skeleton className="h-8 w-32 mt-3" />
       </CardContent>
     </Card>
   );
@@ -95,13 +94,15 @@ function SettingsSkeleton() {
 export default function AccountSettingsPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
-  const [alert, setAlert] = React.useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+  const [saveStatus, setSaveStatus] = React.useState<"idle" | "success" | "error">("idle");
+  const [saveMessage, setSaveMessage] = React.useState<string>("");
 
   const {
     register,
     handleSubmit,
     control,
     reset,
+    watch,
     formState: { errors },
   } = useForm<SettingsFormValues>({
     resolver: zodResolver(settingsSchema),
@@ -115,6 +116,18 @@ export default function AccountSettingsPage() {
       language: "en",
     },
   });
+
+  const watchedTimezone = watch("timezone");
+  const watchedDateFormat = watch("dateFormat");
+  const watchedTimeFormat = watch("timeFormat");
+
+  const [previewDate, setPreviewDate] = React.useState<Date | null>(null);
+
+  React.useEffect(() => {
+    setPreviewDate(new Date());
+    const interval = setInterval(() => setPreviewDate(new Date()), 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   const loadPreferences = React.useCallback(async () => {
     try {
@@ -130,6 +143,15 @@ export default function AccountSettingsPage() {
           timeFormat: (data.timeFormat as "12h" | "24h") || "24h",
           language: data.language || "en",
         });
+
+        // Initialize local storage cache
+        try {
+          if (data.displayName) localStorage.setItem("chronos_display_name", data.displayName);
+          if (data.timezone) localStorage.setItem("chronos_timezone", data.timezone);
+          if (data.dateFormat) localStorage.setItem("chronos_date_format", data.dateFormat);
+          if (data.timeFormat) localStorage.setItem("chronos_time_format", data.timeFormat);
+          if (data.language) localStorage.setItem("chronos_language", data.language);
+        } catch {}
       }
     } catch {
       // Quietly use default state; do not trigger error on initial render
@@ -145,7 +167,7 @@ export default function AccountSettingsPage() {
   const onSubmit = async (values: SettingsFormValues) => {
     try {
       setIsSaving(true);
-      setAlert(null);
+      setSaveStatus("idle");
       const res = await fetch("/api/v1/account/preferences", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -154,14 +176,47 @@ export default function AccountSettingsPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Failed to save settings");
 
-      setAlert({ type: "success", text: "Account settings saved successfully." });
+      // Save to localStorage for instant client-side date formatting
+      try {
+        if (values.displayName) localStorage.setItem("chronos_display_name", values.displayName);
+        if (values.timezone) localStorage.setItem("chronos_timezone", values.timezone);
+        if (values.dateFormat) localStorage.setItem("chronos_date_format", values.dateFormat);
+        if (values.timeFormat) localStorage.setItem("chronos_time_format", values.timeFormat);
+        if (values.language) {
+          localStorage.setItem("chronos_language", values.language);
+          document.documentElement.lang = values.language;
+        }
+      } catch {}
+
+      // Dispatch event to update studio layout, user sidebar badge, and header immediately
+      window.dispatchEvent(
+        new CustomEvent("chronos:settings-updated", {
+          detail: values,
+        })
+      );
+
+      setSaveStatus("success");
+      setSaveMessage("Preferences saved successfully.");
+      setTimeout(() => {
+        setSaveStatus("idle");
+        setSaveMessage("");
+      }, 3500);
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Failed to save settings";
-      setAlert({ type: "error", text: errorMsg });
+      setSaveStatus("error");
+      setSaveMessage(errorMsg);
     } finally {
       setIsSaving(false);
     }
   };
+
+  const previewString = previewDate
+    ? formatDate(previewDate, {
+        timezone: watchedTimezone || "UTC",
+        dateFormat: watchedDateFormat || "YYYY-MM-DD",
+        timeFormat: watchedTimeFormat || "24h",
+      })
+    : "—";
 
   return (
     <div className="space-y-5 w-full pb-10">
@@ -174,14 +229,6 @@ export default function AccountSettingsPage() {
       </div>
 
       <AccountNav />
-
-      {alert && (
-        <DismissibleAlert
-          message={alert}
-          onDismiss={() => setAlert(null)}
-          autoDismissMs={5000}
-        />
-      )}
 
       {isLoading ? (
         <SettingsSkeleton />
@@ -206,7 +253,7 @@ export default function AccountSettingsPage() {
                 <Input
                   id="displayName"
                   type="text"
-                  placeholder="Custom name shown in comments and logs"
+                  placeholder="System Administrator"
                   className="h-8 text-xs bg-elevated/40"
                   {...register("displayName")}
                 />
@@ -298,7 +345,7 @@ export default function AccountSettingsPage() {
                 <FieldError />
               </Field>
 
-              {/* Language */}
+              {/* Language Preferences */}
               <Field error={errors.language?.message}>
                 <FieldLabel htmlFor="language" className="text-xs font-medium">
                   Language Preferences
@@ -324,18 +371,44 @@ export default function AccountSettingsPage() {
                 <FieldError />
               </Field>
 
-              <div className="pt-3">
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={isSaving}
-                  className="text-xs h-8 px-4"
-                >
-                  {isSaving ? "Saving..." : "Save Preferences"}
-                </Button>
+              {/* Active Timestamp Preview */}
+              <div className="mt-4 rounded-lg border border-border/70 bg-elevated/40 p-3 space-y-1">
+                <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5 text-primary" />
+                  Live Timestamp Preview
+                </div>
+                <div className="font-mono text-xs font-semibold text-foreground">
+                  {previewString}
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Temporal audit logs, transactions, query history, and system backups will be rendered in this format across the studio.
+                </p>
               </div>
             </CardContent>
           </Card>
+
+          {/* Form Actions (Outside of the card, aligned to bottom right) */}
+          <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+            {saveStatus === "success" && (
+              <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-medium animate-in fade-in duration-200">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                {saveMessage}
+              </span>
+            )}
+            {saveStatus === "error" && (
+              <span className="text-xs text-destructive flex items-center gap-1.5 font-medium animate-in fade-in duration-200">
+                {saveMessage}
+              </span>
+            )}
+            <Button
+              type="submit"
+              size="sm"
+              disabled={isSaving}
+              className="text-xs h-8 px-4 cursor-pointer"
+            >
+              {isSaving ? "Saving..." : saveStatus === "success" ? "Saved!" : "Save Preferences"}
+            </Button>
+          </div>
         </form>
       )}
     </div>

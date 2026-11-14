@@ -107,7 +107,7 @@ export function StudioLayout({ children }: StudioLayoutProps) {
             });
           }
 
-          // Fetch user appearance preferences for sidebar
+          // Fetch user preferences (appearance & localization)
           try {
             const prefRes = await fetch("/api/v1/account/preferences");
             if (prefRes.ok) {
@@ -120,6 +120,21 @@ export function StudioLayout({ children }: StudioLayoutProps) {
                   localStorage.setItem("chronos_sidebar_pref", pref.sidebarPreference);
                 } catch {}
               }
+              if (pref?.displayName) {
+                setCurrentUser((prev) => ({
+                  ...prev,
+                  fullName: pref.displayName,
+                }));
+              }
+              try {
+                if (pref?.timezone) localStorage.setItem("chronos_timezone", pref.timezone);
+                if (pref?.dateFormat) localStorage.setItem("chronos_date_format", pref.dateFormat);
+                if (pref?.timeFormat) localStorage.setItem("chronos_time_format", pref.timeFormat);
+                if (pref?.language) {
+                  localStorage.setItem("chronos_language", pref.language);
+                  document.documentElement.lang = pref.language;
+                }
+              } catch {}
             }
           } catch {}
         }
@@ -139,7 +154,33 @@ export function StudioLayout({ children }: StudioLayoutProps) {
       }
     };
     window.addEventListener("chronos:sidebar-pref", handlePrefChange);
-    return () => window.removeEventListener("chronos:sidebar-pref", handlePrefChange);
+
+    // Listen to general account settings changes (display name, language, etc.)
+    const handleSettingsChange = (e: Event) => {
+      const customEvent = e as CustomEvent<{
+        displayName?: string;
+        timezone?: string;
+        dateFormat?: string;
+        timeFormat?: string;
+        language?: string;
+      }>;
+      const detail = customEvent.detail;
+      if (detail?.displayName) {
+        setCurrentUser((prev) => ({
+          ...prev,
+          fullName: detail.displayName!,
+        }));
+      }
+      if (detail?.language) {
+        document.documentElement.lang = detail.language;
+      }
+    };
+    window.addEventListener("chronos:settings-updated", handleSettingsChange);
+
+    return () => {
+      window.removeEventListener("chronos:sidebar-pref", handlePrefChange);
+      window.removeEventListener("chronos:settings-updated", handleSettingsChange);
+    };
   }, []);
 
   const handleToggleSidebar = React.useCallback(() => {
