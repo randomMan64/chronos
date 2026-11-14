@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root,
+html.dark {
+  --background: #111315;
+  --foreground: #e8eaed;
+  --sidebar: #151719;
+  --panel: #191c1f;
+  --elevated: #202428;
+  --border: #2b3035;
+  --input: #151719;
+  --ring: #5b8def;
+  --primary: #5b8def;
+  --primary-foreground: #ffffff;
+  --secondary: #202428;
+  --secondary-foreground: #e8eaed;
+  --muted: #191c1f;
+  --muted-foreground: #9299a2;
+  --accent: #5b8def;
+  --accent-foreground: #ffffff;
+  --destructive: #f87171;
+  --destructive-foreground: #ffffff;
+  --card: #191c1f;
+  --card-foreground: #e8eaed;
+  --popover: #151719;
+  --popover-foreground: #e8eaed;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --error: #f87171;
+  --info: #60a5fa;
+}
+
+html.light {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+  --sidebar: #f1f5f9;
+  --panel: #ffffff;
+  --elevated: #f1f5f9;
+  --border: #e2e8f0;
+  --input: #ffffff;
+  --ring: #2563eb;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  --secondary: #f1f5f9;
+  --secondary-foreground: #0f172a;
+  --muted: #f8fafc;
+  --muted-foreground: #64748b;
+  --accent: #2563eb;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --card: #ffffff;
+  --card-foreground: #0f172a;
+  --popover: #ffffff;
+  --popover-foreground: #0f172a;
+  --success: #16a34a;
+  --warning: #d97706;
+  --error: #ef4444;
+  --info: #2563eb;
+}
+
+/* Ensure Radix select & dropdown items have prominent hover/highlight across all themes */
+[data-radix-collection-item]:hover,
+[data-radix-collection-item][data-highlighted],
+[role="option"]:hover,
+[role="option"][data-highlighted],
+[role="menuitem"]:hover,
+[role="menuitem"][data-highlighted] {
+  background-color: var(--secondary) !important;
+  color: var(--foreground) !important;
+}
+
+/* Explicit class-based logo switching */
+html.dark .chronos-logo-dark {
+  display: block !important;
+}
+html.dark .chronos-logo-light {
+  display: none !important;
+}
+
+html.light .chronos-logo-dark {
+  display: none !important;
+}
+html.light .chronos-logo-light {
+  display: block !important;
+}
+
+/* Fallback before hydration */
+:root:not(.light) .chronos-logo-dark {
+  display: block !important;
+}
+:root:not(.light) .chronos-logo-light {
+  display: none !important;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-sidebar: var(--sidebar);
+  --color-panel: var(--panel);
+  --color-elevated: var(--elevated);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Inter", "Geist",
+    sans-serif;
+  --font-mono:
+    "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    monospace;
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  margin: 0;
+  padding: 0;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
+}
+
+code,
+pre,
+.font-mono {
+  font-family: var(--font-mono);
+}
