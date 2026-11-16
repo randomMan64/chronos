@@ -43,8 +43,8 @@ export async function GET() {
         and(
           eq(userSessions.userId, sessionUser.userId),
           isNull(userSessions.revokedAt),
-          gt(userSessions.expiresAt, new Date())
-        )
+          gt(userSessions.expiresAt, new Date()),
+        ),
       )
       .orderBy(desc(userSessions.lastActiveAt));
 
@@ -55,14 +55,20 @@ export async function GET() {
       country: s.country,
       region: s.region,
       city: s.city,
-      location: [s.city, s.country].filter(Boolean).join(", ") || (s.ipAddress === "127.0.0.1" || !s.ipAddress ? "Local Network" : "Unknown Location"),
+      location:
+        [s.city, s.country].filter(Boolean).join(", ") ||
+        (s.ipAddress === "127.0.0.1" || !s.ipAddress
+          ? "Local Network"
+          : "Unknown Location"),
       createdAt: s.createdAt,
       lastActiveAt: s.lastActiveAt || s.createdAt,
       expiresAt: s.expiresAt,
       isCurrent: s.id === sessionUser.sessionId,
       device: {
         id: s.deviceId,
-        name: s.deviceName || (s.userAgent ? s.userAgent.slice(0, 40) : "Current Workstation"),
+        name:
+          s.deviceName ||
+          (s.userAgent ? s.userAgent.slice(0, 40) : "Current Workstation"),
         type: s.deviceType || "desktop",
         manufacturer: s.manufacturer,
         model: s.model,
@@ -120,8 +126,8 @@ export async function GET() {
               "user:session_revoked",
               "user:password_change",
             ]),
-            lt(auditLogs.createdAt, thirtyDaysAgo)
-          )
+            lt(auditLogs.createdAt, thirtyDaysAgo),
+          ),
         );
     } catch (cleanupErr) {
       console.warn("Failed to prune expired login history:", cleanupErr);
@@ -149,8 +155,8 @@ export async function GET() {
             "user:session_revoked",
             "user:password_change",
           ]),
-          gte(auditLogs.createdAt, thirtyDaysAgo)
-        )
+          gte(auditLogs.createdAt, thirtyDaysAgo),
+        ),
       )
       .orderBy(desc(auditLogs.createdAt));
 
@@ -160,6 +166,9 @@ export async function GET() {
     });
   } catch (err) {
     console.error("Failed to load sessions:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 },
+    );
   }
 }

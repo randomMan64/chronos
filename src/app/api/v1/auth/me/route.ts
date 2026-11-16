@@ -1,13 +1,13 @@
 import { NextResponse } from "next/server";
-import { getAuthenticatedSession } from "@/lib/auth/session";
+import { getAuthenticatedSession, clearSessionCookieOnResponse } from "@/lib/auth/session";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
   const session = await getAuthenticatedSession();
   if (!session || !session.user) {
-    return NextResponse.json(
-      { error: "Unauthenticated" },
+    const response = NextResponse.json(
+      { error: "Session has expired or been revoked.", code: "SESSION_REVOKED" },
       {
         status: 401,
         headers: {
@@ -16,6 +16,8 @@ export async function GET() {
         },
       }
     );
+    clearSessionCookieOnResponse(response);
+    return response;
   }
 
   return NextResponse.json(session, {

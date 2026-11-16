@@ -98,6 +98,12 @@ function LoginForm() {
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <CardContent className="space-y-3">
+          {searchParams.get("revoked") === "true" && (
+            <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-600 dark:text-amber-400">
+              Your session was terminated or signed out from another device. Please sign in again.
+            </div>
+          )}
+
           {serverError && (
             <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
               {serverError}

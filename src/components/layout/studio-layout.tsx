@@ -114,16 +114,40 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isMobileMenuOpen]);
 
+  // Intercept 401 Unauthorized API responses across the studio app and immediately redirect to login
   React.useEffect(() => {
-    // Fetch active session info
-    async function loadSession() {
+    const originalFetch = window.fetch;
+    window.fetch = async (...args) => {
+      const response = await originalFetch(...args);
+      if (response.status === 401) {
+        const url = typeof args[0] === "string" ? args[0] : (args[0] as Request)?.url || "";
+        if (!url.includes("/api/v1/auth/login") && !url.includes("/api/v1/auth/register")) {
+          window.location.href = "/login?revoked=true";
+        }
+      }
+      return response;
+    };
+
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, []);
+
+  React.useEffect(() => {
+    let isCancelled = false;
+
+    // Check active session status and populate user info
+    async function checkSession(isInitial = false) {
       try {
-        const res = await fetch("/api/v1/auth/me");
+        const res = await fetch("/api/v1/auth/me", { cache: "no-store" });
         if (res.status === 401) {
-          router.push("/login");
+          window.location.href = "/login?revoked=true";
           return;
         }
-        if (res.ok) {
+
+        if (!isInitial) return;
+
+        if (res.ok && !isCancelled) {
           const data = await res.json();
           if (data.user) {
             setCurrentUser({
@@ -201,14 +225,41 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
                 }
               } catch {}
             }
-          } catch {}
+          } catch {
+            // Non-critical preferences load failure
+          }
         }
       } catch {
-        // Fallback to default state
+        // Network error; do not boot immediately
       }
     }
-    loadSession();
 
+    // Initial check on page load
+    checkSession(true);
+
+    // Heartbeat check every 5 seconds to instantly catch revoked sessions
+    const intervalId = setInterval(() => {
+      checkSession(false);
+    }, 5000);
+
+    // Also check on tab focus or visibility change
+    const onFocusOrVisible = () => {
+      if (document.visibilityState === "visible") {
+        checkSession(false);
+      }
+    };
+    window.addEventListener("focus", onFocusOrVisible);
+    document.addEventListener("visibilitychange", onFocusOrVisible);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(intervalId);
+      window.removeEventListener("focus", onFocusOrVisible);
+      document.removeEventListener("visibilitychange", onFocusOrVisible);
+    };
+  }, []);
+
+  React.useEffect(() => {
     // Listen to sidebar preference changes from appearance settings
     const handlePrefChange = (e: Event) => {
       const customEvent = e as CustomEvent<string>;

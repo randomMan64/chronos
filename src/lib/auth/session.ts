@@ -125,6 +125,27 @@ export async function getCurrentUser(): Promise<SessionPayload | null> {
     } catch {
       // In isolated environments without database connection, fall back to verified JWT payload
     }
+  } else {
+    // If token lacks explicit sessionId, verify the user still has non-revoked active sessions
+    try {
+      const activeUserSessions = await db
+        .select({ id: userSessions.id })
+        .from(userSessions)
+        .where(
+          and(
+            eq(userSessions.userId, payload.userId),
+            isNull(userSessions.revokedAt),
+            gt(userSessions.expiresAt, new Date())
+          )
+        )
+        .limit(1);
+
+      if (activeUserSessions.length === 0) {
+        return null;
+      }
+    } catch {
+      // fallback
+    }
   }
 
   return payload;
