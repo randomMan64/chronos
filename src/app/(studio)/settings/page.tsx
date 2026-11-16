@@ -795,9 +795,9 @@ export default function SettingsPage() {
                                     }
                                     setShowTransferModal(true);
                                   }}
-                                  className="h-7 px-2.5 text-xs font-medium gap-1.5 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30 hover:border-amber-500/50 rounded-md transition-all shadow-2xs cursor-pointer font-sans"
+                                  className="h-7 px-2.5 text-xs font-medium gap-1.5 text-amber-800 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30 hover:border-amber-500/50 rounded-md transition-all shadow-2xs cursor-pointer font-sans"
                                 >
-                                  <ArrowRightLeft className="h-3.5 w-3.5 dark:text-amber-400" />
+                                  <ArrowRightLeft className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" />
                                   <span>Transfer Ownership</span>
                                 </Button>
                               ) : !isSelf && canManageMembers && !isOwner ? (
@@ -1403,7 +1403,7 @@ export default function SettingsPage() {
         <DialogContent className="sm:max-w-md border-border/80 shadow-lg">
           <DialogHeader className="space-y-1.5 pb-2">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 dark:text-amber-400">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400">
                 <Crown className="h-4 w-4" />
               </div>
               <DialogTitle className="text-base font-semibold text-foreground">

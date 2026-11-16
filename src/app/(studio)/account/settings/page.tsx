@@ -507,14 +507,14 @@ export default function AccountSettingsPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           {eligibility && !eligibility.canDelete && (
-            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200 space-y-1">
-              <div className="flex items-center gap-1.5 font-semibold text-amber-400">
-                <AlertTriangle className="h-3.5 w-3.5" />
+            <div className="rounded-md border border-amber-500/40 bg-amber-500/10 dark:border-amber-500/30 dark:bg-amber-500/10 p-3 text-xs space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold text-amber-800 dark:text-amber-400">
+                <AlertTriangle className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
                 <span>Account Deletion Blocked</span>
               </div>
-              <p className="text-[11px] leading-relaxed">
+              <p className="text-[11px] leading-relaxed text-amber-900/90 dark:text-amber-200/90">
                 You are the sole Owner of the following organization(s):{" "}
-                <strong className="text-foreground font-semibold">
+                <strong className="text-amber-950 dark:text-foreground font-semibold">
                   {eligibility.blockingOrganizations.map((o) => o.name).join(", ")}
                 </strong>.
                 You must transfer ownership to another member or delete the organization before deleting your account.

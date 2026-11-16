@@ -50,7 +50,8 @@ interface LoginEvent {
   action: string;
   ipAddress?: string | null;
   userAgent?: string | null;
-  timestamp: string;
+  timestamp?: string | Date | null;
+  createdAt?: string | Date | null;
   details?: unknown;
 }
 
@@ -386,13 +387,13 @@ export default function AccountSecurityPage() {
                       data.loginHistory.map((log) => (
                         <tr key={log.id} className="hover:bg-elevated/20 transition-colors">
                           <td className="px-3.5 py-2.5 font-medium text-foreground">
-                            {log.action.replace("user.", "").replace(".", " ")}
+                            {log.action.replace("user:", "").replace("user.", "").replace(/[:._]/g, " ")}
                           </td>
                           <td className="px-3.5 py-2.5 font-mono text-muted-foreground text-[11px]">
                             {log.ipAddress || "127.0.0.1"}
                           </td>
                           <td className="px-3.5 py-2.5 font-mono text-muted-foreground text-[11px]">
-                            {formatDate(log.timestamp)}
+                            {formatDate(log.timestamp || log.createdAt)}
                           </td>
                           <td className="px-3.5 py-2.5">
                             <Badge variant="outline" className="text-[10px] text-emerald-500 font-mono">

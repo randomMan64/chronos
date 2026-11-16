@@ -50,6 +50,7 @@ export async function GET() {
         action: auditLogs.action,
         outcome: auditLogs.outcome,
         ipAddress: auditLogs.ipAddress,
+        timestamp: auditLogs.createdAt,
         createdAt: auditLogs.createdAt,
       })
       .from(auditLogs)
