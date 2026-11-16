@@ -3,6 +3,7 @@ import { invitations, organizationMembers, organizations, users, workspaces, wor
 import { eq, and } from "drizzle-orm";
 import { OrganizationRole } from "@/lib/permissions/types";
 import { AuditService } from "@/modules/audit/audit-service";
+import { EmailService } from "@/lib/email";
 import crypto from "crypto";
 
 export class InvitationService {
@@ -12,6 +13,23 @@ export class InvitationService {
     role: OrganizationRole;
     invitedBy: string;
   }) {
+    // 1. Prevent duplicate active invitations
+    const existing = await db
+      .select()
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.organizationId, params.organizationId),
+          eq(invitations.email, params.email.toLowerCase()),
+          eq(invitations.status, "pending")
+        )
+      )
+      .limit(1);
+
+    if (existing.length > 0 && new Date(existing[0].expiresAt) > new Date()) {
+      throw new Error("An active pending invitation already exists for this email address.");
+    }
+
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
@@ -36,6 +54,32 @@ export class InvitationService {
       resourceId: invite.id,
       metadata: { email: params.email, role: params.role },
     });
+
+    // 2. Fetch context details for the email dispatch
+    const [org] = await db
+      .select({ name: organizations.name })
+      .from(organizations)
+      .where(eq(organizations.id, params.organizationId))
+      .limit(1);
+
+    const [inviter] = await db
+      .select({ fullName: users.fullName })
+      .from(users)
+      .where(eq(users.id, params.invitedBy))
+      .limit(1);
+
+    // 3. Dispatch transactional invitation email (awaited for delivery)
+    const emailResult = await EmailService.sendOrganizationInvitation(params.email.toLowerCase(), {
+      organizationName: org?.name || "CHRONOS Organization",
+      inviterName: inviter?.fullName || "Your Team",
+      role: params.role,
+      invitationToken: token,
+      expiresInDays: 7,
+    });
+
+    if (!emailResult.success) {
+      console.warn("[InvitationService] Warning: Failed to deliver invitation email:", emailResult.error);
+    }
 
     return invite;
   }

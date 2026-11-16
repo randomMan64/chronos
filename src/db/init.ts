@@ -182,7 +182,19 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   CONSTRAINT user_preferences_user_unique UNIQUE (user_id)
 );
 
--- 14. Temporal Tables Metadata
+-- 14. Password Reset Tokens
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash VARCHAR(255) NOT NULL UNIQUE,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS password_reset_tokens_user_id_idx ON password_reset_tokens(user_id);
+CREATE INDEX IF NOT EXISTS password_reset_tokens_token_hash_idx ON password_reset_tokens(token_hash);
+
+-- 15. Temporal Tables Metadata
 CREATE TABLE IF NOT EXISTS temporal_tables (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   database_id UUID NOT NULL REFERENCES databases(id) ON DELETE CASCADE,

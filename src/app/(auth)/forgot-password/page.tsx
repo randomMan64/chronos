@@ -35,6 +35,8 @@ export default function ForgotPasswordPage() {
   );
   const [isLoading, setIsLoading] = React.useState(false);
 
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -48,11 +50,28 @@ export default function ForgotPasswordPage() {
 
   const onSubmit = async (values: ForgotPasswordFormValues) => {
     setIsLoading(true);
-    // Simulate safe password recovery flow (never leaks email existence)
-    setTimeout(() => {
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch("/api/v1/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: values.email }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to send reset email.");
+      }
+
       setSubmittedEmail(values.email);
+    } catch (err: unknown) {
+      setErrorMessage(
+        err instanceof Error ? err.message : "An unexpected error occurred. Please try again."
+      );
+    } finally {
       setIsLoading(false);
-    }, 600);
+    }
   };
 
   return (
@@ -101,6 +120,11 @@ export default function ForgotPasswordPage() {
                 noValidate
                 className="space-y-3"
               >
+                {errorMessage && (
+                  <div className="p-2.5 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs">
+                    {errorMessage}
+                  </div>
+                )}
                 <Field error={errors.email?.message}>
                   <FieldLabel htmlFor="email" className="text-xs font-medium">
                     Account Email

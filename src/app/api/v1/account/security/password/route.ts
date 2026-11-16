@@ -5,7 +5,9 @@ import { users, auditLogs, organizationMembers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
+import { EmailService } from "@/lib/email";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const changePasswordSchema = z.object({
@@ -37,6 +39,7 @@ export async function POST(req: Request) {
       .select({
         id: users.id,
         email: users.email,
+        fullName: users.fullName,
         passwordHash: users.passwordHash,
       })
       .from(users)
@@ -89,6 +92,16 @@ export async function POST(req: Request) {
           type: "password_rotation",
         },
       });
+    }
+
+    // Security dispatch: notify user by email
+    try {
+      await EmailService.sendPasswordChangedNotification(user.email, {
+        recipientName: user.fullName || "User",
+        ipAddress: req.headers.get("x-forwarded-for") || undefined,
+      });
+    } catch (emailErr) {
+      console.error("[SecurityPassword] Failed to send password changed notification email:", emailErr);
     }
 
     return NextResponse.json({

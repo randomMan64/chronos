@@ -4,6 +4,7 @@ import { InvitationService } from "@/modules/organizations/invitation-service";
 import { inviteMemberSchema } from "@/lib/validation";
 import { handleApiError } from "@/lib/errors";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(

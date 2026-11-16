@@ -6,9 +6,11 @@ import { registerSchema } from "@/lib/validation";
 import { createSessionToken, setSessionCookie } from "@/lib/auth/session";
 import { AuditService } from "@/modules/audit/audit-service";
 import { handleApiError } from "@/lib/errors";
+import { EmailService } from "@/lib/email";
 import { eq } from "drizzle-orm";
 import crypto from "crypto";
 
+export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
@@ -115,6 +117,15 @@ export async function POST(req: Request) {
       outcome: "success",
       metadata: { organizationName: newOrg.name, workspaceName: newWs.name },
     });
+
+    // 8. Dispatch Welcome Email (awaited for reliability)
+    try {
+      await EmailService.sendWelcomeEmail(newUser.email, {
+        recipientName: newUser.fullName,
+      });
+    } catch (emailErr) {
+      console.error("[Register] Failed to send welcome email:", emailErr);
+    }
 
     return NextResponse.json({
       success: true,
