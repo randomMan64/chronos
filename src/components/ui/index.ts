@@ -15,3 +15,4 @@ export * from "./date-picker";
 export * from "./field";
 export * from "./switch";
 export * from "./skeleton";
+export * from "./image-picker";

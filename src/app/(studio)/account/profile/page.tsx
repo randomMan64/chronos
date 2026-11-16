@@ -1,23 +1,53 @@
 "use client";
 
 import * as React from "react";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { AccountNav } from "@/components/account/account-nav";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { Field, FieldLabel, FieldError } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { DismissibleAlert } from "@/components/shared/dismissible-alert";
-import { formatDate } from "@/lib/utils";
-import { Building2, Calendar, CheckCircle2, Shield, User, Info } from "lucide-react";
+import { ImagePicker } from "@/components/ui/image-picker";
+import { formatDate, getInitials } from "@/lib/utils";
+import { useTranslation } from "@/lib/i18n";
+import {
+  Building2,
+  Calendar,
+  CheckCircle2,
+  Shield,
+  User,
+  Info,
+} from "lucide-react";
 
 const profileSchema = z.object({
-  fullName: z.string().trim().min(2, "Full name must be at least 2 characters").max(100, "Full name cannot exceed 100 characters"),
-  avatarUrl: z.string().trim().url("Please enter a valid URL").or(z.literal("")).optional(),
+  fullName: z
+    .string()
+    .trim()
+    .min(2, "Full name must be at least 2 characters")
+    .max(100, "Full name cannot exceed 100 characters"),
+  avatarUrl: z
+    .string()
+    .trim()
+    .refine(
+      (val) =>
+        !val ||
+        val.startsWith("http://") ||
+        val.startsWith("https://") ||
+        val.startsWith("data:image/"),
+      { message: "Please enter a valid image URL or upload an image file" },
+    )
+    .or(z.literal(""))
+    .optional(),
 });
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
@@ -94,14 +124,19 @@ function ProfileSkeleton() {
 }
 
 export default function AccountProfilePage() {
+  const { t } = useTranslation();
   const [data, setData] = React.useState<ProfileData | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
-  const [alert, setAlert] = React.useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+  const [saveStatus, setSaveStatus] = React.useState<
+    "idle" | "success" | "error"
+  >("idle");
+  const [saveMessage, setSaveMessage] = React.useState("");
 
   const {
     register,
     handleSubmit,
+    control,
     reset,
     formState: { errors },
   } = useForm<ProfileFormValues>({
@@ -136,7 +171,7 @@ export default function AccountProfilePage() {
   const onSubmit = async (values: ProfileFormValues) => {
     try {
       setIsSaving(true);
-      setAlert(null);
+      setSaveStatus("idle");
       const res = await fetch("/api/v1/account/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -155,12 +190,27 @@ export default function AccountProfilePage() {
                 avatarUrl: result.user.avatarUrl,
               },
             }
-          : null
+          : null,
       );
-      setAlert({ type: "success", text: "Profile information updated successfully." });
+
+      // Sync display name globally across layout
+      window.dispatchEvent(
+        new CustomEvent("chronos:settings-updated", {
+          detail: { displayName: result.user.fullName },
+        }),
+      );
+
+      setSaveStatus("success");
+      setSaveMessage("Profile information updated successfully.");
+      setTimeout(() => {
+        setSaveStatus("idle");
+        setSaveMessage("");
+      }, 3500);
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to update profile";
-      setAlert({ type: "error", text: errorMsg });
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to update profile";
+      setSaveStatus("error");
+      setSaveMessage(errorMsg);
     } finally {
       setIsSaving(false);
     }
@@ -170,21 +220,15 @@ export default function AccountProfilePage() {
     <div className="space-y-5 w-full pb-10">
       {/* Header */}
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Account</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          {t("account.account")}
+        </h1>
         <p className="text-xs text-muted-foreground">
-          Manage your personal profile, credentials, and individual system preferences
+          {t("account.accountDesc")}
         </p>
       </div>
 
       <AccountNav />
-
-      {alert && (
-        <DismissibleAlert
-          message={alert}
-          onDismiss={() => setAlert(null)}
-          autoDismissMs={5000}
-        />
-      )}
 
       {isLoading ? (
         <ProfileSkeleton />
@@ -203,7 +247,7 @@ export default function AccountProfilePage() {
             </CardHeader>
             <CardContent>
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pb-6 border-b border-border">
-                <div className="h-16 w-16 rounded-full bg-elevated border border-border flex items-center justify-center text-xl font-bold font-mono text-foreground shrink-0 shadow-inner">
+                <div className="h-16 w-16 rounded-full bg-elevated border-2 border-primary/30 flex items-center justify-center text-xl font-bold font-mono text-foreground shrink-0 shadow-inner overflow-hidden">
                   {data.user.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -212,21 +256,23 @@ export default function AccountProfilePage() {
                       className="h-full w-full rounded-full object-cover"
                     />
                   ) : (
-                    data.user.fullName ? data.user.fullName[0].toUpperCase() : "U"
+                    getInitials(data.user.fullName)
                   )}
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h2 className="text-base font-semibold text-foreground">{data.user.fullName}</h2>
-                    <Badge variant="outline" className="text-[10px] bg-panel/60 font-mono">
+                    <h2 className="text-base font-semibold text-foreground">
+                      {data.user.fullName}
+                    </h2>
+                    <Badge
+                      variant="outline"
+                      className="text-[10px] bg-panel/60 font-mono"
+                    >
                       Personal Account
                     </Badge>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
                     <span>{data.user.email}</span>
-                    <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500 font-sans">
-                      <CheckCircle2 className="h-3 w-3" /> Verified
-                    </span>
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
                     <Calendar className="h-3 w-3" />
@@ -239,47 +285,82 @@ export default function AccountProfilePage() {
               <form
                 noValidate
                 onSubmit={handleSubmit(onSubmit)}
-                className="mt-6 space-y-4 max-w-lg"
+                className="mt-6 w-full"
               >
-                <Field error={errors.fullName?.message}>
-                  <FieldLabel htmlFor="fullName" className="text-xs font-medium">
-                    Full Name
-                  </FieldLabel>
-                  <Input
-                    id="fullName"
-                    type="text"
-                    placeholder="Your legal or preferred name"
-                    className="h-8 text-xs bg-elevated/40"
-                    {...register("fullName")}
-                  />
-                  <FieldError />
-                </Field>
+                <div className="space-y-4 max-w-xl">
+                  <Field error={errors.fullName?.message}>
+                    <FieldLabel
+                      htmlFor="fullName"
+                      className="text-xs font-medium"
+                    >
+                      Full Name
+                    </FieldLabel>
+                    <Input
+                      id="fullName"
+                      type="text"
+                      placeholder="Your legal or preferred name"
+                      className="h-8 text-xs bg-elevated/40"
+                      {...register("fullName")}
+                    />
+                    <FieldError />
+                  </Field>
 
-                <Field error={errors.avatarUrl?.message}>
-                  <FieldLabel htmlFor="avatarUrl" className="text-xs font-medium">
-                    Avatar Image URL
-                  </FieldLabel>
-                  <Input
-                    id="avatarUrl"
-                    type="url"
-                    placeholder="https://example.com/avatar.png"
-                    className="h-8 text-xs font-mono bg-elevated/40"
-                    {...register("avatarUrl")}
-                  />
-                  <FieldError />
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Provide a public image link or leave blank to use your name initials.
-                  </p>
-                </Field>
+                  <Field error={errors.avatarUrl?.message}>
+                    <FieldLabel className="text-xs font-medium">
+                      Avatar Image
+                    </FieldLabel>
+                    <Controller
+                      name="avatarUrl"
+                      control={control}
+                      render={({ field }) => (
+                        <ImagePicker
+                          value={field.value}
+                          onChange={(val) => {
+                            field.onChange(val);
+                            setData((prev) =>
+                              prev
+                                ? {
+                                    ...prev,
+                                    user: {
+                                      ...prev.user,
+                                      avatarUrl: val,
+                                    },
+                                  }
+                                : null,
+                            );
+                          }}
+                          disabled={isSaving}
+                        />
+                      )}
+                    />
+                    <FieldError />
+                  </Field>
+                </div>
 
-                <div className="pt-2">
+                {/* Form Actions aligned all the way to the right */}
+                <div className="w-full flex flex-wrap items-center justify-end gap-3 pt-4 border-t border-border/40 mt-6">
+                  {saveStatus === "success" && (
+                    <span className="text-xs dark:text-emerald-400 flex items-center gap-1.5 font-medium animate-in fade-in duration-200">
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      {saveMessage}
+                    </span>
+                  )}
+                  {saveStatus === "error" && (
+                    <span className="text-xs text-destructive flex items-center gap-1.5 font-medium animate-in fade-in duration-200">
+                      {saveMessage}
+                    </span>
+                  )}
                   <Button
                     type="submit"
                     size="sm"
                     disabled={isSaving}
-                    className="text-xs h-8 px-4"
+                    className="text-xs h-8 px-4 cursor-pointer"
                   >
-                    {isSaving ? "Saving..." : "Save Profile"}
+                    {isSaving
+                      ? "Saving..."
+                      : saveStatus === "success"
+                        ? "Saved!"
+                        : "Save Profile"}
                   </Button>
                 </div>
               </form>
@@ -309,10 +390,17 @@ export default function AccountProfilePage() {
                   </thead>
                   <tbody className="divide-y divide-border">
                     {data.organizations.map((org) => (
-                      <tr key={org.id} className="hover:bg-elevated/20 transition-colors">
+                      <tr
+                        key={org.id}
+                        className="hover:bg-elevated/20 transition-colors"
+                      >
                         <td className="px-3.5 py-2.5">
-                          <div className="font-medium text-foreground">{org.name}</div>
-                          <div className="text-[10px] text-muted-foreground font-mono">{org.slug}</div>
+                          <div className="font-medium text-foreground">
+                            {org.name}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground font-mono">
+                            {org.slug}
+                          </div>
                         </td>
                         <td className="px-3.5 py-2.5">
                           <Badge
@@ -320,12 +408,14 @@ export default function AccountProfilePage() {
                               org.role === "owner"
                                 ? "default"
                                 : org.role === "admin"
-                                ? "info"
-                                : "outline"
+                                  ? "info"
+                                  : "outline"
                             }
                             className="capitalize text-[10px] font-mono"
                           >
-                            {org.role === "owner" && <Shield className="h-3 w-3 mr-1 inline" />}
+                            {org.role === "owner" && (
+                              <Shield className="h-3 w-3 mr-1 inline" />
+                            )}
                             {org.role}
                           </Badge>
                         </td>
@@ -341,7 +431,9 @@ export default function AccountProfilePage() {
               <div className="flex items-start gap-2 p-2.5 rounded-lg border border-border/60 bg-elevated/20 text-muted-foreground text-[11px]">
                 <Info className="h-4 w-4 shrink-0 mt-0.5 text-info" />
                 <div>
-                  Organization roles and permissions are governed within each organization. To modify member roles or transfer ownership, navigate to Organization Settings & IAM.
+                  Organization roles and permissions are governed within each
+                  organization. To modify member roles or transfer ownership,
+                  navigate to Organization Settings & IAM.
                 </div>
               </div>
             </CardContent>

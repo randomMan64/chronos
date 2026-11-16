@@ -5,6 +5,16 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function getInitials(name?: string | null): string {
+  if (!name || !name.trim()) return "U";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "U";
+  if (parts.length === 1) {
+    return parts[0].slice(0, 1).toUpperCase();
+  }
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
 export interface FormatDateOptions {
   timezone?: string;
   dateFormat?: string;
@@ -64,9 +74,10 @@ export function formatDate(
   const timezone = options?.timezone || userPrefs.timezone || "UTC";
   const dateFormat = options?.dateFormat || userPrefs.dateFormat || "YYYY-MM-DD";
   const timeFormat = options?.timeFormat || userPrefs.timeFormat || "24h";
+  const locale = options?.locale || userPrefs.locale || "en-US";
 
   try {
-    const formatter = new Intl.DateTimeFormat("en-US", {
+    const formatter = new Intl.DateTimeFormat(locale, {
       timeZone: timezone,
       year: "numeric",
       month: "2-digit",

@@ -78,7 +78,9 @@ function LoginForm() {
 
       router.push(destination);
     } catch (err: unknown) {
-      setServerError(err instanceof Error ? err.message : "Authentication failed");
+      setServerError(
+        err instanceof Error ? err.message : "Authentication failed",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -87,7 +89,9 @@ function LoginForm() {
   return (
     <Card className="border-border">
       <CardHeader className="space-y-1 pb-4">
-        <CardTitle className="text-base font-semibold">Sign in to Studio</CardTitle>
+        <CardTitle className="text-base font-semibold">
+          Sign in to Studio
+        </CardTitle>
         <CardDescription className="text-xs">
           Enter credentials to access your Postgres workspaces
         </CardDescription>
@@ -151,10 +155,6 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center bg-background p-4 text-foreground">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
       <div className="w-full max-w-sm space-y-4">
         <div className="flex flex-col items-center text-center space-y-1">
           <BrandLogo
@@ -163,13 +163,18 @@ export default function LoginPage() {
             className="h-24 w-24 drop-shadow-md"
             priority
           />
-          <h1 className="text-xl font-bold tracking-tight">CHRONOS</h1>
           <p className="text-xs text-muted-foreground font-mono">
             Time-Travel PostgreSQL Engine
           </p>
         </div>
 
-        <React.Suspense fallback={<div className="p-8 text-center text-xs text-muted-foreground">Loading login form...</div>}>
+        <React.Suspense
+          fallback={
+            <div className="p-8 text-center text-xs text-muted-foreground">
+              Loading login form...
+            </div>
+          }
+        >
           <LoginForm />
         </React.Suspense>
       </div>

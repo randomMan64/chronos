@@ -30,7 +30,9 @@ const forgotPasswordSchema = z.object({
 type ForgotPasswordFormValues = z.infer<typeof forgotPasswordSchema>;
 
 export default function ForgotPasswordPage() {
-  const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(null);
+  const [submittedEmail, setSubmittedEmail] = React.useState<string | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = React.useState(false);
 
   const {
@@ -55,35 +57,50 @@ export default function ForgotPasswordPage() {
 
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center bg-background p-4 text-foreground">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
       <div className="w-full max-w-sm space-y-4">
         <div className="flex flex-col items-center text-center space-y-1">
-          <BrandLogo width={48} height={48} className="h-12 w-12 drop-shadow-xs" priority />
-          <h1 className="text-xl font-bold tracking-tight">CHRONOS</h1>
-          <p className="text-xs text-muted-foreground font-mono">Password Recovery</p>
+          <BrandLogo
+            width={48}
+            height={48}
+            className="h-12 w-12 drop-shadow-xs"
+            priority
+          />
+          <p className="text-xs text-muted-foreground font-mono">
+            Password Recovery
+          </p>
         </div>
 
         <Card className="border-border">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-base font-semibold">Reset Password</CardTitle>
+            <CardTitle className="text-base font-semibold">
+              Reset Password
+            </CardTitle>
             <CardDescription className="text-xs">
-              Enter your verified email address to receive password reset instructions
+              Enter your verified email address to receive password reset
+              instructions
             </CardDescription>
           </CardHeader>
           <CardContent>
             {submittedEmail ? (
               <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2">
                 <CheckCircle2 className="h-6 w-6 text-emerald-500 mx-auto" />
-                <div className="text-xs font-medium text-foreground">Recovery email dispatched</div>
+                <div className="text-xs font-medium text-foreground">
+                  Recovery email dispatched
+                </div>
                 <p className="text-[11px] text-muted-foreground">
-                  If an account exists for <span className="font-mono text-foreground">{submittedEmail}</span>, instructions have been sent.
+                  If an account exists for{" "}
+                  <span className="font-mono text-foreground">
+                    {submittedEmail}
+                  </span>
+                  , instructions have been sent.
                 </p>
               </div>
             ) : (
-              <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
+              <form
+                onSubmit={handleSubmit(onSubmit)}
+                noValidate
+                className="space-y-3"
+              >
                 <Field error={errors.email?.message}>
                   <FieldLabel htmlFor="email" className="text-xs font-medium">
                     Account Email
@@ -98,7 +115,12 @@ export default function ForgotPasswordPage() {
                   <FieldError />
                 </Field>
 
-                <Button type="submit" size="sm" className="w-full h-9 text-xs" disabled={isLoading}>
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="w-full h-9 text-xs"
+                  disabled={isLoading}
+                >
                   {isLoading ? "Verifying..." : "Send Reset Instructions"}
                 </Button>
               </form>
@@ -107,7 +129,7 @@ export default function ForgotPasswordPage() {
           <CardFooter className="pt-0">
             <Link
               href="/login"
-              className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors mx-auto"
+              className="inline-flex items-center text-xs text-muted-foreground hover:text-foreground transition-colors mx-auto mt-2"
             >
               <ArrowLeft className="h-3.5 w-3.5 mr-1" /> Back to sign in
             </Link>

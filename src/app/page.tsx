@@ -36,7 +36,6 @@ export default function LandingPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <ThemeToggle />
           <Link
             href="/login"
             className="text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 transition-colors"
@@ -68,14 +67,17 @@ export default function LandingPage() {
           />
           <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-foreground max-w-3xl leading-tight">
             Database Management with <br />
-            <span className="text-primary font-mono">Row-Level Time Travel</span>
+            <span className="text-primary font-mono">
+              Row-Level Time Travel
+            </span>
           </h1>
         </div>
 
         <p className="mt-2 text-sm md:text-base text-muted-foreground max-w-2xl leading-relaxed">
-          CHRONOS gives engineering and operations teams deep visibility into PostgreSQL databases:
-          granular RBAC, schema exploration, Monaco SQL gateway, transaction tracing, and
-          deterministic historical state comparison.
+          CHRONOS gives engineering and operations teams deep visibility into
+          PostgreSQL databases: granular RBAC, schema exploration, Monaco SQL
+          gateway, transaction tracing, and deterministic historical state
+          comparison.
         </p>
 
         <div className="mt-8 flex items-center gap-3">
@@ -100,10 +102,13 @@ export default function LandingPage() {
               <div className="h-7 w-7 rounded bg-elevated border border-border flex items-center justify-center text-primary mb-3">
                 <Clock className="h-4 w-4" />
               </div>
-              <h3 className="text-xs font-semibold text-foreground">Temporal Row History</h3>
+              <h3 className="text-xs font-semibold text-foreground">
+                Temporal Row History
+              </h3>
               <p className="mt-1 text-[11px] text-muted-foreground leading-normal">
-                Inspect historical row versions, diff previous values, and execute compensating
-                record restoration without erasing audit logs.
+                Inspect historical row versions, diff previous values, and
+                execute compensating record restoration without erasing audit
+                logs.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-border text-[10px] font-mono text-muted-foreground">
@@ -116,10 +121,13 @@ export default function LandingPage() {
               <div className="h-7 w-7 rounded bg-elevated border border-border flex items-center justify-center text-[#34D399] mb-3">
                 <Terminal className="h-4 w-4" />
               </div>
-              <h3 className="text-xs font-semibold text-foreground">Restricted SQL Gateway</h3>
+              <h3 className="text-xs font-semibold text-foreground">
+                Restricted SQL Gateway
+              </h3>
               <p className="mt-1 text-[11px] text-muted-foreground leading-normal">
-                Execute queries in Monaco Editor with automatic statement timeouts, read-only
-                enforcement for analysts, and live EXPLAIN analysis.
+                Execute queries in Monaco Editor with automatic statement
+                timeouts, read-only enforcement for analysts, and live EXPLAIN
+                analysis.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-border text-[10px] font-mono text-muted-foreground">
@@ -132,10 +140,13 @@ export default function LandingPage() {
               <div className="h-7 w-7 rounded bg-elevated border border-border flex items-center justify-center text-warning mb-3">
                 <Shield className="h-4 w-4" />
               </div>
-              <h3 className="text-xs font-semibold text-foreground">Six-Tier IAM & Auditing</h3>
+              <h3 className="text-xs font-semibold text-foreground">
+                Six-Tier IAM & Auditing
+              </h3>
               <p className="mt-1 text-[11px] text-muted-foreground leading-normal">
-                Multi-tenant organization isolation, workspace environments (dev/stage/prod),
-                append-only audit logs, and granular database grants.
+                Multi-tenant organization isolation, workspace environments
+                (dev/stage/prod), append-only audit logs, and granular database
+                grants.
               </p>
             </div>
             <div className="mt-4 pt-3 border-t border-border text-[10px] font-mono text-muted-foreground">
@@ -150,13 +161,16 @@ export default function LandingPage() {
             <Database className="h-3 w-3 text-primary" /> Neon PostgreSQL
           </span>
           <span className="flex items-center gap-1.5">
-            <Lock className="h-3 w-3 text-[#34D399]" /> AES-256 Encrypted Credentials
+            <Lock className="h-3 w-3 text-[#34D399]" /> AES-256 Encrypted
+            Credentials
           </span>
           <span className="flex items-center gap-1.5">
-            <Activity className="h-3 w-3 text-warning" /> Live Transaction Tracing
+            <Activity className="h-3 w-3 text-warning" /> Live Transaction
+            Tracing
           </span>
           <span className="flex items-center gap-1.5">
-            <GitBranch className="h-3 w-3 text-[#60A5FA]" /> Drizzle ORM Type-Safety
+            <GitBranch className="h-3 w-3 text-[#60A5FA]" /> Drizzle ORM
+            Type-Safety
           </span>
         </div>
       </main>

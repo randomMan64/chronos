@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
+import { getInitials } from "@/lib/utils";
 
 interface StudioLayoutProps {
   children: React.ReactNode;
@@ -22,6 +24,7 @@ interface StudioLayoutProps {
 export function StudioLayout({ children }: StudioLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
+  const { t } = useTranslation();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState<boolean>(() => {
@@ -36,9 +39,11 @@ export function StudioLayout({ children }: StudioLayoutProps) {
   const [currentUser, setCurrentUser] = React.useState<{
     email: string;
     fullName: string;
+    avatarUrl?: string | null;
   }>({
     email: "admin@chronos.internal",
     fullName: "System Administrator",
+    avatarUrl: null,
   });
 
   const [currentOrg, setCurrentOrg] = React.useState({
@@ -90,6 +95,7 @@ export function StudioLayout({ children }: StudioLayoutProps) {
             setCurrentUser({
               email: data.user.email,
               fullName: data.user.fullName,
+              avatarUrl: data.user.avatarUrl || null,
             });
           }
           if (data.organizations?.[0]) {
@@ -155,7 +161,7 @@ export function StudioLayout({ children }: StudioLayoutProps) {
     };
     window.addEventListener("chronos:sidebar-pref", handlePrefChange);
 
-    // Listen to general account settings changes (display name, language, etc.)
+    // Listen to general account settings changes (display name, language, avatar, etc.)
     const handleSettingsChange = (e: Event) => {
       const customEvent = e as CustomEvent<{
         displayName?: string;
@@ -163,12 +169,19 @@ export function StudioLayout({ children }: StudioLayoutProps) {
         dateFormat?: string;
         timeFormat?: string;
         language?: string;
+        avatarUrl?: string | null;
       }>;
       const detail = customEvent.detail;
       if (detail?.displayName) {
         setCurrentUser((prev) => ({
           ...prev,
           fullName: detail.displayName!,
+        }));
+      }
+      if (detail?.avatarUrl !== undefined) {
+        setCurrentUser((prev) => ({
+          ...prev,
+          avatarUrl: detail.avatarUrl,
         }));
       }
       if (detail?.language) {
@@ -259,19 +272,26 @@ export function StudioLayout({ children }: StudioLayoutProps) {
                 <LogOut className="h-4 w-4" />
               </div>
               <DialogTitle className="text-base font-semibold text-foreground -mt-1">
-                Sign Out
+                {t("account.signOut")}
               </DialogTitle>
             </div>
             <DialogDescription className="text-xs text-muted-foreground pt-1 leading-normal">
-              Are you sure you want to end your current session?
+              {t("account.signOutConfirm")}
             </DialogDescription>
           </DialogHeader>
 
           <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-sidebar/50 my-1">
-            <div className="h-9 w-9 rounded-full bg-elevated border border-border flex items-center justify-center font-mono text-xs font-semibold text-foreground shrink-0">
-              {currentUser.fullName
-                ? currentUser.fullName[0].toUpperCase()
-                : "U"}
+            <div className="h-9 w-9 rounded-full bg-elevated border border-border flex items-center justify-center font-mono text-xs font-semibold text-foreground shrink-0 overflow-hidden">
+              {currentUser.avatarUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={currentUser.avatarUrl}
+                  alt={currentUser.fullName}
+                  className="h-full w-full object-cover rounded-full"
+                />
+              ) : (
+                getInitials(currentUser.fullName)
+              )}
             </div>
             <div className="flex flex-col min-w-0">
               <span className="text-xs font-semibold text-foreground truncate">
@@ -292,7 +312,7 @@ export function StudioLayout({ children }: StudioLayoutProps) {
               disabled={isLoggingOut}
               className="h-8 text-xs cursor-pointer"
             >
-              Cancel
+              {t("account.cancel")}
             </Button>
             <Button
               type="button"
@@ -302,63 +322,7 @@ export function StudioLayout({ children }: StudioLayoutProps) {
               isLoading={isLoggingOut}
               className="h-8 text-xs gap-1.5 cursor-pointer"
             >
-              <LogOut className="h-3.5 w-3.5" /> Sign Out
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Logout Confirmation Dialog */}
-      <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader className="space-y-1.5 pb-1">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-                <LogOut className="h-4 w-4" />
-              </div>
-              <DialogTitle className="text-base font-semibold text-foreground">
-                Confirm Sign Out
-              </DialogTitle>
-            </div>
-            <DialogDescription className="text-xs text-muted-foreground pt-1 leading-normal">
-              Are you sure you want to end your current session and sign out of CHRONOS?
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-sidebar/50 my-1">
-            <div className="h-9 w-9 rounded-full bg-elevated border border-border flex items-center justify-center font-mono text-xs font-semibold text-foreground shrink-0">
-              {currentUser.fullName ? currentUser.fullName[0].toUpperCase() : "U"}
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-semibold text-foreground truncate">
-                {currentUser.fullName}
-              </span>
-              <span className="text-[11px] font-mono text-muted-foreground truncate">
-                {currentUser.email}
-              </span>
-            </div>
-          </div>
-
-          <DialogFooter className="pt-2 gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowLogoutDialog(false)}
-              disabled={isLoggingOut}
-              className="h-8 text-xs cursor-pointer"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={handleConfirmLogout}
-              isLoading={isLoggingOut}
-              className="h-8 text-xs gap-1.5 cursor-pointer"
-            >
-              <LogOut className="h-3.5 w-3.5" /> Sign Out
+              <LogOut className="h-3.5 w-3.5" /> {t("account.signOut")}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -4,16 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { User, Settings, Shield, Monitor } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-const navItems = [
-  { href: "/account/profile", label: "My Profile", icon: User },
-  { href: "/account/settings", label: "Account Settings", icon: Settings },
-  { href: "/account/security", label: "Security", icon: Shield },
-  { href: "/account/appearance", label: "Appearance", icon: Monitor },
-];
+import { useTranslation } from "@/lib/i18n";
 
 export function AccountNav() {
   const pathname = usePathname();
+  const { t } = useTranslation();
+
+  const navItems = [
+    { href: "/account/profile", label: t("account.myProfile"), icon: User },
+    { href: "/account/settings", label: t("account.accountSettings"), icon: Settings },
+    { href: "/account/security", label: t("account.security"), icon: Shield },
+    { href: "/account/appearance", label: t("account.appearance"), icon: Monitor },
+  ];
 
   return (
     <div className="inline-flex items-center bg-panel border border-border p-1 rounded-lg gap-1 max-w-full overflow-x-auto">

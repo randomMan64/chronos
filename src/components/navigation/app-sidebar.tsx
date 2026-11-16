@@ -25,16 +25,17 @@ import {
   Shield,
   Monitor,
 } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { StatusIndicator } from "@/components/shared/status-indicator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useTranslation } from "@/lib/i18n";
 
 interface AppSidebarProps {
   currentOrg?: { id: string; name: string; role?: string };
   currentWorkspace?: { id: string; name: string; environment?: string };
   currentDatabase?: { id: string; name: string; status?: string };
-  user?: { email: string; fullName: string };
+  user?: { email: string; fullName: string; avatarUrl?: string | null };
   permissions?: string[];
   onLogout?: () => void;
   isCollapsed?: boolean;
@@ -56,58 +57,59 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const pathname = usePathname();
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+  const { t } = useTranslation();
 
   const navigationItems = [
     {
-      title: "Overview",
+      title: t("nav.overview"),
       href: "/dashboard",
       icon: LayoutDashboard,
       badge: null,
     },
     {
-      title: "Database Explorer",
+      title: t("nav.databaseExplorer"),
       href: "/explorer",
       icon: Database,
       badge: null,
     },
     {
-      title: "SQL Gateway",
+      title: t("nav.sqlGateway"),
       href: "/sql-editor",
       icon: Terminal,
       badge: null,
     },
     {
-      title: "Time Travel",
+      title: t("nav.timeTravel"),
       href: "/temporal",
       icon: Clock,
       badge: "Core",
     },
     {
-      title: "Transaction Inspector",
+      title: t("nav.transactionInspector"),
       href: "/transactions",
       icon: Activity,
       badge: null,
     },
     {
-      title: "Query Analyzer",
+      title: t("nav.queryAnalyzer"),
       href: "/analyzer",
       icon: Layers,
       badge: null,
     },
     {
-      title: "Audit Center",
+      title: t("nav.auditCenter"),
       href: "/audit",
       icon: ShieldCheck,
       badge: null,
     },
     {
-      title: "Backup & Recovery",
+      title: t("nav.backupRecovery"),
       href: "/backups",
       icon: Archive,
       badge: null,
     },
     {
-      title: "Settings & IAM",
+      title: t("nav.settingsIam"),
       href: "/settings",
       icon: Settings,
       badge: null,
@@ -125,8 +127,8 @@ export function AppSidebar({
       className={cn(
         "shrink-0 border-r border-border bg-sidebar flex flex-col justify-between h-screen select-none transition-all duration-200 z-30",
         isMobile
-          ? "w-[280px] max-w-[85vw]"
-          : cn("hidden md:flex", isCollapsed ? "w-16" : "w-[240px]")
+          ? "w-70 max-w-[85vw]"
+          : cn("hidden md:flex", isCollapsed ? "w-16" : "w-60")
       )}
     >
       {/* Top Organization & Brand section */}
@@ -176,7 +178,7 @@ export function AppSidebar({
             <div className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-panel cursor-pointer transition-colors text-xs">
               <div className="flex flex-col min-w-0">
                 <span className="text-[10px] uppercase font-mono text-muted-foreground tracking-wider">
-                  Organization
+                  {t("nav.organization")}
                 </span>
                 <span className="font-medium text-foreground truncate text-[11px]">
                   {currentOrg.name}
@@ -191,7 +193,7 @@ export function AppSidebar({
             <div className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-panel cursor-pointer transition-colors text-xs">
               <div className="flex flex-col min-w-0">
                 <span className="text-[10px] uppercase font-mono text-muted-foreground tracking-wider">
-                  Workspace
+                  {t("nav.workspace")}
                 </span>
                 <span className="font-medium text-foreground truncate text-[11px]">
                   {currentWorkspace.name}
@@ -237,7 +239,7 @@ export function AppSidebar({
         <nav className="p-2 space-y-0.5">
           {(!isCollapsed || isMobile) && (
             <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground">
-              Modules
+              {t("nav.modules")}
             </div>
           )}
           {navigationItems.map((item) => {
@@ -253,7 +255,7 @@ export function AppSidebar({
                   "flex items-center rounded text-xs transition-colors cursor-pointer",
                   isCollapsed && !isMobile
                     ? "h-9 w-full justify-center"
-                    : "justify-between px-2.5 py-2 min-h-[38px]",
+                    : "justify-between px-2.5 py-2 min-h-9.5",
                   isActive
                     ? "bg-elevated text-foreground font-medium border-l-2 border-primary"
                     : "text-muted-foreground hover:bg-panel hover:text-foreground"
@@ -298,9 +300,18 @@ export function AppSidebar({
             >
               <div className="flex items-center gap-2 min-w-0">
                 <div
-                  className="h-7 w-7 rounded-full bg-elevated border border-border flex items-center justify-center text-[11px] font-mono text-foreground shrink-0 font-semibold group-hover:border-foreground/30 transition-colors"
+                  className="h-7 w-7 rounded-full bg-elevated border border-border flex items-center justify-center text-[10px] font-mono text-foreground shrink-0 font-semibold group-hover:border-foreground/30 transition-colors overflow-hidden tracking-tighter"
                 >
-                  {user.fullName ? user.fullName[0].toUpperCase() : "U"}
+                  {user.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.fullName}
+                      className="h-full w-full object-cover rounded-full"
+                    />
+                  ) : (
+                    getInitials(user.fullName)
+                  )}
                 </div>
                 {(!isCollapsed || isMobile) && (
                   <div className="flex flex-col min-w-0">
@@ -333,8 +344,17 @@ export function AppSidebar({
             {/* Header info */}
             <div className="flex items-center px-2.5 py-2">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="h-8 w-8 rounded-full bg-elevated border border-border flex items-center justify-center text-xs font-mono text-foreground shrink-0 font-semibold">
-                  {user.fullName ? user.fullName[0].toUpperCase() : "U"}
+                <div className="h-8 w-8 rounded-full bg-elevated border border-border flex items-center justify-center text-xs font-mono text-foreground shrink-0 font-semibold overflow-hidden">
+                  {user.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={user.avatarUrl}
+                      alt={user.fullName}
+                      className="h-full w-full object-cover rounded-full"
+                    />
+                  ) : (
+                    getInitials(user.fullName)
+                  )}
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-semibold text-foreground truncate">
@@ -362,8 +382,8 @@ export function AppSidebar({
                 <div className="flex items-center gap-2.5 min-w-0">
                   <User className="h-4 w-4 text-muted-foreground group-hover:text-foreground shrink-0" />
                   <div className="flex flex-col min-w-0 text-left">
-                    <span className="text-xs font-medium text-foreground">My Profile</span>
-                    <span className="text-[10px] text-muted-foreground">Personal information</span>
+                    <span className="text-xs font-medium text-foreground">{t("nav.myProfile")}</span>
+                    <span className="text-[10px] text-muted-foreground">{t("account.myProfile")}</span>
                   </div>
                 </div>
                 <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
@@ -380,8 +400,8 @@ export function AppSidebar({
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Settings className="h-4 w-4 text-muted-foreground group-hover:text-foreground shrink-0" />
                   <div className="flex flex-col min-w-0 text-left">
-                    <span className="text-xs font-medium text-foreground">Account Settings</span>
-                    <span className="text-[10px] text-muted-foreground">Preferences and security</span>
+                    <span className="text-xs font-medium text-foreground">{t("nav.accountSettings")}</span>
+                    <span className="text-[10px] text-muted-foreground">{t("settings.description")}</span>
                   </div>
                 </div>
                 <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
@@ -398,8 +418,8 @@ export function AppSidebar({
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Shield className="h-4 w-4 text-muted-foreground group-hover:text-foreground shrink-0" />
                   <div className="flex flex-col min-w-0 text-left">
-                    <span className="text-xs font-medium text-foreground">Security</span>
-                    <span className="text-[10px] text-muted-foreground">Password and active sessions</span>
+                    <span className="text-xs font-medium text-foreground">{t("nav.security")}</span>
+                    <span className="text-[10px] text-muted-foreground">{t("account.security")}</span>
                   </div>
                 </div>
                 <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
@@ -416,8 +436,8 @@ export function AppSidebar({
                 <div className="flex items-center gap-2.5 min-w-0">
                   <Monitor className="h-4 w-4 text-muted-foreground group-hover:text-foreground shrink-0" />
                   <div className="flex flex-col min-w-0 text-left">
-                    <span className="text-xs font-medium text-foreground">Appearance</span>
-                    <span className="text-[10px] text-muted-foreground">Theme and display</span>
+                    <span className="text-xs font-medium text-foreground">{t("nav.appearance")}</span>
+                    <span className="text-[10px] text-muted-foreground">{t("account.appearance")}</span>
                   </div>
                 </div>
                 <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
@@ -437,7 +457,7 @@ export function AppSidebar({
               className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-destructive hover:bg-destructive/10 transition-colors text-xs font-medium cursor-pointer"
             >
               <LogOut className="h-4 w-4 shrink-0" />
-              <span>Sign out</span>
+              <span>{t("nav.signOut")}</span>
             </button>
           </PopoverContent>
         </Popover>
@@ -453,15 +473,15 @@ export function AppSidebar({
                 ? "justify-center p-1.5 h-8 mt-1"
                 : "justify-between px-2 py-1.5 h-8 mt-1"
             )}
-            title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={isCollapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
+            aria-label={isCollapsed ? t("nav.expandSidebar") : t("nav.collapseSidebar")}
           >
             {isCollapsed ? (
               <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground shrink-0 transition-transform group-hover:translate-x-0.5" />
             ) : (
               <>
                 <span className="text-[11px] font-medium text-muted-foreground group-hover:text-foreground transition-colors">
-                  Collapse sidebar
+                  {t("nav.collapseSidebar")}
                 </span>
                 <ChevronLeft className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0 transition-transform group-hover:-translate-x-0.5" />
               </>

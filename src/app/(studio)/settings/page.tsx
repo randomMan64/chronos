@@ -58,7 +58,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatDate } from "@/lib/utils";
+import { formatDate, getInitials } from "@/lib/utils";
 import { DismissibleAlert } from "@/components/shared/dismissible-alert";
 import {
   Users,
@@ -455,8 +455,8 @@ export default function SettingsPage() {
                           <tr key={m.id} className="hover:bg-elevated/40 transition-colors">
                             <td className="p-3 font-medium text-foreground">
                               <div className="flex items-center gap-2">
-                                <div className="h-6 w-6 rounded-full bg-elevated border border-border flex items-center justify-center font-mono text-[10px]">
-                                  {m.fullName[0].toUpperCase()}
+                                <div className="h-6 w-6 rounded-full bg-elevated border border-border flex items-center justify-center font-mono text-[9px] font-semibold tracking-tighter">
+                                  {getInitials(m.fullName)}
                                 </div>
                                 <div className="flex items-center gap-1.5">
                                   <span>{m.fullName}</span>

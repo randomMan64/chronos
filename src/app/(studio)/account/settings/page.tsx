@@ -19,6 +19,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Settings, Globe, Clock, Calendar, CheckCircle2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
+import { useTranslation, type SupportedLocale } from "@/lib/i18n";
 
 const settingsSchema = z.object({
   displayName: z.string().trim().max(100, "Display name cannot exceed 100 characters").optional(),
@@ -92,6 +93,7 @@ function SettingsSkeleton() {
 }
 
 export default function AccountSettingsPage() {
+  const { locale, setLocale, t } = useTranslation();
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveStatus, setSaveStatus] = React.useState<"idle" | "success" | "error">("idle");
@@ -120,6 +122,7 @@ export default function AccountSettingsPage() {
   const watchedTimezone = watch("timezone");
   const watchedDateFormat = watch("dateFormat");
   const watchedTimeFormat = watch("timeFormat");
+  const watchedLanguage = watch("language");
 
   const [previewDate, setPreviewDate] = React.useState<Date | null>(null);
 
@@ -144,6 +147,10 @@ export default function AccountSettingsPage() {
           language: data.language || "en",
         });
 
+        if (data.language && ["en", "es", "de", "fr", "ja"].includes(data.language)) {
+          setLocale(data.language as SupportedLocale);
+        }
+
         // Initialize local storage cache
         try {
           if (data.displayName) localStorage.setItem("chronos_display_name", data.displayName);
@@ -158,7 +165,7 @@ export default function AccountSettingsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [reset]);
+  }, [reset, setLocale]);
 
   React.useEffect(() => {
     loadPreferences();
@@ -175,6 +182,10 @@ export default function AccountSettingsPage() {
       });
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Failed to save settings");
+
+      if (values.language && ["en", "es", "de", "fr", "ja"].includes(values.language)) {
+        setLocale(values.language as SupportedLocale);
+      }
 
       // Save to localStorage for instant client-side date formatting
       try {
@@ -196,7 +207,7 @@ export default function AccountSettingsPage() {
       );
 
       setSaveStatus("success");
-      setSaveMessage("Preferences saved successfully.");
+      setSaveMessage(t("settings.saveSuccess"));
       setTimeout(() => {
         setSaveStatus("idle");
         setSaveMessage("");
@@ -215,6 +226,7 @@ export default function AccountSettingsPage() {
         timezone: watchedTimezone || "UTC",
         dateFormat: watchedDateFormat || "YYYY-MM-DD",
         timeFormat: watchedTimeFormat || "24h",
+        locale: watchedLanguage || locale,
       })
     : "—";
 
@@ -222,9 +234,9 @@ export default function AccountSettingsPage() {
     <div className="space-y-5 w-full pb-10">
       {/* Header */}
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Account</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">{t("account.account")}</h1>
         <p className="text-xs text-muted-foreground">
-          Manage your personal profile, credentials, and individual system preferences
+          {t("account.accountDesc")}
         </p>
       </div>
 
@@ -238,22 +250,22 @@ export default function AccountSettingsPage() {
             <CardHeader className="pb-4">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Settings className="h-4 w-4 text-primary" />
-                Localization & Display Preferences
+                {t("settings.title")}
               </CardTitle>
               <CardDescription className="text-xs">
-                Configure your preferred regional formats, timestamps, and interface language
+                {t("settings.description")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-w-xl">
               {/* Display Name */}
               <Field error={errors.displayName?.message}>
                 <FieldLabel htmlFor="displayName" className="text-xs font-medium">
-                  Display Name
+                  {t("settings.displayName")}
                 </FieldLabel>
                 <Input
                   id="displayName"
                   type="text"
-                  placeholder="System Administrator"
+                  placeholder={t("settings.displayNamePlaceholder")}
                   className="h-8 text-xs bg-elevated/40"
                   {...register("displayName")}
                 />
@@ -264,7 +276,7 @@ export default function AccountSettingsPage() {
               <Field error={errors.timezone?.message}>
                 <FieldLabel htmlFor="timezone" className="text-xs font-medium flex items-center gap-1.5">
                   <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-                  Timezone
+                  {t("settings.timezone")}
                 </FieldLabel>
                 <Controller
                   name="timezone"
@@ -286,7 +298,7 @@ export default function AccountSettingsPage() {
                 />
                 <FieldError />
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  Temporal audit trails and timeline queries will be rendered using this timezone.
+                  {t("settings.timezoneHelp")}
                 </p>
               </Field>
 
@@ -294,7 +306,7 @@ export default function AccountSettingsPage() {
               <Field error={errors.dateFormat?.message}>
                 <FieldLabel htmlFor="dateFormat" className="text-xs font-medium flex items-center gap-1.5">
                   <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                  Date Format
+                  {t("settings.dateFormat")}
                 </FieldLabel>
                 <Controller
                   name="dateFormat"
@@ -321,7 +333,7 @@ export default function AccountSettingsPage() {
               <Field error={errors.timeFormat?.message}>
                 <FieldLabel htmlFor="timeFormat" className="text-xs font-medium flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                  Time Format
+                  {t("settings.timeFormat")}
                 </FieldLabel>
                 <Controller
                   name="timeFormat"
@@ -333,10 +345,10 @@ export default function AccountSettingsPage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="12h" className="text-xs font-mono">
-                          12-Hour (e.g. 02:30 PM)
+                          {t("settings.twelveHour")}
                         </SelectItem>
                         <SelectItem value="24h" className="text-xs font-mono">
-                          24-Hour (e.g. 14:30)
+                          {t("settings.twentyFourHour")}
                         </SelectItem>
                       </SelectContent>
                     </Select>
@@ -348,13 +360,21 @@ export default function AccountSettingsPage() {
               {/* Language Preferences */}
               <Field error={errors.language?.message}>
                 <FieldLabel htmlFor="language" className="text-xs font-medium">
-                  Language Preferences
+                  {t("settings.language")}
                 </FieldLabel>
                 <Controller
                   name="language"
                   control={control}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select
+                      value={field.value}
+                      onValueChange={(val) => {
+                        field.onChange(val);
+                        if (val && ["en", "es", "de", "fr", "ja"].includes(val)) {
+                          setLocale(val as SupportedLocale);
+                        }
+                      }}
+                    >
                       <SelectTrigger id="language" className="h-8 text-xs bg-elevated/40">
                         <SelectValue placeholder="Select language" />
                       </SelectTrigger>
@@ -375,13 +395,13 @@ export default function AccountSettingsPage() {
               <div className="mt-4 rounded-lg border border-border/70 bg-elevated/40 p-3 space-y-1">
                 <div className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
                   <Clock className="h-3.5 w-3.5 text-primary" />
-                  Live Timestamp Preview
+                  {t("settings.previewTitle")}
                 </div>
                 <div className="font-mono text-xs font-semibold text-foreground">
                   {previewString}
                 </div>
                 <p className="text-[10px] text-muted-foreground">
-                  Temporal audit logs, transactions, query history, and system backups will be rendered in this format across the studio.
+                  {t("settings.previewHelp")}
                 </p>
               </div>
             </CardContent>
@@ -390,7 +410,7 @@ export default function AccountSettingsPage() {
           {/* Form Actions (Outside of the card, aligned to bottom right) */}
           <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
             {saveStatus === "success" && (
-              <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-medium animate-in fade-in duration-200">
+              <span className="text-xs dark:text-emerald-400 flex items-center gap-1.5 font-medium animate-in fade-in duration-200">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 {saveMessage}
               </span>
@@ -406,7 +426,7 @@ export default function AccountSettingsPage() {
               disabled={isSaving}
               className="text-xs h-8 px-4 cursor-pointer"
             >
-              {isSaving ? "Saving..." : saveStatus === "success" ? "Saved!" : "Save Preferences"}
+              {isSaving ? t("settings.saving") : saveStatus === "success" ? t("settings.saved") : t("settings.savePreferences")}
             </Button>
           </div>
         </form>

@@ -5,12 +5,21 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { BrandLogo } from "@/components/shared/brand-logo";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { ArrowRight, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 
-export default function InvitePage(props: { params: Promise<{ token: string }> }) {
+export default function InvitePage(props: {
+  params: Promise<{ token: string }>;
+}) {
   const router = useRouter();
   const [token, setToken] = React.useState<string | null>(null);
   const [invite, setInvite] = React.useState<{
@@ -62,7 +71,9 @@ export default function InvitePage(props: { params: Promise<{ token: string }> }
         router.push("/dashboard");
       }, 1500);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to accept invitation");
+      setError(
+        err instanceof Error ? err.message : "Failed to accept invitation",
+      );
     } finally {
       setIsAccepting(false);
     }
@@ -73,7 +84,9 @@ export default function InvitePage(props: { params: Promise<{ token: string }> }
       <div className="flex min-h-screen items-center justify-center bg-background text-muted-foreground">
         <div className="flex flex-col items-center gap-2">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="text-xs font-mono">Resolving invitation credentials...</span>
+          <span className="text-xs font-mono">
+            Resolving invitation credentials...
+          </span>
         </div>
       </div>
     );
@@ -81,11 +94,6 @@ export default function InvitePage(props: { params: Promise<{ token: string }> }
 
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center bg-background p-4 text-foreground">
-      {/* Top right theme toggle */}
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
       <div className="w-full max-w-sm space-y-4">
         {/* Brand */}
         <div className="flex flex-col items-center text-center space-y-1">
@@ -95,10 +103,9 @@ export default function InvitePage(props: { params: Promise<{ token: string }> }
             className="h-22 w-22 drop-shadow-md mb-1"
             priority
           />
-          <h1 className="text-base font-semibold tracking-wider font-mono uppercase text-foreground">
-            CHRONOS
-          </h1>
-          <p className="text-xs text-muted-foreground">Organization Invitation</p>
+          <p className="text-xs text-muted-foreground">
+            Organization Invitation
+          </p>
         </div>
 
         <Card className="border-border bg-card">
@@ -126,8 +133,12 @@ export default function InvitePage(props: { params: Promise<{ token: string }> }
             {invite && !isSuccess && (
               <div className="space-y-3 rounded-md border border-border bg-sidebar p-3 text-xs">
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Target Organization</span>
-                  <span className="font-semibold text-foreground">{invite.organizationName}</span>
+                  <span className="text-muted-foreground">
+                    Target Organization
+                  </span>
+                  <span className="font-semibold text-foreground">
+                    {invite.organizationName}
+                  </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Assigned Role</span>
@@ -137,7 +148,7 @@ export default function InvitePage(props: { params: Promise<{ token: string }> }
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Invited Email</span>
-                  <span className="font-mono text-muted-foreground truncate max-w-[160px]">
+                  <span className="font-mono text-muted-foreground truncate max-w-40">
                     {invite.email}
                   </span>
                 </div>
@@ -151,7 +162,8 @@ export default function InvitePage(props: { params: Promise<{ token: string }> }
                 className="w-full"
                 isLoading={isAccepting}
               >
-                Accept & Join Organization <ArrowRight className="ml-1 h-3 w-3" />
+                Accept & Join Organization{" "}
+                <ArrowRight className="ml-1 h-3 w-3" />
               </Button>
             )}
 

@@ -10,8 +10,20 @@ import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
-import { Field, FieldLabel, FieldDescription, FieldError } from "@/components/ui/field";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
+import {
+  Field,
+  FieldLabel,
+  FieldDescription,
+  FieldError,
+} from "@/components/ui/field";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardFooter,
+} from "@/components/ui/card";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { ArrowRight } from "lucide-react";
 
@@ -66,7 +78,9 @@ export default function RegisterPage() {
 
       router.push("/dashboard");
     } catch (err: unknown) {
-      setServerError(err instanceof Error ? err.message : "Registration failed");
+      setServerError(
+        err instanceof Error ? err.message : "Registration failed",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -74,11 +88,6 @@ export default function RegisterPage() {
 
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center bg-background p-4 text-foreground">
-      {/* Top right theme toggle */}
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
       <div className="w-full max-w-sm space-y-4">
         {/* Brand */}
         <div className="flex flex-col items-center text-center space-y-1">
@@ -88,10 +97,9 @@ export default function RegisterPage() {
             className="h-22 w-22 drop-shadow-md mb-1"
             priority
           />
-          <h1 className="text-base font-semibold tracking-wider font-mono uppercase text-foreground">
-            CHRONOS
-          </h1>
-          <p className="text-xs text-muted-foreground">Create Organization & Control Plane</p>
+          <p className="text-xs text-muted-foreground">
+            Create Organization & Control Plane
+          </p>
         </div>
 
         {/* Card */}
@@ -99,7 +107,8 @@ export default function RegisterPage() {
           <CardHeader>
             <CardTitle>Initialize Workspace</CardTitle>
             <CardDescription>
-              Create your organization owner account. The owner role configures workspaces and registered databases.
+              Create your organization owner account. The owner role configures
+              workspaces and registered databases.
             </CardDescription>
           </CardHeader>
           <form onSubmit={handleSubmit(onSubmit)} noValidate>
@@ -122,7 +131,9 @@ export default function RegisterPage() {
               </Field>
 
               <Field error={errors.organizationName?.message}>
-                <FieldLabel htmlFor="organizationName">Organization Name</FieldLabel>
+                <FieldLabel htmlFor="organizationName">
+                  Organization Name
+                </FieldLabel>
                 <Input
                   id="organizationName"
                   type="text"

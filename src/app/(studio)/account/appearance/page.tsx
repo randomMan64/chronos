@@ -28,6 +28,7 @@ import {
   Check,
   CheckCircle2,
 } from "lucide-react";
+import { useTranslation } from "@/lib/i18n";
 
 const appearanceSchema = z.object({
   theme: z.enum(["system", "dark", "light"]),
@@ -115,6 +116,7 @@ function AppearanceSkeleton() {
 
 export default function AccountAppearancePage() {
   const { theme: activeTheme, setTheme } = useTheme();
+  const { t } = useTranslation();
   const [isLoading, setIsLoading] = React.useState(true);
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveStatus, setSaveStatus] = React.useState<"success" | "error" | null>(null);
@@ -230,9 +232,9 @@ export default function AccountAppearancePage() {
     <div className="space-y-5 w-full pb-10">
       {/* Header */}
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Account</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">{t("account.account")}</h1>
         <p className="text-xs text-muted-foreground">
-          Manage your personal profile, credentials, and individual system preferences
+          {t("account.accountDesc")}
         </p>
       </div>
 
@@ -247,10 +249,10 @@ export default function AccountAppearancePage() {
             <CardHeader className="pb-4">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Sun className="h-4 w-4 text-primary" />
-                Theme & Interface Appearance
+                {t("appearance.themeTitle")}
               </CardTitle>
               <CardDescription className="text-xs">
-                Select your preferred color scheme for the studio and editor environments
+                {t("appearance.themeDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -270,11 +272,11 @@ export default function AccountAppearancePage() {
                     <Monitor className="h-5 w-5" />
                   </div>
                   <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    System Preference
+                    {t("appearance.system")}
                     {selectedTheme === "system" && <Check className="h-3.5 w-3.5 text-primary" />}
                   </span>
                   <span className="text-[10px] text-muted-foreground mt-0.5">
-                    Synchronize with your operating system
+                    {t("appearance.systemDesc")}
                   </span>
                 </button>
 
@@ -293,11 +295,11 @@ export default function AccountAppearancePage() {
                     <Moon className="h-5 w-5" />
                   </div>
                   <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    Dark Mode
+                    {t("appearance.dark")}
                     {selectedTheme === "dark" && <Check className="h-3.5 w-3.5 text-primary" />}
                   </span>
                   <span className="text-[10px] text-muted-foreground mt-0.5">
-                    High contrast dark palette
+                    {t("appearance.darkDesc")}
                   </span>
                 </button>
 
@@ -316,11 +318,11 @@ export default function AccountAppearancePage() {
                     <Sun className="h-5 w-5" />
                   </div>
                   <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    Light Mode
+                    {t("appearance.light")}
                     {selectedTheme === "light" && <Check className="h-3.5 w-3.5 text-primary" />}
                   </span>
                   <span className="text-[10px] text-muted-foreground mt-0.5">
-                    Crisp minimal light palette
+                    {t("appearance.lightDesc")}
                   </span>
                 </button>
               </div>
@@ -332,15 +334,15 @@ export default function AccountAppearancePage() {
             <CardHeader className="pb-4">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <PanelLeft className="h-4 w-4 text-primary" />
-                Sidebar & Navigation
+                {t("appearance.sidebarTitle")}
               </CardTitle>
               <CardDescription className="text-xs">
-                Configure default drawer behavior and sidebar layout
+                {t("appearance.sidebarDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4 max-w-lg">
               <Field>
-                <FieldLabel className="text-xs font-medium">Default Sidebar State</FieldLabel>
+                <FieldLabel className="text-xs font-medium">{t("appearance.defaultSidebarState")}</FieldLabel>
                 <Controller
                   name="sidebarPreference"
                   control={control}
@@ -351,17 +353,17 @@ export default function AccountAppearancePage() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="expanded" className="text-xs font-mono">
-                          Expanded (Full Navigation Labels)
+                          {t("appearance.expanded")}
                         </SelectItem>
                         <SelectItem value="collapsed" className="text-xs font-mono">
-                          Collapsed (Compact Icons Only)
+                          {t("appearance.collapsed")}
                         </SelectItem>
                       </SelectContent>
                     </Select>
                   )}
                 />
                 <p className="text-[11px] text-muted-foreground mt-1">
-                  On mobile and small tablets, the sidebar automatically transitions to an overlay drawer.
+                  {t("appearance.mobileDrawerNote")}
                 </p>
               </Field>
             </CardContent>
@@ -372,16 +374,16 @@ export default function AccountAppearancePage() {
             <CardHeader className="pb-4">
               <CardTitle className="text-sm font-semibold flex items-center gap-2">
                 <Code2 className="h-4 w-4 text-primary" />
-                SQL Editor & Monaco Defaults
+                {t("appearance.monacoTitle")}
               </CardTitle>
               <CardDescription className="text-xs">
-                Customize typography and convenience toggles in the query editor
+                {t("appearance.monacoDesc")}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-5 max-w-lg">
               {/* Font Size */}
               <Field>
-                <FieldLabel className="text-xs font-medium">Editor Font Size</FieldLabel>
+                <FieldLabel className="text-xs font-medium">{t("appearance.fontSize")}</FieldLabel>
                 <Controller
                   name="sqlFontSize"
                   control={control}
@@ -420,9 +422,9 @@ export default function AccountAppearancePage() {
                 {/* Word wrap */}
                 <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-elevated/30">
                   <div className="space-y-0.5">
-                    <span className="text-xs font-medium text-foreground">Word Wrap</span>
+                    <span className="text-xs font-medium text-foreground">{t("appearance.wordWrap")}</span>
                     <p className="text-[11px] text-muted-foreground">
-                      Wrap long SQL query lines instead of horizontal scrolling
+                      {t("appearance.wordWrapDesc")}
                     </p>
                   </div>
                   <Controller
@@ -440,9 +442,9 @@ export default function AccountAppearancePage() {
                 {/* Line numbers */}
                 <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-elevated/30">
                   <div className="space-y-0.5">
-                    <span className="text-xs font-medium text-foreground">Line Numbers</span>
+                    <span className="text-xs font-medium text-foreground">{t("appearance.lineNumbers")}</span>
                     <p className="text-[11px] text-muted-foreground">
-                      Show line numbering gutter in SQL editor
+                      {t("appearance.lineNumbersDesc")}
                     </p>
                   </div>
                   <Controller
@@ -460,9 +462,9 @@ export default function AccountAppearancePage() {
                 {/* Minimap */}
                 <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-elevated/30">
                   <div className="space-y-0.5">
-                    <span className="text-xs font-medium text-foreground">Editor Minimap</span>
+                    <span className="text-xs font-medium text-foreground">{t("appearance.minimap")}</span>
                     <p className="text-[11px] text-muted-foreground">
-                      Display high-level code minimap overview on right gutter
+                      {t("appearance.minimapDesc")}
                     </p>
                   </div>
                   <Controller
@@ -483,7 +485,7 @@ export default function AccountAppearancePage() {
           {/* Form Actions (Outside of the card, aligned to bottom right) */}
           <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
             {saveStatus === "success" && (
-              <span className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 font-medium animate-in fade-in duration-200">
+              <span className="text-xs dark:text-emerald-400 flex items-center gap-1.5 font-medium animate-in fade-in duration-200">
                 <CheckCircle2 className="h-3.5 w-3.5" />
                 {saveMessage}
               </span>
@@ -499,7 +501,7 @@ export default function AccountAppearancePage() {
               disabled={isSaving}
               className="text-xs h-8 px-4 cursor-pointer"
             >
-              {isSaving ? "Saving..." : saveStatus === "success" ? "Saved!" : "Save Appearance Preferences"}
+              {isSaving ? t("appearance.saving") : saveStatus === "success" ? t("appearance.saved") : t("appearance.saveAppearance")}
             </Button>
           </div>
         </form>

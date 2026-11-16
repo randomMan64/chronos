@@ -9,7 +9,20 @@ export const dynamic = "force-dynamic";
 
 const updateProfileSchema = z.object({
   fullName: z.string().trim().min(1, "Full name cannot be empty").max(255),
-  avatarUrl: z.string().trim().url("Must be a valid URL").optional().nullable().or(z.literal("")),
+  avatarUrl: z
+    .string()
+    .trim()
+    .refine(
+      (val) =>
+        !val ||
+        val.startsWith("http://") ||
+        val.startsWith("https://") ||
+        val.startsWith("data:image/"),
+      { message: "Must be a valid image URL or image data" }
+    )
+    .optional()
+    .nullable()
+    .or(z.literal("")),
 });
 
 export async function GET() {

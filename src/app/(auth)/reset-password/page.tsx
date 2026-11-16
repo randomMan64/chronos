@@ -57,20 +57,25 @@ export default function ResetPasswordPage() {
 
   return (
     <div className="relative flex min-h-screen w-full items-center justify-center bg-background p-4 text-foreground">
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
       <div className="w-full max-w-sm space-y-4">
         <div className="flex flex-col items-center text-center space-y-1">
-          <BrandLogo width={48} height={48} className="h-12 w-12 drop-shadow-xs" priority />
+          <BrandLogo
+            width={48}
+            height={48}
+            className="h-12 w-12 drop-shadow-xs"
+            priority
+          />
           <h1 className="text-xl font-bold tracking-tight">CHRONOS</h1>
-          <p className="text-xs text-muted-foreground font-mono">Create New Password</p>
+          <p className="text-xs text-muted-foreground font-mono">
+            Create New Password
+          </p>
         </div>
 
         <Card className="border-border">
           <CardHeader className="space-y-1 pb-4">
-            <CardTitle className="text-base font-semibold">Set New Password</CardTitle>
+            <CardTitle className="text-base font-semibold">
+              Set New Password
+            </CardTitle>
             <CardDescription className="text-xs">
               Choose a strong password of at least 8 characters
             </CardDescription>
@@ -79,9 +84,12 @@ export default function ResetPasswordPage() {
             {isSuccess ? (
               <div className="p-4 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-center space-y-2">
                 <CheckCircle2 className="h-6 w-6 text-emerald-500 mx-auto" />
-                <div className="text-xs font-medium text-foreground">Password updated</div>
+                <div className="text-xs font-medium text-foreground">
+                  Password updated
+                </div>
                 <p className="text-[11px] text-muted-foreground">
-                  Your password has been reset. You may now sign in with your new credentials.
+                  Your password has been reset. You may now sign in with your
+                  new credentials.
                 </p>
                 <div className="pt-2">
                   <Link
@@ -93,9 +101,16 @@ export default function ResetPasswordPage() {
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
+              <form
+                onSubmit={handleSubmit(onSubmit)}
+                noValidate
+                className="space-y-3"
+              >
                 <Field error={errors.password?.message}>
-                  <FieldLabel htmlFor="password" className="text-xs font-medium">
+                  <FieldLabel
+                    htmlFor="password"
+                    className="text-xs font-medium"
+                  >
                     New Password
                   </FieldLabel>
                   <PasswordInput
@@ -108,7 +123,10 @@ export default function ResetPasswordPage() {
                 </Field>
 
                 <Field error={errors.confirmPassword?.message}>
-                  <FieldLabel htmlFor="confirmPassword" className="text-xs font-medium">
+                  <FieldLabel
+                    htmlFor="confirmPassword"
+                    className="text-xs font-medium"
+                  >
                     Confirm New Password
                   </FieldLabel>
                   <PasswordInput
@@ -120,7 +138,12 @@ export default function ResetPasswordPage() {
                   <FieldError />
                 </Field>
 
-                <Button type="submit" size="sm" className="w-full h-9 text-xs" disabled={isLoading}>
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="w-full h-9 text-xs"
+                  disabled={isLoading}
+                >
                   {isLoading ? "Saving..." : "Update Password"}
                 </Button>
               </form>
