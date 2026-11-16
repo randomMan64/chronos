@@ -187,7 +187,7 @@ export class EmailService {
     }
   ): Promise<SendMailResult> {
     const config = getEmailConfig();
-    const invitationUrl = `${config.appUrl}/invite/${encodeURIComponent(props.invitationToken)}`;
+    const invitationUrl = `${config.appUrl}/invite/accept?token=${encodeURIComponent(props.invitationToken)}`;
     const template = renderOrganizationInvitationEmail({
       recipientEmail: to,
       organizationName: props.organizationName,

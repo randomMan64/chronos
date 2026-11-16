@@ -45,7 +45,9 @@ export async function proxy(request: NextRequest) {
 
   // 1. Authenticated users attempting to visit auth entry pages (/login, /register)
   if (isAuthenticated && (pathname === "/login" || pathname === "/register")) {
-    const returnUrl = request.nextUrl.searchParams.get("returnUrl");
+    const returnUrl =
+      request.nextUrl.searchParams.get("returnUrl") ||
+      request.nextUrl.searchParams.get("redirect");
     const targetUrl =
       returnUrl && returnUrl.startsWith("/") && !returnUrl.startsWith("//")
         ? returnUrl

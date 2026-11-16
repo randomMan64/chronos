@@ -81,6 +81,7 @@ export const invitations = pgTable(
     status: varchar("status", { length: 50 }).notNull().default("pending"), // 'pending' | 'accepted' | 'expired' | 'revoked'
     invitedBy: uuid("invited_by").references(() => users.id, { onDelete: "set null" }),
     expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    acceptedAt: timestamp("accepted_at", { withTimezone: true }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

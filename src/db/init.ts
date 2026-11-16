@@ -46,8 +46,10 @@ CREATE TABLE IF NOT EXISTS invitations (
   status VARCHAR(50) NOT NULL DEFAULT 'pending',
   invited_by UUID REFERENCES users(id) ON DELETE SET NULL,
   expires_at TIMESTAMPTZ NOT NULL,
+  accepted_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE invitations ADD COLUMN IF NOT EXISTS accepted_at TIMESTAMPTZ;
 
 -- 5. Workspaces
 CREATE TABLE IF NOT EXISTS workspaces (
