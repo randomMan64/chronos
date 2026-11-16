@@ -270,4 +270,53 @@ describe("Phase 9 — Route Protection, Authorization & Tenant Isolation", () =>
       expect(wouldLeaveZeroOwners).toBe(true);
     });
   });
+
+  describe("6. Conditional UI & Effective Permissions Alignment", () => {
+    it("Owner possesses members:invite and members:manage permissions for UI actions", () => {
+      const perms = resolvePermissions({ orgRole: "owner" });
+      expect(hasPermission(perms, "members:invite")).toBe(true);
+      expect(hasPermission(perms, "members:manage")).toBe(true);
+      expect(hasPermission(perms, "workspace:create")).toBe(true);
+      expect(hasPermission(perms, "organization:manage")).toBe(true);
+    });
+
+    it("Admin possesses members:invite and members:manage permissions for UI actions", () => {
+      const perms = resolvePermissions({ orgRole: "admin" });
+      expect(hasPermission(perms, "members:invite")).toBe(true);
+      expect(hasPermission(perms, "members:manage")).toBe(true);
+      expect(hasPermission(perms, "workspace:create")).toBe(true);
+    });
+
+    it("Regular Member is restricted from members:invite, members:manage, and workspace:create", () => {
+      const perms = resolvePermissions({ orgRole: "member", workspaceRole: "developer" });
+      expect(hasPermission(perms, "organization:read")).toBe(true);
+      expect(hasPermission(perms, "workspace:read")).toBe(true);
+      // Invitation management must be strictly false
+      expect(hasPermission(perms, "members:invite")).toBe(false);
+      expect(hasPermission(perms, "members:manage")).toBe(false);
+      expect(hasPermission(perms, "workspace:create")).toBe(false);
+    });
+
+    it("Auditor can access audit/read information but is restricted from inviting and managing members", () => {
+      const perms = resolvePermissions({ orgRole: "member", workspaceRole: "auditor" });
+      expect(hasPermission(perms, "audit:read")).toBe(true);
+      expect(hasPermission(perms, "organization:read")).toBe(true);
+      expect(hasPermission(perms, "members:invite")).toBe(false);
+      expect(hasPermission(perms, "members:manage")).toBe(false);
+    });
+
+    it("hasPermission functions identically with Array<string> from client API responses and Set<Permission>", () => {
+      const arrayPerms = ["organization:read", "members:invite", "query:read"];
+      const setPerms = new Set(arrayPerms);
+
+      expect(hasPermission(arrayPerms, "members:invite")).toBe(true);
+      expect(hasPermission(setPerms, "members:invite")).toBe(true);
+
+      expect(hasPermission(arrayPerms, "members:manage")).toBe(false);
+      expect(hasPermission(setPerms, "members:manage")).toBe(false);
+
+      expect(hasPermission(null, "members:invite")).toBe(false);
+      expect(hasPermission(undefined, "members:invite")).toBe(false);
+    });
+  });
 });

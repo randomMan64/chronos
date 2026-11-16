@@ -142,15 +142,31 @@ export function resolvePermissions(params: {
 }
 
 export function hasPermission(
-  effectivePermissions: Set<Permission>,
+  effectivePermissions: Set<Permission> | Set<string> | Permission[] | string[] | undefined | null,
   required: Permission
 ): boolean {
-  return effectivePermissions.has(required);
+  if (!effectivePermissions) return false;
+  if (effectivePermissions instanceof Set) {
+    return (effectivePermissions as Set<string>).has(required);
+  }
+  if (Array.isArray(effectivePermissions)) {
+    return (effectivePermissions as string[]).includes(required);
+  }
+  return false;
 }
 
 export function hasAllPermissions(
-  effectivePermissions: Set<Permission>,
+  effectivePermissions: Set<Permission> | Set<string> | Permission[] | string[] | undefined | null,
   required: Permission[]
 ): boolean {
-  return required.every((p) => effectivePermissions.has(p));
+  if (!effectivePermissions) return false;
+  return required.every((p) => hasPermission(effectivePermissions, p));
+}
+
+export function hasAnyPermission(
+  effectivePermissions: Set<Permission> | Set<string> | Permission[] | string[] | undefined | null,
+  required: Permission[]
+): boolean {
+  if (!effectivePermissions) return false;
+  return required.some((p) => hasPermission(effectivePermissions, p));
 }

@@ -24,6 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { hasPermission } from "@/lib/permissions/resolver";
 
 const inviteSchema = z.object({
   email: z
@@ -93,6 +94,17 @@ export default function SettingsPage() {
     slug: string;
     role?: string;
   } | null>(null);
+  const [permissions, setPermissions] = React.useState<string[]>([]);
+
+  // Permission-derived capabilities
+  const canInviteMembers = hasPermission(permissions, "members:invite");
+  const canManageMembers = hasPermission(permissions, "members:manage");
+  const canCreateWorkspace = hasPermission(permissions, "workspace:create");
+  const canTransferOwnership =
+    org?.role === "owner" &&
+    (hasPermission(permissions, "permissions:manage") ||
+      hasPermission(permissions, "organization:manage"));
+  const canViewInvites = canInviteMembers || canManageMembers;
   const [members, setMembers] = React.useState<
     Array<{
       id: string;
@@ -200,14 +212,26 @@ export default function SettingsPage() {
         if (meData.user) {
           setCurrentUser(meData.user);
         }
-        const activeOrg = meData.organizations?.[0];
+        const effectivePerms: string[] = Array.isArray(meData.permissions)
+          ? meData.permissions
+          : [];
+        setPermissions(effectivePerms);
+
+        const activeOrg = meData.currentOrg || meData.organizations?.[0];
         if (activeOrg) {
           setOrg(activeOrg);
 
-          // Fetch members, invitations, and workspaces in parallel
+          // Determine permissions for invitations fetch
+          const userCanViewInvites =
+            hasPermission(effectivePerms, "members:invite") ||
+            hasPermission(effectivePerms, "members:manage");
+
+          // Fetch members, invitations (if permitted), and workspaces in parallel
           const [membersRes, invitesRes, wsRes] = await Promise.all([
             fetch(`/api/v1/organizations/${activeOrg.id}/members`),
-            fetch(`/api/v1/organizations/${activeOrg.id}/invitations`),
+            userCanViewInvites
+              ? fetch(`/api/v1/organizations/${activeOrg.id}/invitations`)
+              : Promise.resolve(null),
             fetch(`/api/v1/workspaces?organizationId=${activeOrg.id}`),
           ]);
 
@@ -215,9 +239,11 @@ export default function SettingsPage() {
             const mData = await membersRes.json();
             setMembers(mData.members || []);
           }
-          if (invitesRes.ok) {
+          if (invitesRes && invitesRes.ok) {
             const iData = await invitesRes.json();
             setInvitations(iData.invitations || []);
+          } else {
+            setInvitations([]);
           }
           if (wsRes.ok) {
             const wData = await wsRes.json();
@@ -237,7 +263,7 @@ export default function SettingsPage() {
   }, [loadData]);
 
   const handleSendInvite = async (values: InviteFormValues) => {
-    if (!org) return;
+    if (!org || !canInviteMembers) return;
     setIsInviting(true);
     setMessage(null);
 
@@ -267,7 +293,7 @@ export default function SettingsPage() {
   };
 
   const handleRevokeInvite = async (inviteId: string) => {
-    if (!org) return;
+    if (!org || !canManageMembers) return;
     try {
       const res = await fetch(
         `/api/v1/organizations/${org.id}/invitations/${inviteId}`,
@@ -289,7 +315,7 @@ export default function SettingsPage() {
     targetRole?: string,
   ) => {
     const roleToApply = targetRole || pendingRoles[memberId];
-    if (!org || !roleToApply) return;
+    if (!org || !canManageMembers || !roleToApply) return;
     setUpdatingRoleId(memberId);
     try {
       const res = await fetch(
@@ -326,7 +352,7 @@ export default function SettingsPage() {
   };
 
   const handleRemoveMember = async (memberId: string) => {
-    if (!org || !confirm("Are you sure you want to remove this member?"))
+    if (!org || !canManageMembers || !confirm("Are you sure you want to remove this member?"))
       return;
     try {
       const res = await fetch(
@@ -392,7 +418,7 @@ export default function SettingsPage() {
   };
 
   const handleCreateWorkspace = async (values: WorkspaceFormValues) => {
-    if (!org) return;
+    if (!org || !canCreateWorkspace) return;
     setIsCreatingWs(true);
     setMessage(null);
 
@@ -471,7 +497,9 @@ export default function SettingsPage() {
               Invitations (
               {isLoading
                 ? "..."
-                : invitations.filter((i) => i.status === "pending").length}
+                : canViewInvites
+                  ? invitations.filter((i) => i.status === "pending").length
+                  : 0}
               )
             </span>
           </TabsTrigger>
@@ -593,8 +621,8 @@ export default function SettingsPage() {
                                     <Lock className="h-3 w-3" /> Locked
                                   </span>
                                 </div>
-                              ) : isCurrentOwner && !isOwner ? (
-                                /* Requirement 5: Allow Owners to manage the roles of other members */
+                              ) : canManageMembers && !isOwner ? (
+                                /* Requirement 5: Allow users with members:manage permission to manage the roles of other members */
                                 <div className="flex items-center gap-2">
                                   <Select
                                     value={pendingRoles[m.id] ?? m.role}
@@ -666,7 +694,7 @@ export default function SettingsPage() {
                             </td>
                             <td className="p-3 text-right">
                               {/* Requirement 6 & 7: Transfer Ownership workflow trigger for Owner */}
-                              {isSelf && isOwner ? (
+                              {isSelf && isOwner && canTransferOwnership ? (
                                 <Button
                                   size="sm"
                                   variant="outline"
@@ -688,8 +716,8 @@ export default function SettingsPage() {
                                   <ArrowRightLeft className="h-3.5 w-3.5 dark:text-amber-400" />
                                   <span>Transfer Ownership</span>
                                 </Button>
-                              ) : !isSelf && isCurrentOwner && !isOwner ? (
-                                /* Requirement 3: Hide self-removal */
+                              ) : !isSelf && canManageMembers && !isOwner ? (
+                                /* Requirement 3: Hide self-removal; only users with members:manage can remove non-owners */
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -714,257 +742,273 @@ export default function SettingsPage() {
 
         {/* Tab 2: Invitations */}
         <TabsContent value="invites" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Invite New Member</CardTitle>
-              <CardDescription>
-                Send an invitation token allowing a teammate to join this
-                organization
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form
-                onSubmit={handleInviteSubmit(handleSendInvite)}
-                noValidate
-                className="flex flex-col sm:flex-row items-start gap-2.5"
-              >
-                <Field
-                  error={inviteErrors.email?.message}
-                  className="relative flex-1 w-full space-y-1"
+          {canInviteMembers && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Invite New Member</CardTitle>
+                <CardDescription>
+                  Send an invitation token allowing a teammate to join this
+                  organization
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  onSubmit={handleInviteSubmit(handleSendInvite)}
+                  noValidate
+                  className="flex flex-col sm:flex-row items-start gap-2.5"
                 >
-                  <div className="relative w-full">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                    <Input
-                      id="inviteEmail"
-                      type="email"
-                      placeholder="Colleague email (e.g. name@company.com)"
-                      className="pl-9 h-9 text-xs w-full bg-input"
-                      {...registerInvite("email")}
-                    />
-                  </div>
-                  <FieldError />
-                </Field>
-                <Select value={inviteRole} onValueChange={setInviteRole}>
-                  <SelectTrigger className="h-9 w-full sm:w-40 text-xs shrink-0 font-sans">
-                    <span className="text-xs truncate leading-none">
-                      <span className="text-muted-foreground">Role:</span>{" "}
-                      <span className="capitalize font-medium text-foreground">
-                        {inviteRole}
+                  <Field
+                    error={inviteErrors.email?.message}
+                    className="relative flex-1 w-full space-y-1"
+                  >
+                    <div className="relative w-full">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      <Input
+                        id="inviteEmail"
+                        type="email"
+                        placeholder="Colleague email (e.g. name@company.com)"
+                        className="pl-9 h-9 text-xs w-full bg-input"
+                        {...registerInvite("email")}
+                      />
+                    </div>
+                    <FieldError />
+                  </Field>
+                  <Select value={inviteRole} onValueChange={setInviteRole}>
+                    <SelectTrigger className="h-9 w-full sm:w-40 text-xs shrink-0 font-sans">
+                      <span className="text-xs truncate leading-none">
+                        <span className="text-muted-foreground">Role:</span>{" "}
+                        <span className="capitalize font-medium text-foreground">
+                          {inviteRole}
+                        </span>
                       </span>
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="member" className="text-xs font-mono">
-                      Member
-                    </SelectItem>
-                    <SelectItem value="admin" className="text-xs font-mono">
-                      Admin
-                    </SelectItem>
-                    <SelectItem value="owner" className="text-xs font-mono">
-                      Owner
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="submit"
-                  isLoading={isInviting}
-                  className="h-9 px-4 text-xs font-medium shrink-0 w-full sm:w-auto cursor-pointer"
-                >
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Send Invite
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="member" className="text-xs font-mono">
+                        Member
+                      </SelectItem>
+                      <SelectItem value="admin" className="text-xs font-mono">
+                        Admin
+                      </SelectItem>
+                      <SelectItem value="owner" className="text-xs font-mono">
+                        Owner
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="submit"
+                    isLoading={isInviting}
+                    className="h-9 px-4 text-xs font-medium shrink-0 w-full sm:w-auto cursor-pointer"
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Send Invite
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          )}
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Active Invitations</CardTitle>
-              <CardDescription>
-                Invitations valid for 7 days from generation
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-border bg-sidebar/50 text-muted-foreground">
-                      <th className="p-3 font-medium">Invited Email</th>
-                      <th className="p-3 font-medium">Role</th>
-                      <th className="p-3 font-medium">Status</th>
-                      <th className="p-3 font-medium">Expires</th>
-                      <th className="p-3 font-medium text-right">
-                        Invite Link / Action
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {isLoading ? (
-                      Array.from({ length: 2 }).map((_, i) => (
-                        <tr key={i} className="animate-pulse">
-                          <td className="p-3">
-                            <div className="h-4 w-36 bg-muted rounded" />
-                          </td>
-                          <td className="p-3">
-                            <div className="h-5 w-16 bg-muted rounded" />
-                          </td>
-                          <td className="p-3">
-                            <div className="h-5 w-16 bg-muted rounded" />
-                          </td>
-                          <td className="p-3">
-                            <div className="h-4 w-24 bg-muted rounded" />
-                          </td>
-                          <td className="p-3 text-right">
-                            <div className="h-4 w-20 bg-muted rounded ml-auto" />
-                          </td>
-                        </tr>
-                      ))
-                    ) : invitations.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="p-6 text-center text-muted-foreground font-mono text-xs"
-                        >
-                          No pending invitations
-                        </td>
+          {!canViewInvites ? (
+            <Card>
+              <CardContent className="p-8 text-center text-muted-foreground font-mono text-xs">
+                Organization invitation management is restricted to authorized administrators.
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader>
+                <CardTitle>Active Invitations</CardTitle>
+                <CardDescription>
+                  Invitations valid for 7 days from generation
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-border bg-sidebar/50 text-muted-foreground">
+                        <th className="p-3 font-medium">Invited Email</th>
+                        <th className="p-3 font-medium">Role</th>
+                        <th className="p-3 font-medium">Status</th>
+                        <th className="p-3 font-medium">Expires</th>
+                        <th className="p-3 font-medium text-right">
+                          Invite Link / Action
+                        </th>
                       </tr>
-                    ) : (
-                      invitations.map((inv) => (
-                        <tr key={inv.id} className="hover:bg-elevated/40">
-                          <td className="p-3 font-mono text-foreground">
-                            {inv.email}
-                          </td>
-                          <td className="p-3">
-                            <Badge variant="outline" className="capitalize">
-                              {inv.role}
-                            </Badge>
-                          </td>
-                          <td className="p-3">
-                            <Badge
-                              variant={
-                                inv.status === "accepted"
-                                  ? "success"
-                                  : inv.status === "pending"
-                                    ? "warning"
-                                    : "destructive"
-                              }
-                              className="capitalize"
-                            >
-                              {inv.status}
-                            </Badge>
-                          </td>
-                          <td className="p-3 font-mono text-[11px] text-muted-foreground">
-                            {formatDate(inv.expiresAt)}
-                          </td>
-                          <td className="p-3 text-right">
-                            {inv.status === "pending" && (
-                              <div className="inline-flex items-center gap-2">
-                                <button
-                                  onClick={() => {
-                                    const url = `${window.location.origin}/invite/${inv.token}`;
-                                    navigator.clipboard.writeText(url);
-                                    setMessage({
-                                      type: "success",
-                                      text: "Invitation link copied to clipboard!",
-                                    });
-                                  }}
-                                  className="text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
-                                  title="Copy invite URL"
-                                >
-                                  <Copy className="h-3 w-3" /> Copy Link
-                                </button>
-                                <button
-                                  onClick={() => handleRevokeInvite(inv.id)}
-                                  className="text-destructive hover:underline cursor-pointer ml-2"
-                                >
-                                  Revoke
-                                </button>
-                              </div>
-                            )}
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {isLoading ? (
+                        Array.from({ length: 2 }).map((_, i) => (
+                          <tr key={i} className="animate-pulse">
+                            <td className="p-3">
+                              <div className="h-4 w-36 bg-muted rounded" />
+                            </td>
+                            <td className="p-3">
+                              <div className="h-5 w-16 bg-muted rounded" />
+                            </td>
+                            <td className="p-3">
+                              <div className="h-5 w-16 bg-muted rounded" />
+                            </td>
+                            <td className="p-3">
+                              <div className="h-4 w-24 bg-muted rounded" />
+                            </td>
+                            <td className="p-3 text-right">
+                              <div className="h-4 w-20 bg-muted rounded ml-auto" />
+                            </td>
+                          </tr>
+                        ))
+                      ) : invitations.length === 0 ? (
+                        <tr>
+                          <td
+                            colSpan={5}
+                            className="p-6 text-center text-muted-foreground font-mono text-xs"
+                          >
+                            No pending invitations
                           </td>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                      ) : (
+                        invitations.map((inv) => (
+                          <tr key={inv.id} className="hover:bg-elevated/40">
+                            <td className="p-3 font-mono text-foreground">
+                              {inv.email}
+                            </td>
+                            <td className="p-3">
+                              <Badge variant="outline" className="capitalize">
+                                {inv.role}
+                              </Badge>
+                            </td>
+                            <td className="p-3">
+                              <Badge
+                                variant={
+                                  inv.status === "accepted"
+                                    ? "success"
+                                    : inv.status === "pending"
+                                      ? "warning"
+                                      : "destructive"
+                                }
+                                className="capitalize"
+                              >
+                                {inv.status}
+                              </Badge>
+                            </td>
+                            <td className="p-3 font-mono text-[11px] text-muted-foreground">
+                              {formatDate(inv.expiresAt)}
+                            </td>
+                            <td className="p-3 text-right">
+                              {inv.status === "pending" && (
+                                <div className="inline-flex items-center gap-2">
+                                  {canInviteMembers && (
+                                    <button
+                                      onClick={() => {
+                                        const url = `${window.location.origin}/invite/${inv.token}`;
+                                        navigator.clipboard.writeText(url);
+                                        setMessage({
+                                          type: "success",
+                                          text: "Invitation link copied to clipboard!",
+                                        });
+                                      }}
+                                      className="text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
+                                      title="Copy invite URL"
+                                    >
+                                      <Copy className="h-3 w-3" /> Copy Link
+                                    </button>
+                                  )}
+                                  {canManageMembers && (
+                                    <button
+                                      onClick={() => handleRevokeInvite(inv.id)}
+                                      className="text-destructive hover:underline cursor-pointer ml-2"
+                                    >
+                                      Revoke
+                                    </button>
+                                  )}
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Tab 3: Workspaces */}
         <TabsContent value="workspaces" className="mt-4 space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Create New Workspace</CardTitle>
-              <CardDescription>
-                Isolate database connections into development, staging, or
-                production boundaries
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form
-                onSubmit={handleWsSubmit(handleCreateWorkspace)}
-                noValidate
-                className="flex flex-col sm:flex-row items-start gap-2.5"
-              >
-                <Field
-                  error={wsErrors.name?.message}
-                  className="relative flex-1 w-full space-y-1"
+          {canCreateWorkspace && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Create New Workspace</CardTitle>
+                <CardDescription>
+                  Isolate database connections into development, staging, or
+                  production boundaries
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form
+                  onSubmit={handleWsSubmit(handleCreateWorkspace)}
+                  noValidate
+                  className="flex flex-col sm:flex-row items-start gap-2.5"
                 >
-                  <div className="relative w-full">
-                    <Layers className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-                    <Input
-                      id="wsName"
-                      type="text"
-                      placeholder="Workspace Name (e.g. Analytics Staging)"
-                      className="pl-9 h-9 text-xs w-full bg-input"
-                      {...registerWs("name")}
-                    />
-                  </div>
-                  <FieldError />
-                </Field>
-                <Select
-                  value={wsEnv}
-                  onValueChange={(
-                    val: "development" | "staging" | "production",
-                  ) => setWsEnv(val)}
-                >
-                  <SelectTrigger className="h-9 w-full sm:w-44 text-xs shrink-0 font-sans">
-                    <span className="text-xs truncate leading-none">
-                      <span className="text-muted-foreground">Env:</span>{" "}
-                      <span className="capitalize font-medium text-foreground">
-                        {wsEnv}
+                  <Field
+                    error={wsErrors.name?.message}
+                    className="relative flex-1 w-full space-y-1"
+                  >
+                    <div className="relative w-full">
+                      <Layers className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      <Input
+                        id="wsName"
+                        type="text"
+                        placeholder="Workspace Name (e.g. Analytics Staging)"
+                        className="pl-9 h-9 text-xs w-full bg-input"
+                        {...registerWs("name")}
+                      />
+                    </div>
+                    <FieldError />
+                  </Field>
+                  <Select
+                    value={wsEnv}
+                    onValueChange={(
+                      val: "development" | "staging" | "production",
+                    ) => setWsEnv(val)}
+                  >
+                    <SelectTrigger className="h-9 w-full sm:w-44 text-xs shrink-0 font-sans">
+                      <span className="text-xs truncate leading-none">
+                        <span className="text-muted-foreground">Env:</span>{" "}
+                        <span className="capitalize font-medium text-foreground">
+                          {wsEnv}
+                        </span>
                       </span>
-                    </span>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem
-                      value="development"
-                      className="text-xs font-mono"
-                    >
-                      Development
-                    </SelectItem>
-                    <SelectItem value="staging" className="text-xs font-mono">
-                      Staging
-                    </SelectItem>
-                    <SelectItem
-                      value="production"
-                      className="text-xs font-mono"
-                    >
-                      Production
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button
-                  type="submit"
-                  isLoading={isCreatingWs}
-                  className="h-9 px-4 text-xs font-medium shrink-0 w-full sm:w-auto cursor-pointer"
-                >
-                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Workspace
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem
+                        value="development"
+                        className="text-xs font-mono"
+                      >
+                        Development
+                      </SelectItem>
+                      <SelectItem value="staging" className="text-xs font-mono">
+                        Staging
+                      </SelectItem>
+                      <SelectItem
+                        value="production"
+                        className="text-xs font-mono"
+                      >
+                        Production
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    type="submit"
+                    isLoading={isCreatingWs}
+                    className="h-9 px-4 text-xs font-medium shrink-0 w-full sm:w-auto cursor-pointer"
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Workspace
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          )}
 
           <Card>
             <CardHeader>
