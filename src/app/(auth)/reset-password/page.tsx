@@ -53,7 +53,9 @@ function ResetPasswordForm() {
 
   const onSubmit = async (values: ResetPasswordFormValues) => {
     if (!token) {
-      setErrorMessage("Missing recovery token. Please request a new password reset.");
+      setErrorMessage(
+        "Missing recovery token. Please request a new password reset.",
+      );
       return;
     }
 
@@ -78,7 +80,7 @@ function ResetPasswordForm() {
       setIsSuccess(true);
     } catch (err: unknown) {
       setErrorMessage(
-        err instanceof Error ? err.message : "An unexpected error occurred."
+        err instanceof Error ? err.message : "An unexpected error occurred.",
       );
     } finally {
       setIsLoading(false);
@@ -116,8 +118,8 @@ function ResetPasswordForm() {
           Password updated
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Your password has been reset. All prior active sessions have been revoked.
-          You may now sign in with your new credentials.
+          Your password has been reset. All prior active sessions have been
+          revoked. You may now sign in with your new credentials.
         </p>
         <div className="pt-2">
           <Link
@@ -132,11 +134,7 @@ function ResetPasswordForm() {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit(onSubmit)}
-      noValidate
-      className="space-y-3"
-    >
+    <form onSubmit={handleSubmit(onSubmit)} noValidate className="space-y-3">
       {errorMessage && (
         <div className="p-2.5 rounded-md bg-destructive/10 border border-destructive/20 text-destructive text-xs">
           {errorMessage}
@@ -144,10 +142,7 @@ function ResetPasswordForm() {
       )}
 
       <Field error={errors.password?.message}>
-        <FieldLabel
-          htmlFor="password"
-          className="text-xs font-medium"
-        >
+        <FieldLabel htmlFor="password" className="text-xs font-medium">
           New Password
         </FieldLabel>
         <PasswordInput
@@ -160,10 +155,7 @@ function ResetPasswordForm() {
       </Field>
 
       <Field error={errors.confirmPassword?.message}>
-        <FieldLabel
-          htmlFor="confirmPassword"
-          className="text-xs font-medium"
-        >
+        <FieldLabel htmlFor="confirmPassword" className="text-xs font-medium">
           Confirm New Password
         </FieldLabel>
         <PasswordInput
@@ -198,7 +190,6 @@ export default function ResetPasswordPage() {
             className="h-12 w-12 drop-shadow-xs"
             priority
           />
-          <h1 className="text-xl font-bold tracking-tight">CHRONOS</h1>
           <p className="text-xs text-muted-foreground font-mono">
             Create New Password
           </p>
