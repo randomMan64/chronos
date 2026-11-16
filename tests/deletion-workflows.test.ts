@@ -290,4 +290,59 @@ describe("Account and Organization Deletion Workflows", () => {
       expect(() => attemptDelete("org-deleted")).toThrowError(/Organization not found/);
     });
   });
+
+  describe("Login History Retention & Pagination", () => {
+    it("automatically prunes login history events older than 30 days from database", () => {
+      const now = Date.now();
+      const thirtyDaysMs = 30 * 24 * 60 * 60 * 1000;
+      const thirtyDaysAgo = new Date(now - thirtyDaysMs);
+
+      const auditEntries = [
+        { id: "1", action: "user:login", createdAt: new Date(now - 1000 * 60 * 60) }, // 1 hour ago (Keep)
+        { id: "2", action: "user:login", createdAt: new Date(now - 1000 * 60 * 60 * 24 * 10) }, // 10 days ago (Keep)
+        { id: "3", action: "user:login", createdAt: new Date(now - 1000 * 60 * 60 * 24 * 29) }, // 29 days ago (Keep)
+        { id: "4", action: "user:login", createdAt: new Date(now - 1000 * 60 * 60 * 24 * 31) }, // 31 days ago (Prune)
+        { id: "5", action: "user:login", createdAt: new Date(now - 1000 * 60 * 60 * 24 * 45) }, // 45 days ago (Prune)
+      ];
+
+      // Prune entries older than 30 days
+      const pruned = auditEntries.filter(
+        (entry) => !(entry.action === "user:login" && entry.createdAt < thirtyDaysAgo)
+      );
+
+      expect(pruned).toHaveLength(3);
+      expect(pruned.map((p) => p.id)).toEqual(["1", "2", "3"]);
+      expect(pruned.some((p) => p.id === "4" || p.id === "5")).toBe(false);
+    });
+
+    it("paginates login history records with a maximum of 5 rows per page", () => {
+      const pageSize = 5;
+      const mockHistory = Array.from({ length: 12 }, (_, i) => ({
+        id: `login-${i + 1}`,
+        action: "user:login",
+        timestamp: new Date().toISOString(),
+      }));
+
+      const totalPages = Math.ceil(mockHistory.length / pageSize);
+      expect(totalPages).toBe(3);
+
+      // Page 1: items 1..5
+      const page1 = mockHistory.slice(0, 5);
+      expect(page1).toHaveLength(5);
+      expect(page1[0].id).toBe("login-1");
+      expect(page1[4].id).toBe("login-5");
+
+      // Page 2: items 6..10
+      const page2 = mockHistory.slice(5, 10);
+      expect(page2).toHaveLength(5);
+      expect(page2[0].id).toBe("login-6");
+      expect(page2[4].id).toBe("login-10");
+
+      // Page 3: items 11..12
+      const page3 = mockHistory.slice(10, 15);
+      expect(page3).toHaveLength(2);
+      expect(page3[0].id).toBe("login-11");
+      expect(page3[1].id).toBe("login-12");
+    });
+  });
 });

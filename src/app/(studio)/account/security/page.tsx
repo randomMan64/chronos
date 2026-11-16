@@ -29,6 +29,8 @@ import {
   Lock,
   LogOut,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 
 const passwordSchema = z
@@ -124,6 +126,8 @@ export default function AccountSecurityPage() {
   const [isChangingPassword, setIsChangingPassword] = React.useState(false);
   const [isRevoking, setIsRevoking] = React.useState(false);
   const [showRevokeModal, setShowRevokeModal] = React.useState(false);
+  const [loginHistoryPage, setLoginHistoryPage] = React.useState(1);
+  const LOGIN_HISTORY_PAGE_SIZE = 5;
   const [alert, setAlert] = React.useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
   const {
@@ -198,6 +202,13 @@ export default function AccountSecurityPage() {
       setIsRevoking(false);
     }
   };
+
+  const totalLoginEvents = data?.loginHistory || [];
+  const totalLoginPages = Math.ceil(totalLoginEvents.length / LOGIN_HISTORY_PAGE_SIZE) || 1;
+  const paginatedLoginHistory = totalLoginEvents.slice(
+    (loginHistoryPage - 1) * LOGIN_HISTORY_PAGE_SIZE,
+    loginHistoryPage * LOGIN_HISTORY_PAGE_SIZE
+  );
 
   return (
     <div className="space-y-5 w-full pb-10">
@@ -392,8 +403,8 @@ export default function AccountSecurityPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {data && data.loginHistory.length > 0 ? (
-                      data.loginHistory.map((log) => (
+                    {paginatedLoginHistory.length > 0 ? (
+                      paginatedLoginHistory.map((log) => (
                         <tr key={log.id} className="hover:bg-elevated/20 transition-colors">
                           <td className="px-3.5 py-2.5 font-medium text-foreground">
                             {log.action.replace("user:", "").replace("user.", "").replace(/[:._]/g, " ")}
@@ -420,6 +431,43 @@ export default function AccountSecurityPage() {
                     )}
                   </tbody>
                 </table>
+
+                {/* Pagination Controls (Max 5 per page) */}
+                {totalLoginEvents.length > LOGIN_HISTORY_PAGE_SIZE && (
+                  <div className="h-10 border-t border-border px-3.5 flex items-center justify-between bg-panel text-xs">
+                    <div className="flex items-center gap-2 text-muted-foreground font-mono text-[11px]">
+                      Showing {(loginHistoryPage - 1) * LOGIN_HISTORY_PAGE_SIZE + 1}–
+                      {Math.min(loginHistoryPage * LOGIN_HISTORY_PAGE_SIZE, totalLoginEvents.length)} of{" "}
+                      {totalLoginEvents.length}
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={loginHistoryPage === 1}
+                        onClick={() => setLoginHistoryPage((p) => Math.max(1, p - 1))}
+                        className="h-6 px-2 text-[10px] cursor-pointer"
+                      >
+                        <ChevronLeft className="h-3 w-3 mr-0.5" /> Prev
+                      </Button>
+                      <span className="text-[11px] font-mono text-muted-foreground px-1">
+                        Page {loginHistoryPage} of {totalLoginPages}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={loginHistoryPage >= totalLoginPages}
+                        onClick={() => setLoginHistoryPage((p) => Math.min(totalLoginPages, p + 1))}
+                        className="h-6 px-2 text-[10px] cursor-pointer"
+                      >
+                        Next <ChevronRight className="h-3 w-3 ml-0.5" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

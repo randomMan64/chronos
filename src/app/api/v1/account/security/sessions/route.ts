@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { db } from "@/db/connections/control-plane";
 import { userSessions, auditLogs } from "@/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, lt, gte } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +43,23 @@ export async function GET() {
       });
     }
 
-    // 2. Fetch login history for this user
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+
+    // Automatically prune login history older than 30 days from database
+    try {
+      await db
+        .delete(auditLogs)
+        .where(
+          and(
+            eq(auditLogs.action, "user:login"),
+            lt(auditLogs.createdAt, thirtyDaysAgo)
+          )
+        );
+    } catch (cleanupErr) {
+      console.warn("Failed to prune expired login history:", cleanupErr);
+    }
+
+    // 2. Fetch login history for this user within the past 30 days
     const loginHistory = await db
       .select({
         id: auditLogs.id,
@@ -54,9 +70,14 @@ export async function GET() {
         createdAt: auditLogs.createdAt,
       })
       .from(auditLogs)
-      .where(and(eq(auditLogs.actorId, sessionUser.userId), eq(auditLogs.action, "user:login")))
-      .orderBy(desc(auditLogs.createdAt))
-      .limit(10);
+      .where(
+        and(
+          eq(auditLogs.actorId, sessionUser.userId),
+          eq(auditLogs.action, "user:login"),
+          gte(auditLogs.createdAt, thirtyDaysAgo)
+        )
+      )
+      .orderBy(desc(auditLogs.createdAt));
 
     return NextResponse.json({
       sessions,
