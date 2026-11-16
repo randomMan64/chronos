@@ -77,6 +77,7 @@ import {
   Crown,
   Lock,
   ArrowRightLeft,
+  ShieldAlert,
 } from "lucide-react";
 
 export default function SettingsPage() {
@@ -97,6 +98,7 @@ export default function SettingsPage() {
   const [permissions, setPermissions] = React.useState<string[]>([]);
 
   // Permission-derived capabilities
+  const isOwner = org?.role === "owner";
   const canInviteMembers = hasPermission(permissions, "members:invite");
   const canManageMembers = hasPermission(permissions, "members:manage");
   const canCreateWorkspace = hasPermission(permissions, "workspace:create");
@@ -156,6 +158,25 @@ export default function SettingsPage() {
     role: string;
   } | null>(null);
   const [isRemovingMember, setIsRemovingMember] = React.useState(false);
+
+  // Organization Deletion state
+  const [showOrgDeleteModal, setShowOrgDeleteModal] = React.useState(false);
+  const [orgDeletionPreview, setOrgDeletionPreview] = React.useState<{
+    organizationId: string;
+    name: string;
+    slug: string;
+    memberCount: number;
+    workspaceCount: number;
+    databaseCount: number;
+    pendingInviteCount: number;
+    resourcesAffected: string[];
+    databaseSafetyNotice: string;
+  } | null>(null);
+  const [isLoadingOrgPreview, setIsLoadingOrgPreview] = React.useState(false);
+  const [orgDeletePassword, setOrgDeletePassword] = React.useState("");
+  const [orgDeleteConfirmName, setOrgDeleteConfirmName] = React.useState("");
+  const [isDeletingOrg, setIsDeletingOrg] = React.useState(false);
+  const [orgDeleteError, setOrgDeleteError] = React.useState<string | null>(null);
 
   const {
     register: registerInvite,
@@ -388,6 +409,57 @@ export default function SettingsPage() {
       setMessage({ type: "error", text: "Failed to remove member" });
     } finally {
       setIsRemovingMember(false);
+    }
+  };
+
+  const handleOpenOrgDeleteModal = async () => {
+    if (!org) return;
+    setOrgDeleteError(null);
+    setOrgDeletePassword("");
+    setOrgDeleteConfirmName("");
+    setShowOrgDeleteModal(true);
+    setIsLoadingOrgPreview(true);
+    try {
+      const res = await fetch(`/api/v1/organizations/${org.id}/deletion-preview`);
+      if (res.ok) {
+        const data = await res.json();
+        setOrgDeletionPreview(data);
+      } else {
+        const err = await res.json();
+        setOrgDeleteError(err.error || "Failed to load deletion preview");
+      }
+    } catch {
+      setOrgDeleteError("Failed to fetch organization details");
+    } finally {
+      setIsLoadingOrgPreview(false);
+    }
+  };
+
+  const handleConfirmDeleteOrg = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!org || !orgDeletePassword || orgDeleteConfirmName.trim() !== org.name.trim()) return;
+    setIsDeletingOrg(true);
+    setOrgDeleteError(null);
+    try {
+      const res = await fetch(`/api/v1/organizations/${org.id}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: orgDeletePassword,
+          confirmOrgName: orgDeleteConfirmName.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setOrgDeleteError(data.error || "Failed to delete organization");
+        setIsDeletingOrg(false);
+        return;
+      }
+      // Navigate to nextUrl (e.g. /dashboard or /init)
+      window.location.href = data.nextUrl || "/dashboard";
+    } catch {
+      setOrgDeleteError("Network error occurred while deleting organization.");
+      setIsDeletingOrg(false);
     }
   };
 
@@ -1288,6 +1360,44 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
 
+      {/* Danger Zone: Organization Deletion (Only displayed to Organization Owners) */}
+      {isOwner && (
+        <Card className="mt-8 border-destructive/30 bg-destructive/5">
+          <CardHeader className="pb-3 space-y-1">
+            <div className="flex items-center gap-2 text-destructive">
+              <ShieldAlert className="h-4 w-4" />
+              <CardTitle className="text-sm font-semibold">Danger Zone</CardTitle>
+            </div>
+            <CardDescription className="text-xs text-muted-foreground">
+              Permanently delete this organization, workspaces, and remove registered database configurations.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+              <div className="space-y-0.5">
+                <p className="text-xs font-medium text-foreground">
+                  Delete organization: <strong className="text-foreground font-semibold">{org?.name}</strong>
+                </p>
+                <p className="text-[11px] text-muted-foreground max-w-xl leading-relaxed">
+                  Permanently deletes all workspaces, role assignments, saved queries, and connection registrations.
+                  External PostgreSQL databases (e.g. Neon, AWS RDS) will not be dropped or modified.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                onClick={handleOpenOrgDeleteModal}
+                className="text-xs h-8 cursor-pointer shrink-0 gap-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Organization</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* SHADCN DIALOG: Transfer Ownership */}
       <Dialog open={showTransferModal} onOpenChange={setShowTransferModal}>
         <DialogContent className="sm:max-w-md border-border/80 shadow-lg">
@@ -1533,6 +1643,143 @@ export default function SettingsPage() {
               <span>Remove Member</span>
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* SHADCN DIALOG: Delete Organization Confirmation */}
+      <Dialog open={showOrgDeleteModal} onOpenChange={setShowOrgDeleteModal}>
+        <DialogContent className="sm:max-w-lg">
+          <form onSubmit={handleConfirmDeleteOrg}>
+            <DialogHeader className="space-y-1.5 pb-2">
+              <div className="flex items-center gap-2 text-destructive">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10">
+                  <Trash2 className="h-4 w-4" />
+                </div>
+                <DialogTitle className="text-base font-semibold text-foreground">
+                  Delete Organization
+                </DialogTitle>
+              </div>
+              <DialogDescription className="text-xs text-muted-foreground pt-1 leading-normal">
+                This action is irreversible. All CHRONOS metadata, workspaces, and configurations for{" "}
+                <strong className="text-foreground font-semibold">{org?.name}</strong> will be permanently removed.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3.5 py-3">
+              {/* Summary Stats Grid */}
+              <div className="rounded-lg border border-border/70 bg-panel/60 p-3 space-y-2">
+                <p className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Impacted Resources
+                </p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                  <div className="rounded-md border border-border/50 bg-elevated/40 p-2">
+                    <div className="text-base font-bold font-mono text-foreground">
+                      {isLoadingOrgPreview ? "..." : (orgDeletionPreview?.memberCount ?? members.length)}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">Members</div>
+                  </div>
+                  <div className="rounded-md border border-border/50 bg-elevated/40 p-2">
+                    <div className="text-base font-bold font-mono text-foreground">
+                      {isLoadingOrgPreview ? "..." : (orgDeletionPreview?.workspaceCount ?? workspaces.length)}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">Workspaces</div>
+                  </div>
+                  <div className="rounded-md border border-border/50 bg-elevated/40 p-2">
+                    <div className="text-base font-bold font-mono text-foreground">
+                      {isLoadingOrgPreview ? "..." : (orgDeletionPreview?.databaseCount ?? 0)}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">Databases</div>
+                  </div>
+                  <div className="rounded-md border border-border/50 bg-elevated/40 p-2">
+                    <div className="text-base font-bold font-mono text-foreground">
+                      {isLoadingOrgPreview
+                        ? "..."
+                        : (orgDeletionPreview?.pendingInviteCount ??
+                          invitations.filter((i) => i.status === "pending").length)}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">Pending Invites</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* What is deleted vs retained notice */}
+              <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive space-y-1">
+                <p className="font-semibold flex items-center gap-1.5">
+                  <ShieldAlert className="h-3.5 w-3.5" />
+                  <span>External Database Safety Guarantee</span>
+                </p>
+                <p className="text-[11px] leading-relaxed text-destructive/90">
+                  External PostgreSQL databases (such as Neon, AWS RDS, or self-hosted) will <strong>NOT</strong> be destroyed or modified.
+                  Only CHRONOS workspaces, access policies, and encrypted connection profiles will be removed.
+                </p>
+              </div>
+
+              {orgDeleteError && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/15 p-2.5 text-xs text-destructive flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{orgDeleteError}</span>
+                </div>
+              )}
+
+              {/* Re-authentication: Password */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">
+                  Current Password <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  type="password"
+                  value={orgDeletePassword}
+                  onChange={(e) => setOrgDeletePassword(e.target.value)}
+                  placeholder="Enter your password to verify"
+                  className="h-8 text-xs bg-elevated/40"
+                  required
+                />
+              </div>
+
+              {/* Exact name match */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">
+                  To confirm, type <span className="font-semibold text-foreground">&quot;{org?.name}&quot;</span> below:
+                </label>
+                <Input
+                  type="text"
+                  value={orgDeleteConfirmName}
+                  onChange={(e) => setOrgDeleteConfirmName(e.target.value)}
+                  placeholder={org?.name || "Organization Name"}
+                  className="h-8 text-xs font-mono bg-elevated/40"
+                  required
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border/50">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowOrgDeleteModal(false)}
+                disabled={isDeletingOrg}
+                className="text-xs h-8 cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                size="sm"
+                isLoading={isDeletingOrg}
+                disabled={
+                  isDeletingOrg ||
+                  !orgDeletePassword ||
+                  orgDeleteConfirmName.trim() !== (org?.name || "").trim()
+                }
+                className="text-xs h-8 cursor-pointer gap-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Organization</span>
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </div>

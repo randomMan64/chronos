@@ -17,7 +17,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Settings, Globe, Clock, Calendar, CheckCircle2 } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Settings, Globe, Clock, Calendar, CheckCircle2, ShieldAlert, AlertTriangle, Trash2 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 import { useTranslation, type SupportedLocale } from "@/lib/i18n";
 
@@ -99,6 +107,19 @@ export default function AccountSettingsPage() {
   const [saveStatus, setSaveStatus] = React.useState<"idle" | "success" | "error">("idle");
   const [saveMessage, setSaveMessage] = React.useState<string>("");
 
+  // Account Deletion State
+  const [eligibility, setEligibility] = React.useState<{
+    canDelete: boolean;
+    blockingOrganizations: Array<{ id: string; name: string }>;
+    membershipsCount: number;
+    retentionNotice?: string;
+  } | null>(null);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = React.useState(false);
+  const [deletePassword, setDeletePassword] = React.useState("");
+  const [deleteConfirmation, setDeleteConfirmation] = React.useState("");
+  const [isDeleting, setIsDeleting] = React.useState(false);
+  const [deleteError, setDeleteError] = React.useState<string | null>(null);
+
   const {
     register,
     handleSubmit,
@@ -167,9 +188,50 @@ export default function AccountSettingsPage() {
     }
   }, [reset, setLocale]);
 
+  const loadAccountEligibility = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/v1/account");
+      if (res.ok) {
+        const data = await res.json();
+        setEligibility(data);
+      }
+    } catch {
+      // Quietly ignore
+    }
+  }, []);
+
   React.useEffect(() => {
     loadPreferences();
-  }, [loadPreferences]);
+    loadAccountEligibility();
+  }, [loadPreferences, loadAccountEligibility]);
+
+  const handleDeleteAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deletePassword || deleteConfirmation !== "DELETE") return;
+    setIsDeleting(true);
+    setDeleteError(null);
+    try {
+      const res = await fetch("/api/v1/account", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          password: deletePassword,
+          confirmationPhrase: deleteConfirmation,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setDeleteError(data.error || "Failed to delete account");
+        setIsDeleting(false);
+        return;
+      }
+      // Successful deletion redirects to login
+      window.location.href = data.nextUrl || "/login";
+    } catch {
+      setDeleteError("A network error occurred. Please try again.");
+      setIsDeleting(false);
+    }
+  };
 
   const onSubmit = async (values: SettingsFormValues) => {
     try {
@@ -431,6 +493,151 @@ export default function AccountSettingsPage() {
           </div>
         </form>
       )}
+
+      {/* Danger Zone: Account Deletion */}
+      <Card className="mt-8 border-destructive/30 bg-destructive/5">
+        <CardHeader className="pb-3 space-y-1">
+          <div className="flex items-center gap-2 text-destructive">
+            <ShieldAlert className="h-4 w-4" />
+            <CardTitle className="text-sm font-semibold">Danger Zone</CardTitle>
+          </div>
+          <CardDescription className="text-xs text-muted-foreground">
+            Permanently delete your account and personal credentials.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {eligibility && !eligibility.canDelete && (
+            <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-200 space-y-1">
+              <div className="flex items-center gap-1.5 font-semibold text-amber-400">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                <span>Account Deletion Blocked</span>
+              </div>
+              <p className="text-[11px] leading-relaxed">
+                You are the sole Owner of the following organization(s):{" "}
+                <strong className="text-foreground font-semibold">
+                  {eligibility.blockingOrganizations.map((o) => o.name).join(", ")}
+                </strong>.
+                You must transfer ownership to another member or delete the organization before deleting your account.
+              </p>
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
+            <div className="space-y-0.5">
+              <p className="text-xs font-medium text-foreground">Delete this account</p>
+              <p className="text-[11px] text-muted-foreground max-w-lg">
+                Once deleted, your active sessions, preferences, and personal profile will be permanently removed.
+                Audit records will be retained with your identity anonymized.
+              </p>
+            </div>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              disabled={eligibility ? !eligibility.canDelete : false}
+              onClick={() => {
+                setDeleteError(null);
+                setDeletePassword("");
+                setDeleteConfirmation("");
+                setIsDeleteModalOpen(true);
+              }}
+              className="text-xs h-8 cursor-pointer shrink-0 gap-1.5"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Delete Account</span>
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* SHADCN DIALOG: Delete Account Confirmation */}
+      <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
+        <DialogContent className="sm:max-w-md">
+          <form onSubmit={handleDeleteAccount}>
+            <DialogHeader className="space-y-1.5 pb-2">
+              <div className="flex items-center gap-2 text-destructive">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10">
+                  <Trash2 className="h-4 w-4" />
+                </div>
+                <DialogTitle className="text-base font-semibold text-foreground">
+                  Permanently Delete Account
+                </DialogTitle>
+              </div>
+              <DialogDescription className="text-xs text-muted-foreground pt-1">
+                This action is irreversible. All of your active sessions, personal preferences, and profile data will be permanently wiped.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3 py-3">
+              <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive space-y-1">
+                <p className="font-semibold">Compliance & Safety Notice</p>
+                <p className="text-[11px] leading-relaxed text-destructive/90">
+                  Active organizations, workspaces, and connected databases will remain intact. Historical audit trails are preserved with your identity anonymized.
+                </p>
+              </div>
+
+              {deleteError && (
+                <div className="rounded-md border border-destructive/30 bg-destructive/15 p-2.5 text-xs text-destructive flex items-start gap-2">
+                  <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                  <span>{deleteError}</span>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">
+                  Current Password <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  type="password"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  placeholder="Enter your current password to verify"
+                  className="h-8 text-xs bg-elevated/40"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-foreground">
+                  To confirm, type <span className="font-mono font-bold text-destructive">DELETE</span> below:
+                </label>
+                <Input
+                  type="text"
+                  value={deleteConfirmation}
+                  onChange={(e) => setDeleteConfirmation(e.target.value)}
+                  placeholder="DELETE"
+                  className="h-8 text-xs font-mono bg-elevated/40"
+                  required
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border/50">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsDeleteModalOpen(false)}
+                disabled={isDeleting}
+                className="text-xs h-8 cursor-pointer"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="destructive"
+                size="sm"
+                isLoading={isDeleting}
+                disabled={isDeleting || deleteConfirmation !== "DELETE" || !deletePassword}
+                className="text-xs h-8 cursor-pointer gap-1.5"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+                <span>Delete Account</span>
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

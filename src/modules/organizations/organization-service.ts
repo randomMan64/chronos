@@ -1,10 +1,19 @@
 import { db } from "@/db/connections/control-plane";
-import { organizations, organizationMembers, users, workspaces, workspaceMembers } from "@/db/schema";
+import {
+  organizations,
+  organizationMembers,
+  users,
+  workspaces,
+  workspaceMembers,
+  databases,
+  invitations,
+} from "@/db/schema";
 import { eq, and, sql, count } from "drizzle-orm";
 import { OrganizationRole } from "@/lib/permissions/types";
 import { AuditService } from "@/modules/audit/audit-service";
 import { ForbiddenError } from "@/lib/auth/guards";
 import crypto from "crypto";
+import bcrypt from "bcryptjs";
 
 export class OrganizationService {
   public static async createOrganization(params: {
@@ -458,6 +467,189 @@ export class OrganizationService {
         success: true,
         newOwner,
         previousOwner: prevOwnerUpdated,
+      };
+    });
+  }
+
+  public static async getOrganizationDeletionPreview(organizationId: string, actorId: string) {
+    // 1. Fetch organization
+    const [org] = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, organizationId))
+      .limit(1);
+
+    if (!org) {
+      throw new Error("Organization not found.");
+    }
+
+    // 2. Verify actor is an Owner
+    const [actorMember] = await db
+      .select({ role: organizationMembers.role })
+      .from(organizationMembers)
+      .where(
+        and(
+          eq(organizationMembers.organizationId, organizationId),
+          eq(organizationMembers.userId, actorId)
+        )
+      )
+      .limit(1);
+
+    if (!actorMember || actorMember.role !== "owner") {
+      throw new ForbiddenError("Only an Organization Owner can delete the organization.", 403);
+    }
+
+    // 3. Gather stats
+    const [memberCountRes] = await db
+      .select({ count: count() })
+      .from(organizationMembers)
+      .where(eq(organizationMembers.organizationId, organizationId));
+
+    const [workspaceCountRes] = await db
+      .select({ count: count() })
+      .from(workspaces)
+      .where(eq(workspaces.organizationId, organizationId));
+
+    const [databaseCountRes] = await db
+      .select({ count: count() })
+      .from(databases)
+      .where(eq(databases.organizationId, organizationId));
+
+    const [pendingInviteCountRes] = await db
+      .select({ count: count() })
+      .from(invitations)
+      .where(
+        and(
+          eq(invitations.organizationId, organizationId),
+          eq(invitations.status, "pending")
+        )
+      );
+
+    return {
+      organizationId: org.id,
+      name: org.name,
+      slug: org.slug,
+      memberCount: Number(memberCountRes?.count || 0),
+      workspaceCount: Number(workspaceCountRes?.count || 0),
+      databaseCount: Number(databaseCountRes?.count || 0),
+      pendingInviteCount: Number(pendingInviteCountRes?.count || 0),
+      resourcesAffected: [
+        "All workspaces, environments, and workspace member role assignments",
+        "All registered database connection metadata and credentials stored in CHRONOS",
+        "All pending invitations and access tokens",
+        "All saved queries and audit trail references for this organization",
+      ],
+      databaseSafetyNotice:
+        "External Database Safety: External PostgreSQL databases (Neon, AWS RDS, GCP Cloud SQL, or self-hosted) will NOT be dropped or modified. Only CHRONOS control plane registration metadata is removed.",
+    };
+  }
+
+  public static async deleteOrganization(params: {
+    organizationId: string;
+    actorId: string;
+    actorEmail?: string;
+    password: string;
+    confirmOrgName: string;
+  }) {
+    // 1. Fetch organization
+    const [org] = await db
+      .select()
+      .from(organizations)
+      .where(eq(organizations.id, params.organizationId))
+      .limit(1);
+
+    if (!org) {
+      throw new Error("Organization not found.");
+    }
+
+    // 2. Verify actor is an Owner
+    const [actorMember] = await db
+      .select({
+        id: organizationMembers.id,
+        role: organizationMembers.role,
+        email: users.email,
+        passwordHash: users.passwordHash,
+      })
+      .from(organizationMembers)
+      .innerJoin(users, eq(users.id, organizationMembers.userId))
+      .where(
+        and(
+          eq(organizationMembers.organizationId, params.organizationId),
+          eq(organizationMembers.userId, params.actorId)
+        )
+      )
+      .limit(1);
+
+    if (!actorMember || actorMember.role !== "owner") {
+      throw new ForbiddenError("Only an Organization Owner can delete the organization.", 403);
+    }
+
+    // 3. Confirm exact organization name match
+    if (params.confirmOrgName.trim() !== org.name.trim()) {
+      throw new Error(`Confirmation failed: Provided name does not match '${org.name}'.`);
+    }
+
+    // 4. Re-authenticate actor password
+    const isPasswordValid = await bcrypt.compare(params.password, actorMember.passwordHash);
+    if (!isPasswordValid) {
+      throw new Error("Password incorrect. Re-authentication failed.");
+    }
+
+    // 5. Audit record the deletion request before tearing down resources
+    await AuditService.log({
+      organizationId: params.organizationId,
+      actorId: params.actorId,
+      actorEmail: params.actorEmail || actorMember.email,
+      action: "organization:delete",
+      resourceType: "organization",
+      resourceId: params.organizationId,
+      outcome: "success",
+      metadata: {
+        organizationName: org.name,
+        organizationSlug: org.slug,
+        deletedBy: actorMember.email,
+        deletedAt: new Date().toISOString(),
+        externalDatabasesUnaffected: true,
+      },
+    });
+
+    // 6. Safe, transactional deletion
+    return await db.transaction(async (tx) => {
+      // Row lock the organization to prevent race conditions
+      await tx.execute(
+        sql`SELECT id FROM organizations WHERE id = ${params.organizationId} FOR UPDATE`
+      );
+
+      // Revoke all pending invitations
+      await tx
+        .update(invitations)
+        .set({ status: "revoked" })
+        .where(eq(invitations.organizationId, params.organizationId));
+
+      // Remove database connection registrations (only metadata in control plane - external databases are NEVER dropped)
+      await tx
+        .delete(databases)
+        .where(eq(databases.organizationId, params.organizationId));
+
+      // Remove workspaces
+      await tx
+        .delete(workspaces)
+        .where(eq(workspaces.organizationId, params.organizationId));
+
+      // Remove organization members
+      await tx
+        .delete(organizationMembers)
+        .where(eq(organizationMembers.organizationId, params.organizationId));
+
+      // Delete the organization
+      await tx
+        .delete(organizations)
+        .where(eq(organizations.id, params.organizationId));
+
+      return {
+        success: true,
+        deletedOrganizationId: params.organizationId,
+        deletedOrganizationName: org.name,
       };
     });
   }

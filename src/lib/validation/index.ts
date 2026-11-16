@@ -26,6 +26,18 @@ export const transferOwnershipSchema = z.object({
   previousOwnerNewRole: z.enum(["admin", "member"]).default("admin"),
 });
 
+export const deleteAccountSchema = z.object({
+  password: z.string().min(1, "Password is required for re-authentication"),
+  confirmationPhrase: z.string().refine((val): val is string => val === "DELETE", {
+    message: 'Type "DELETE" to confirm account deletion',
+  }),
+});
+
+export const deleteOrganizationSchema = z.object({
+  password: z.string().min(1, "Password is required for re-authentication"),
+  confirmOrgName: z.string().min(1, "Organization name is required to confirm"),
+});
+
 // Organizations & Workspaces
 export const createOrganizationSchema = z.object({
   name: z.string().min(2, "Organization name must be at least 2 characters"),
