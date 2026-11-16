@@ -61,30 +61,30 @@ export async function GET() {
       .innerJoin(organizations, eq(organizations.id, organizationMembers.organizationId))
       .where(eq(organizationMembers.userId, user.id));
 
-    return NextResponse.json({
-      user,
-      organizations: orgs,
-    });
-  } catch (err) {
-    console.warn("Failed to fetch account profile from DB, returning session fallback:", err);
-    return NextResponse.json({
-      user: {
-        id: sessionUser.userId,
-        email: sessionUser.email,
-        fullName: sessionUser.email.split("@")[0].toUpperCase() || "Admin User",
-        avatarUrl: null,
-        createdAt: new Date().toISOString(),
+    return NextResponse.json(
+      {
+        user,
+        organizations: orgs,
       },
-      organizations: [
-        {
-          id: "default-org",
-          name: "Acme Enterprise",
-          slug: "acme-enterprise",
-          role: "owner",
-          joinedAt: new Date().toISOString(),
+      {
+        headers: {
+          "Cache-Control": "private, no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
         },
-      ],
-    });
+      }
+    );
+  } catch (err) {
+    console.error("Failed to fetch account profile from DB:", err);
+    return NextResponse.json(
+      { error: "Failed to load account profile" },
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "private, no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
+      }
+    );
   }
 }
 

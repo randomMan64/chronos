@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/db/connections/control-plane";
 import { users, userSessions, organizationMembers, organizations, workspaces } from "@/db/schema";
 import { loginSchema } from "@/lib/validation";
-import { createSessionToken, setSessionCookie } from "@/lib/auth/session";
+import { createSessionToken, setSessionCookie, attachSessionCookieToResponse } from "@/lib/auth/session";
 import { AuditService } from "@/modules/audit/audit-service";
 import { handleApiError } from "@/lib/errors";
 import { eq, and } from "drizzle-orm";
@@ -97,30 +97,42 @@ export async function POST(req: Request) {
       });
     }
 
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        fullName: user.fullName,
+    const response = NextResponse.json(
+      {
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          fullName: user.fullName,
+        },
+        organization: defaultOrg
+          ? {
+              id: defaultOrg.id,
+              name: defaultOrg.name,
+              slug: defaultOrg.slug,
+              role: orgMems[0]?.member.role,
+            }
+          : null,
+        workspace: defaultWs
+          ? {
+              id: defaultWs.id,
+              name: defaultWs.name,
+              slug: defaultWs.slug,
+              environment: defaultWs.environment,
+            }
+          : null,
       },
-      organization: defaultOrg
-        ? {
-            id: defaultOrg.id,
-            name: defaultOrg.name,
-            slug: defaultOrg.slug,
-            role: orgMems[0]?.member.role,
-          }
-        : null,
-      workspace: defaultWs
-        ? {
-            id: defaultWs.id,
-            name: defaultWs.name,
-            slug: defaultWs.slug,
-            environment: defaultWs.environment,
-          }
-        : null,
-    });
+      {
+        headers: {
+          "Cache-Control": "private, no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
+      }
+    );
+
+    attachSessionCookieToResponse(response, sessionToken);
+
+    return response;
   } catch (err) {
     const error = handleApiError(err);
     return NextResponse.json(error.body, { status: error.status });

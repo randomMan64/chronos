@@ -8,7 +8,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Field, FieldLabel, FieldError } from "@/components/ui/field";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -40,17 +46,14 @@ interface TransferFormValues {
 
 const transferSchema = z.object({
   newOwnerMemberId: z.string().min(1, "Select an eligible member"),
-  confirmationPhrase: z.string().refine((val): val is string => val === "TRANSFER_OWNERSHIP", {
-    message: 'Type "TRANSFER_OWNERSHIP" to confirm',
-  }),
+  confirmationPhrase: z
+    .string()
+    .refine((val): val is string => val === "TRANSFER_OWNERSHIP", {
+      message: 'Type "TRANSFER_OWNERSHIP" to confirm',
+    }),
   previousOwnerNewRole: z.enum(["admin", "member"]).default("admin"),
 });
-import {
-  Tabs,
-  TabsList,
-  TabsTrigger,
-  TabsContent,
-} from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -79,37 +82,54 @@ export default function SettingsPage() {
   const [activeTab, setActiveTab] = React.useState<string>("members");
 
   // Organization & Session state
-  const [currentUser, setCurrentUser] = React.useState<{ id: string; email: string; fullName: string } | null>(null);
-  const [org, setOrg] = React.useState<{ id: string; name: string; slug: string; role?: string } | null>(null);
-  const [members, setMembers] = React.useState<Array<{
+  const [currentUser, setCurrentUser] = React.useState<{
     id: string;
-    userId: string;
     email: string;
     fullName: string;
-    role: string;
-    joinedAt: string;
-  }>>([]);
-  const [invitations, setInvitations] = React.useState<Array<{
-    id: string;
-    email: string;
-    role: string;
-    token: string;
-    status: string;
-    expiresAt: string;
-  }>>([]);
-  const [workspaces, setWorkspaces] = React.useState<Array<{
+  } | null>(null);
+  const [org, setOrg] = React.useState<{
     id: string;
     name: string;
     slug: string;
-    environment: string;
-    createdAt: string;
-  }>>([]);
+    role?: string;
+  } | null>(null);
+  const [members, setMembers] = React.useState<
+    Array<{
+      id: string;
+      userId: string;
+      email: string;
+      fullName: string;
+      role: string;
+      joinedAt: string;
+    }>
+  >([]);
+  const [invitations, setInvitations] = React.useState<
+    Array<{
+      id: string;
+      email: string;
+      role: string;
+      token: string;
+      status: string;
+      expiresAt: string;
+    }>
+  >([]);
+  const [workspaces, setWorkspaces] = React.useState<
+    Array<{
+      id: string;
+      name: string;
+      slug: string;
+      environment: string;
+      createdAt: string;
+    }>
+  >([]);
 
   // Form states
   const [inviteRole, setInviteRole] = React.useState("member");
   const [isInviting, setIsInviting] = React.useState(false);
 
-  const [wsEnv, setWsEnv] = React.useState<"development" | "staging" | "production">("development");
+  const [wsEnv, setWsEnv] = React.useState<
+    "development" | "staging" | "production"
+  >("development");
   const [isCreatingWs, setIsCreatingWs] = React.useState(false);
 
   // Transfer Ownership state
@@ -159,9 +179,16 @@ export default function SettingsPage() {
   });
 
   const [isLoading, setIsLoading] = React.useState(true);
-  const [pendingRoles, setPendingRoles] = React.useState<Record<string, string>>({});
-  const [updatingRoleId, setUpdatingRoleId] = React.useState<string | null>(null);
-  const [message, setMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [pendingRoles, setPendingRoles] = React.useState<
+    Record<string, string>
+  >({});
+  const [updatingRoleId, setUpdatingRoleId] = React.useState<string | null>(
+    null,
+  );
+  const [message, setMessage] = React.useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // Load active organization data
   const loadData = React.useCallback(async () => {
@@ -223,11 +250,17 @@ export default function SettingsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create invitation");
 
-      setMessage({ type: "success", text: `Invitation sent to ${values.email}` });
+      setMessage({
+        type: "success",
+        text: `Invitation sent to ${values.email}`,
+      });
       resetInvite();
       loadData();
     } catch (err: unknown) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to invite" });
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to invite",
+      });
     } finally {
       setIsInviting(false);
     }
@@ -236,9 +269,12 @@ export default function SettingsPage() {
   const handleRevokeInvite = async (inviteId: string) => {
     if (!org) return;
     try {
-      const res = await fetch(`/api/v1/organizations/${org.id}/invitations/${inviteId}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/v1/organizations/${org.id}/invitations/${inviteId}`,
+        {
+          method: "DELETE",
+        },
+      );
       if (res.ok) {
         setMessage({ type: "success", text: "Invitation revoked" });
         loadData();
@@ -248,18 +284,27 @@ export default function SettingsPage() {
     }
   };
 
-  const handleUpdateMemberRole = async (memberId: string, targetRole?: string) => {
+  const handleUpdateMemberRole = async (
+    memberId: string,
+    targetRole?: string,
+  ) => {
     const roleToApply = targetRole || pendingRoles[memberId];
     if (!org || !roleToApply) return;
     setUpdatingRoleId(memberId);
     try {
-      const res = await fetch(`/api/v1/organizations/${org.id}/members/${memberId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: roleToApply }),
-      });
+      const res = await fetch(
+        `/api/v1/organizations/${org.id}/members/${memberId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ role: roleToApply }),
+        },
+      );
       if (res.ok) {
-        setMessage({ type: "success", text: `Member role updated to ${roleToApply}` });
+        setMessage({
+          type: "success",
+          text: `Member role updated to ${roleToApply}`,
+        });
         setPendingRoles((prev) => {
           const next = { ...prev };
           delete next[memberId];
@@ -268,7 +313,10 @@ export default function SettingsPage() {
         loadData();
       } else {
         const data = await res.json();
-        setMessage({ type: "error", text: data.error || "Failed to update member role" });
+        setMessage({
+          type: "error",
+          text: data.error || "Failed to update member role",
+        });
       }
     } catch {
       setMessage({ type: "error", text: "Failed to update member role" });
@@ -278,17 +326,27 @@ export default function SettingsPage() {
   };
 
   const handleRemoveMember = async (memberId: string) => {
-    if (!org || !confirm("Are you sure you want to remove this member?")) return;
+    if (!org || !confirm("Are you sure you want to remove this member?"))
+      return;
     try {
-      const res = await fetch(`/api/v1/organizations/${org.id}/members/${memberId}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/v1/organizations/${org.id}/members/${memberId}`,
+        {
+          method: "DELETE",
+        },
+      );
       if (res.ok) {
-        setMessage({ type: "success", text: "Member removed from organization" });
+        setMessage({
+          type: "success",
+          text: "Member removed from organization",
+        });
         loadData();
       } else {
         const data = await res.json();
-        setMessage({ type: "error", text: data.error || "Failed to remove member" });
+        setMessage({
+          type: "error",
+          text: data.error || "Failed to remove member",
+        });
       }
     } catch {
       setMessage({ type: "error", text: "Failed to remove member" });
@@ -301,11 +359,14 @@ export default function SettingsPage() {
     setMessage(null);
 
     try {
-      const res = await fetch(`/api/v1/organizations/${org.id}/transfer-ownership`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(values),
-      });
+      const res = await fetch(
+        `/api/v1/organizations/${org.id}/transfer-ownership`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(values),
+        },
+      );
 
       const data = await res.json();
       if (!res.ok) {
@@ -322,7 +383,8 @@ export default function SettingsPage() {
     } catch (err: unknown) {
       setMessage({
         type: "error",
-        text: err instanceof Error ? err.message : "Failed to transfer ownership",
+        text:
+          err instanceof Error ? err.message : "Failed to transfer ownership",
       });
     } finally {
       setIsTransferring(false);
@@ -347,11 +409,17 @@ export default function SettingsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create workspace");
 
-      setMessage({ type: "success", text: `Workspace '${values.name}' created` });
+      setMessage({
+        type: "success",
+        text: `Workspace '${values.name}' created`,
+      });
       resetWs();
       loadData();
     } catch (err: unknown) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Failed to create workspace" });
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to create workspace",
+      });
     } finally {
       setIsCreatingWs(false);
     }
@@ -362,9 +430,12 @@ export default function SettingsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-base font-semibold text-foreground">Settings & Access Management</h1>
+          <h1 className="text-base font-semibold text-foreground">
+            Settings & Access Management
+          </h1>
           <p className="text-xs text-muted-foreground">
-            Manage organization members, workspace environments, and granular RBAC policies
+            Manage organization members, workspace environments, and granular
+            RBAC policies
           </p>
         </div>
         {org && (
@@ -384,19 +455,37 @@ export default function SettingsPage() {
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="bg-panel border border-border p-1 h-auto flex flex-wrap gap-1">
-          <TabsTrigger value="members" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
+          <TabsTrigger
+            value="members"
+            className="text-xs py-1.5 px-3 flex items-center gap-1.5"
+          >
             <Users className="h-3.5 w-3.5" />
             <span>Members ({isLoading ? "..." : members.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="invites" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
+          <TabsTrigger
+            value="invites"
+            className="text-xs py-1.5 px-3 flex items-center gap-1.5"
+          >
             <Mail className="h-3.5 w-3.5" />
-            <span>Invitations ({isLoading ? "..." : invitations.filter((i) => i.status === "pending").length})</span>
+            <span>
+              Invitations (
+              {isLoading
+                ? "..."
+                : invitations.filter((i) => i.status === "pending").length}
+              )
+            </span>
           </TabsTrigger>
-          <TabsTrigger value="workspaces" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
+          <TabsTrigger
+            value="workspaces"
+            className="text-xs py-1.5 px-3 flex items-center gap-1.5"
+          >
             <Layers className="h-3.5 w-3.5" />
             <span>Workspaces ({isLoading ? "..." : workspaces.length})</span>
           </TabsTrigger>
-          <TabsTrigger value="rbac" className="text-xs py-1.5 px-3 flex items-center gap-1.5">
+          <TabsTrigger
+            value="rbac"
+            className="text-xs py-1.5 px-3 flex items-center gap-1.5"
+          >
             <Shield className="h-3.5 w-3.5" />
             <span>Roles & Permissions Matrix</span>
           </TabsTrigger>
@@ -408,7 +497,8 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Organization Members</CardTitle>
               <CardDescription>
-                Assign organization-level roles. Changes take effect on subsequent authorization checks.
+                Assign organization-level roles. Changes take effect on
+                subsequent authorization checks.
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
@@ -433,15 +523,26 @@ export default function SettingsPage() {
                               <div className="h-4 w-28 bg-muted rounded" />
                             </div>
                           </td>
-                          <td className="p-3"><div className="h-4 w-36 bg-muted rounded" /></td>
-                          <td className="p-3"><div className="h-6 w-24 bg-muted rounded" /></td>
-                          <td className="p-3"><div className="h-4 w-20 bg-muted rounded" /></td>
-                          <td className="p-3 text-right"><div className="h-6 w-8 bg-muted rounded ml-auto" /></td>
+                          <td className="p-3">
+                            <div className="h-4 w-36 bg-muted rounded" />
+                          </td>
+                          <td className="p-3">
+                            <div className="h-6 w-24 bg-muted rounded" />
+                          </td>
+                          <td className="p-3">
+                            <div className="h-4 w-20 bg-muted rounded" />
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="h-6 w-8 bg-muted rounded ml-auto" />
+                          </td>
                         </tr>
                       ))
                     ) : members.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="p-6 text-center text-xs text-muted-foreground font-mono">
+                        <td
+                          colSpan={5}
+                          className="p-6 text-center text-xs text-muted-foreground font-mono"
+                        >
                           No organization members found
                         </td>
                       </tr>
@@ -452,7 +553,10 @@ export default function SettingsPage() {
                         const isCurrentOwner = org?.role === "owner";
 
                         return (
-                          <tr key={m.id} className="hover:bg-elevated/40 transition-colors">
+                          <tr
+                            key={m.id}
+                            className="hover:bg-elevated/40 transition-colors"
+                          >
                             <td className="p-3 font-medium text-foreground">
                               <div className="flex items-center gap-2">
                                 <div className="h-6 w-6 rounded-full bg-elevated border border-border flex items-center justify-center font-mono text-[9px] font-semibold tracking-tighter">
@@ -461,20 +565,31 @@ export default function SettingsPage() {
                                 <div className="flex items-center gap-1.5">
                                   <span>{m.fullName}</span>
                                   {isSelf && (
-                                    <span className="text-[10px] text-muted-foreground font-mono">(You)</span>
+                                    <span className="text-[10px] text-muted-foreground font-mono">
+                                      (You)
+                                    </span>
                                   )}
                                 </div>
                               </div>
                             </td>
-                            <td className="p-3 font-mono text-muted-foreground">{m.email}</td>
+                            <td className="p-3 font-mono text-muted-foreground">
+                              {m.email}
+                            </td>
                             <td className="p-3">
                               {/* Requirement 1 & 2: The currently authenticated Organization Owner must not be able to modify their own role. Replace their role dropdown and Apply button with a non-interactive Owner badge or locked role indicator. */}
                               {isSelf && isOwner ? (
                                 <div className="flex items-center gap-1.5 py-0.5">
-                                  <Badge variant="warning" className="font-mono text-[10px] capitalize flex items-center gap-1">
-                                    <Crown className="h-3 w-3 text-warning" /> Owner
+                                  <Badge
+                                    variant="warning"
+                                    className="font-mono text-[10px] capitalize flex items-center gap-1"
+                                  >
+                                    <Crown className="h-3 w-3 text-warning" />{" "}
+                                    Owner
                                   </Badge>
-                                  <span className="text-[10px] text-muted-foreground flex items-center gap-0.5" title="Owner role cannot be self-modified directly">
+                                  <span
+                                    className="text-[10px] text-muted-foreground flex items-center gap-0.5"
+                                    title="Owner role cannot be self-modified directly"
+                                  >
                                     <Lock className="h-3 w-3" /> Locked
                                   </span>
                                 </div>
@@ -484,21 +599,43 @@ export default function SettingsPage() {
                                   <Select
                                     value={pendingRoles[m.id] ?? m.role}
                                     onValueChange={(val) =>
-                                      setPendingRoles((prev) => ({ ...prev, [m.id]: val }))
+                                      setPendingRoles((prev) => ({
+                                        ...prev,
+                                        [m.id]: val,
+                                      }))
                                     }
                                   >
                                     <SelectTrigger className="h-7 w-28 text-xs font-mono">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="admin" className="text-xs font-mono">Admin</SelectItem>
-                                      <SelectItem value="member" className="text-xs font-mono">Member</SelectItem>
+                                      <SelectItem
+                                        value="admin"
+                                        className="text-xs font-mono"
+                                      >
+                                        Admin
+                                      </SelectItem>
+                                      <SelectItem
+                                        value="member"
+                                        className="text-xs font-mono"
+                                      >
+                                        Member
+                                      </SelectItem>
                                     </SelectContent>
                                   </Select>
                                   <Button
                                     size="sm"
-                                    variant={pendingRoles[m.id] && pendingRoles[m.id] !== m.role ? "default" : "outline"}
-                                    disabled={!pendingRoles[m.id] || pendingRoles[m.id] === m.role || updatingRoleId === m.id}
+                                    variant={
+                                      pendingRoles[m.id] &&
+                                      pendingRoles[m.id] !== m.role
+                                        ? "default"
+                                        : "outline"
+                                    }
+                                    disabled={
+                                      !pendingRoles[m.id] ||
+                                      pendingRoles[m.id] === m.role ||
+                                      updatingRoleId === m.id
+                                    }
                                     isLoading={updatingRoleId === m.id}
                                     onClick={() => handleUpdateMemberRole(m.id)}
                                     className="h-7 px-2.5 text-[11px] font-mono cursor-pointer"
@@ -508,10 +645,18 @@ export default function SettingsPage() {
                                 </div>
                               ) : (
                                 <Badge
-                                  variant={m.role === "owner" ? "warning" : m.role === "admin" ? "info" : "outline"}
+                                  variant={
+                                    m.role === "owner"
+                                      ? "warning"
+                                      : m.role === "admin"
+                                        ? "info"
+                                        : "outline"
+                                  }
                                   className="font-mono text-[10px] capitalize"
                                 >
-                                  {m.role === "owner" && <Crown className="h-3 w-3 mr-1 inline text-warning" />}
+                                  {m.role === "owner" && (
+                                    <Crown className="h-3 w-3 mr-1 inline text-warning" />
+                                  )}
                                   {m.role}
                                 </Badge>
                               )}
@@ -526,15 +671,21 @@ export default function SettingsPage() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => {
-                                    const otherMembers = members.filter((other) => other.userId !== currentUser?.id);
+                                    const otherMembers = members.filter(
+                                      (other) =>
+                                        other.userId !== currentUser?.id,
+                                    );
                                     if (otherMembers.length > 0) {
-                                      setTransferValue("newOwnerMemberId", otherMembers[0].id);
+                                      setTransferValue(
+                                        "newOwnerMemberId",
+                                        otherMembers[0].id,
+                                      );
                                     }
                                     setShowTransferModal(true);
                                   }}
-                                  className="h-7 px-2.5 text-xs font-medium gap-1.5 text-amber-600 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30 hover:border-amber-500/50 rounded-md transition-all shadow-2xs cursor-pointer font-sans"
+                                  className="h-7 px-2.5 text-xs font-medium gap-1.5 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30 hover:border-amber-500/50 rounded-md transition-all shadow-2xs cursor-pointer font-sans"
                                 >
-                                  <ArrowRightLeft className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
+                                  <ArrowRightLeft className="h-3.5 w-3.5 dark:text-amber-400" />
                                   <span>Transfer Ownership</span>
                                 </Button>
                               ) : !isSelf && isCurrentOwner && !isOwner ? (
@@ -567,12 +718,20 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Invite New Member</CardTitle>
               <CardDescription>
-                Send an invitation token allowing a teammate to join this organization
+                Send an invitation token allowing a teammate to join this
+                organization
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleInviteSubmit(handleSendInvite)} noValidate className="flex flex-col sm:flex-row items-start gap-2.5">
-                <Field error={inviteErrors.email?.message} className="relative flex-1 w-full space-y-1">
+              <form
+                onSubmit={handleInviteSubmit(handleSendInvite)}
+                noValidate
+                className="flex flex-col sm:flex-row items-start gap-2.5"
+              >
+                <Field
+                  error={inviteErrors.email?.message}
+                  className="relative flex-1 w-full space-y-1"
+                >
                   <div className="relative w-full">
                     <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                     <Input
@@ -589,13 +748,21 @@ export default function SettingsPage() {
                   <SelectTrigger className="h-9 w-full sm:w-40 text-xs shrink-0 font-sans">
                     <span className="text-xs truncate leading-none">
                       <span className="text-muted-foreground">Role:</span>{" "}
-                      <span className="capitalize font-medium text-foreground">{inviteRole}</span>
+                      <span className="capitalize font-medium text-foreground">
+                        {inviteRole}
+                      </span>
                     </span>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="member" className="text-xs font-mono">Member</SelectItem>
-                    <SelectItem value="admin" className="text-xs font-mono">Admin</SelectItem>
-                    <SelectItem value="owner" className="text-xs font-mono">Owner</SelectItem>
+                    <SelectItem value="member" className="text-xs font-mono">
+                      Member
+                    </SelectItem>
+                    <SelectItem value="admin" className="text-xs font-mono">
+                      Admin
+                    </SelectItem>
+                    <SelectItem value="owner" className="text-xs font-mono">
+                      Owner
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
@@ -612,91 +779,113 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Active Invitations</CardTitle>
-              <CardDescription>Invitations valid for 7 days from generation</CardDescription>
+              <CardDescription>
+                Invitations valid for 7 days from generation
+              </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-border bg-sidebar/50 text-muted-foreground">
-                    <th className="p-3 font-medium">Invited Email</th>
-                    <th className="p-3 font-medium">Role</th>
-                    <th className="p-3 font-medium">Status</th>
-                    <th className="p-3 font-medium">Expires</th>
-                    <th className="p-3 font-medium text-right">Invite Link / Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {isLoading ? (
-                    Array.from({ length: 2 }).map((_, i) => (
-                      <tr key={i} className="animate-pulse">
-                        <td className="p-3"><div className="h-4 w-36 bg-muted rounded" /></td>
-                        <td className="p-3"><div className="h-5 w-16 bg-muted rounded" /></td>
-                        <td className="p-3"><div className="h-5 w-16 bg-muted rounded" /></td>
-                        <td className="p-3"><div className="h-4 w-24 bg-muted rounded" /></td>
-                        <td className="p-3 text-right"><div className="h-4 w-20 bg-muted rounded ml-auto" /></td>
-                      </tr>
-                    ))
-                  ) : invitations.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="p-6 text-center text-muted-foreground font-mono text-xs">
-                        No pending invitations
-                      </td>
+                  <thead>
+                    <tr className="border-b border-border bg-sidebar/50 text-muted-foreground">
+                      <th className="p-3 font-medium">Invited Email</th>
+                      <th className="p-3 font-medium">Role</th>
+                      <th className="p-3 font-medium">Status</th>
+                      <th className="p-3 font-medium">Expires</th>
+                      <th className="p-3 font-medium text-right">
+                        Invite Link / Action
+                      </th>
                     </tr>
-                  ) : (
-                    invitations.map((inv) => (
-                      <tr key={inv.id} className="hover:bg-elevated/40">
-                        <td className="p-3 font-mono text-foreground">{inv.email}</td>
-                        <td className="p-3">
-                          <Badge variant="outline" className="capitalize">
-                            {inv.role}
-                          </Badge>
-                        </td>
-                        <td className="p-3">
-                          <Badge
-                            variant={
-                              inv.status === "accepted"
-                                ? "success"
-                                : inv.status === "pending"
-                                ? "warning"
-                                : "destructive"
-                            }
-                            className="capitalize"
-                          >
-                            {inv.status}
-                          </Badge>
-                        </td>
-                        <td className="p-3 font-mono text-[11px] text-muted-foreground">
-                          {formatDate(inv.expiresAt)}
-                        </td>
-                        <td className="p-3 text-right">
-                          {inv.status === "pending" && (
-                            <div className="inline-flex items-center gap-2">
-                              <button
-                                onClick={() => {
-                                  const url = `${window.location.origin}/invite/${inv.token}`;
-                                  navigator.clipboard.writeText(url);
-                                  setMessage({ type: "success", text: "Invitation link copied to clipboard!" });
-                                }}
-                                className="text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
-                                title="Copy invite URL"
-                              >
-                                <Copy className="h-3 w-3" /> Copy Link
-                              </button>
-                              <button
-                                onClick={() => handleRevokeInvite(inv.id)}
-                                className="text-destructive hover:underline cursor-pointer ml-2"
-                              >
-                                Revoke
-                              </button>
-                            </div>
-                          )}
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {isLoading ? (
+                      Array.from({ length: 2 }).map((_, i) => (
+                        <tr key={i} className="animate-pulse">
+                          <td className="p-3">
+                            <div className="h-4 w-36 bg-muted rounded" />
+                          </td>
+                          <td className="p-3">
+                            <div className="h-5 w-16 bg-muted rounded" />
+                          </td>
+                          <td className="p-3">
+                            <div className="h-5 w-16 bg-muted rounded" />
+                          </td>
+                          <td className="p-3">
+                            <div className="h-4 w-24 bg-muted rounded" />
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="h-4 w-20 bg-muted rounded ml-auto" />
+                          </td>
+                        </tr>
+                      ))
+                    ) : invitations.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={5}
+                          className="p-6 text-center text-muted-foreground font-mono text-xs"
+                        >
+                          No pending invitations
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      invitations.map((inv) => (
+                        <tr key={inv.id} className="hover:bg-elevated/40">
+                          <td className="p-3 font-mono text-foreground">
+                            {inv.email}
+                          </td>
+                          <td className="p-3">
+                            <Badge variant="outline" className="capitalize">
+                              {inv.role}
+                            </Badge>
+                          </td>
+                          <td className="p-3">
+                            <Badge
+                              variant={
+                                inv.status === "accepted"
+                                  ? "success"
+                                  : inv.status === "pending"
+                                    ? "warning"
+                                    : "destructive"
+                              }
+                              className="capitalize"
+                            >
+                              {inv.status}
+                            </Badge>
+                          </td>
+                          <td className="p-3 font-mono text-[11px] text-muted-foreground">
+                            {formatDate(inv.expiresAt)}
+                          </td>
+                          <td className="p-3 text-right">
+                            {inv.status === "pending" && (
+                              <div className="inline-flex items-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    const url = `${window.location.origin}/invite/${inv.token}`;
+                                    navigator.clipboard.writeText(url);
+                                    setMessage({
+                                      type: "success",
+                                      text: "Invitation link copied to clipboard!",
+                                    });
+                                  }}
+                                  className="text-primary hover:underline inline-flex items-center gap-1 cursor-pointer"
+                                  title="Copy invite URL"
+                                >
+                                  <Copy className="h-3 w-3" /> Copy Link
+                                </button>
+                                <button
+                                  onClick={() => handleRevokeInvite(inv.id)}
+                                  className="text-destructive hover:underline cursor-pointer ml-2"
+                                >
+                                  Revoke
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>
@@ -708,12 +897,20 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Create New Workspace</CardTitle>
               <CardDescription>
-                Isolate database connections into development, staging, or production boundaries
+                Isolate database connections into development, staging, or
+                production boundaries
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleWsSubmit(handleCreateWorkspace)} noValidate className="flex flex-col sm:flex-row items-start gap-2.5">
-                <Field error={wsErrors.name?.message} className="relative flex-1 w-full space-y-1">
+              <form
+                onSubmit={handleWsSubmit(handleCreateWorkspace)}
+                noValidate
+                className="flex flex-col sm:flex-row items-start gap-2.5"
+              >
+                <Field
+                  error={wsErrors.name?.message}
+                  className="relative flex-1 w-full space-y-1"
+                >
                   <div className="relative w-full">
                     <Layers className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                     <Input
@@ -728,18 +925,34 @@ export default function SettingsPage() {
                 </Field>
                 <Select
                   value={wsEnv}
-                  onValueChange={(val: "development" | "staging" | "production") => setWsEnv(val)}
+                  onValueChange={(
+                    val: "development" | "staging" | "production",
+                  ) => setWsEnv(val)}
                 >
                   <SelectTrigger className="h-9 w-full sm:w-44 text-xs shrink-0 font-sans">
                     <span className="text-xs truncate leading-none">
                       <span className="text-muted-foreground">Env:</span>{" "}
-                      <span className="capitalize font-medium text-foreground">{wsEnv}</span>
+                      <span className="capitalize font-medium text-foreground">
+                        {wsEnv}
+                      </span>
                     </span>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="development" className="text-xs font-mono">Development</SelectItem>
-                    <SelectItem value="staging" className="text-xs font-mono">Staging</SelectItem>
-                    <SelectItem value="production" className="text-xs font-mono">Production</SelectItem>
+                    <SelectItem
+                      value="development"
+                      className="text-xs font-mono"
+                    >
+                      Development
+                    </SelectItem>
+                    <SelectItem value="staging" className="text-xs font-mono">
+                      Staging
+                    </SelectItem>
+                    <SelectItem
+                      value="production"
+                      className="text-xs font-mono"
+                    >
+                      Production
+                    </SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
@@ -756,62 +969,79 @@ export default function SettingsPage() {
           <Card>
             <CardHeader>
               <CardTitle>Existing Workspaces</CardTitle>
-              <CardDescription>Registered workspaces under this organization</CardDescription>
+              <CardDescription>
+                Registered workspaces under this organization
+              </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
-                <thead>
-                  <tr className="border-b border-border bg-sidebar/50 text-muted-foreground">
-                    <th className="p-3 font-medium">Name</th>
-                    <th className="p-3 font-medium">Slug</th>
-                    <th className="p-3 font-medium">Environment</th>
-                    <th className="p-3 font-medium">Created</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border">
-                  {isLoading ? (
-                    Array.from({ length: 2 }).map((_, i) => (
-                      <tr key={i} className="animate-pulse">
-                        <td className="p-3"><div className="h-4 w-32 bg-muted rounded" /></td>
-                        <td className="p-3"><div className="h-4 w-24 bg-muted rounded" /></td>
-                        <td className="p-3"><div className="h-5 w-16 bg-muted rounded" /></td>
-                        <td className="p-3"><div className="h-4 w-24 bg-muted rounded" /></td>
-                      </tr>
-                    ))
-                  ) : workspaces.length === 0 ? (
-                    <tr>
-                      <td colSpan={4} className="p-6 text-center text-muted-foreground font-mono text-xs">
-                        No registered workspaces found
-                      </td>
+                  <thead>
+                    <tr className="border-b border-border bg-sidebar/50 text-muted-foreground">
+                      <th className="p-3 font-medium">Name</th>
+                      <th className="p-3 font-medium">Slug</th>
+                      <th className="p-3 font-medium">Environment</th>
+                      <th className="p-3 font-medium">Created</th>
                     </tr>
-                  ) : (
-                    workspaces.map((ws) => (
-                      <tr key={ws.id} className="hover:bg-elevated/40">
-                        <td className="p-3 font-medium text-foreground">{ws.name}</td>
-                        <td className="p-3 font-mono text-muted-foreground">{ws.slug}</td>
-                        <td className="p-3">
-                          <Badge
-                            variant={
-                              ws.environment === "production"
-                                ? "destructive"
-                                : ws.environment === "staging"
-                                ? "warning"
-                                : "info"
-                            }
-                            className="capitalize"
-                          >
-                            {ws.environment}
-                          </Badge>
-                        </td>
-                        <td className="p-3 font-mono text-[11px] text-muted-foreground">
-                          {formatDate(ws.createdAt)}
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {isLoading ? (
+                      Array.from({ length: 2 }).map((_, i) => (
+                        <tr key={i} className="animate-pulse">
+                          <td className="p-3">
+                            <div className="h-4 w-32 bg-muted rounded" />
+                          </td>
+                          <td className="p-3">
+                            <div className="h-4 w-24 bg-muted rounded" />
+                          </td>
+                          <td className="p-3">
+                            <div className="h-5 w-16 bg-muted rounded" />
+                          </td>
+                          <td className="p-3">
+                            <div className="h-4 w-24 bg-muted rounded" />
+                          </td>
+                        </tr>
+                      ))
+                    ) : workspaces.length === 0 ? (
+                      <tr>
+                        <td
+                          colSpan={4}
+                          className="p-6 text-center text-muted-foreground font-mono text-xs"
+                        >
+                          No registered workspaces found
                         </td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      workspaces.map((ws) => (
+                        <tr key={ws.id} className="hover:bg-elevated/40">
+                          <td className="p-3 font-medium text-foreground">
+                            {ws.name}
+                          </td>
+                          <td className="p-3 font-mono text-muted-foreground">
+                            {ws.slug}
+                          </td>
+                          <td className="p-3">
+                            <Badge
+                              variant={
+                                ws.environment === "production"
+                                  ? "destructive"
+                                  : ws.environment === "staging"
+                                    ? "warning"
+                                    : "info"
+                              }
+                              className="capitalize"
+                            >
+                              {ws.environment}
+                            </Badge>
+                          </td>
+                          <td className="p-3 font-mono text-[11px] text-muted-foreground">
+                            {formatDate(ws.createdAt)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>
@@ -823,7 +1053,8 @@ export default function SettingsPage() {
             <CardHeader>
               <CardTitle>Role-Based Access Control (RBAC) Matrix</CardTitle>
               <CardDescription>
-                Backend-enforced permission mappings for each of the six primary user roles
+                Backend-enforced permission mappings for each of the six primary
+                user roles
               </CardDescription>
             </CardHeader>
             <CardContent className="p-0">
@@ -831,87 +1062,167 @@ export default function SettingsPage() {
                 <table className="w-full text-left text-xs border-collapse font-mono">
                   <thead>
                     <tr className="border-b border-border bg-sidebar/50 text-muted-foreground">
-                      <th className="p-3 font-medium">Capability / Permission</th>
+                      <th className="p-3 font-medium">
+                        Capability / Permission
+                      </th>
                       <th className="p-3 font-medium text-center">Owner</th>
                       <th className="p-3 font-medium text-center">DBA</th>
                       <th className="p-3 font-medium text-center">Developer</th>
-                      <th className="p-3 font-medium text-center text-primary">Data Analyst</th>
-                      <th className="p-3 font-medium text-center">DB Engineer</th>
+                      <th className="p-3 font-medium text-center text-primary">
+                        Data Analyst
+                      </th>
+                      <th className="p-3 font-medium text-center">
+                        DB Engineer
+                      </th>
                       <th className="p-3 font-medium text-center">Auditor</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border text-[11px]">
                     <tr>
-                      <td className="p-2.5 text-foreground">organization:manage</td>
+                      <td className="p-2.5 text-foreground">
+                        organization:manage
+                      </td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
                     </tr>
                     <tr>
-                      <td className="p-2.5 text-foreground">database:manage / register</td>
+                      <td className="p-2.5 text-foreground">
+                        database:manage / register
+                      </td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
                     </tr>
                     <tr>
-                      <td className="p-2.5 text-foreground">query:read (SELECT)</td>
+                      <td className="p-2.5 text-foreground">
+                        query:read (SELECT)
+                      </td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-[#34D399] font-bold">YES</td>
+                      <td className="p-2.5 text-center text-[#34D399] font-bold">
+                        YES
+                      </td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
                     </tr>
                     <tr>
-                      <td className="p-2.5 text-foreground">query:write (INSERT, UPDATE, DELETE)</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
+                      <td className="p-2.5 text-foreground">
+                        query:write (INSERT, UPDATE, DELETE)
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-destructive font-bold">STRICT NO</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-destructive font-bold">STRICT NO</td>
+                      <td className="p-2.5 text-center text-destructive font-bold">
+                        STRICT NO
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-destructive font-bold">
+                        STRICT NO
+                      </td>
                     </tr>
                     <tr>
-                      <td className="p-2.5 text-foreground">schema:write (ALTER, CREATE TABLE)</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
+                      <td className="p-2.5 text-foreground">
+                        schema:write (ALTER, CREATE TABLE)
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
                       <td className="p-2.5 text-center text-destructive">NO</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
                       <td className="p-2.5 text-center text-destructive">NO</td>
                     </tr>
                     <tr>
-                      <td className="p-2.5 text-foreground">history:restore (Compensating tx)</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
+                      <td className="p-2.5 text-foreground">
+                        history:restore (Compensating tx)
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
                       <td className="p-2.5 text-center text-destructive">NO</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
                       <td className="p-2.5 text-center text-destructive">NO</td>
                     </tr>
                     <tr>
-                      <td className="p-2.5 text-foreground">performance:inspect (EXPLAIN ANALYZE)</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
+                      <td className="p-2.5 text-foreground">
+                        performance:inspect (EXPLAIN ANALYZE)
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-primary font-bold">YES</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-primary font-bold">
+                        YES
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
                     </tr>
                     <tr>
-                      <td className="p-2.5 text-foreground">audit:read (Append-only logs)</td>
+                      <td className="p-2.5 text-foreground">
+                        audit:read (Append-only logs)
+                      </td>
                       <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-muted-foreground">—</td>
-                      <td className="p-2.5 text-center text-primary font-bold">YES</td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-muted-foreground">
+                        —
+                      </td>
+                      <td className="p-2.5 text-center text-primary font-bold">
+                        YES
+                      </td>
                     </tr>
                   </tbody>
                 </table>
@@ -926,7 +1237,7 @@ export default function SettingsPage() {
         <DialogContent className="sm:max-w-md border-border/80 shadow-lg">
           <DialogHeader className="space-y-1.5 pb-2">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-amber-500/10 dark:text-amber-400">
                 <Crown className="h-4 w-4" />
               </div>
               <DialogTitle className="text-base font-semibold text-foreground">
@@ -934,20 +1245,26 @@ export default function SettingsPage() {
               </DialogTitle>
             </div>
             <DialogDescription className="text-xs text-muted-foreground pt-1 leading-normal">
-              Transfer primary ownership of <span className="font-medium text-foreground">&quot;{org?.name}&quot;</span> to another active member. You will relinquish Owner authority.
+              Transfer primary ownership of{" "}
+              <span className="font-medium text-foreground">
+                &quot;{org?.name}&quot;
+              </span>{" "}
+              to another active member. You will relinquish Owner authority.
             </DialogDescription>
           </DialogHeader>
 
           {members.filter((m) => m.userId !== currentUser?.id).length === 0 ? (
             <div className="py-6 px-4 flex flex-col items-center text-center rounded-lg border border-border/70 bg-muted/30 my-1">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 mb-3 ring-8 ring-amber-500/5">
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 dark:text-amber-400 mb-3 ring-8 ring-amber-500/5">
                 <Users className="h-6 w-6" />
               </div>
               <h4 className="text-sm font-semibold text-foreground">
                 No Eligible Members Found
               </h4>
-              <p className="text-xs text-muted-foreground max-w-[300px] mt-1.5 leading-relaxed">
-                You must have at least one other active member in this organization before transferring ownership. Invite a teammate first.
+              <p className="text-xs text-muted-foreground max-w-75 mt-1.5 leading-relaxed">
+                You must have at least one other active member in this
+                organization before transferring ownership. Invite a teammate
+                first.
               </p>
               <div className="flex items-center gap-2.5 mt-5">
                 <Button
@@ -973,24 +1290,40 @@ export default function SettingsPage() {
               </div>
             </div>
           ) : (
-            <form onSubmit={handleTransferSubmit(handleTransferOwnership)} noValidate className="space-y-4 pt-1">
+            <form
+              onSubmit={handleTransferSubmit(handleTransferOwnership)}
+              noValidate
+              className="space-y-4 pt-1"
+            >
               <div className="flex items-start gap-2.5 p-3 rounded-lg border border-amber-500/25 bg-amber-500/5 text-xs text-foreground">
-                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <AlertTriangle className="h-4 w-4 dark:text-amber-400 shrink-0 mt-0.5" />
                 <div className="space-y-0.5 leading-relaxed">
-                  <span className="font-semibold text-foreground">Warning: </span>
+                  <span className="font-semibold text-foreground">
+                    Warning:{" "}
+                  </span>
                   <span className="text-muted-foreground text-[11px]">
-                    This action permanently transfers primary organization ownership and administrative root privileges.
+                    This action permanently transfers primary organization
+                    ownership and administrative root privileges.
                   </span>
                 </div>
               </div>
 
               <Field error={transferErrors.newOwnerMemberId?.message}>
-                <FieldLabel htmlFor="newOwnerMemberId">Select New Owner</FieldLabel>
+                <FieldLabel htmlFor="newOwnerMemberId">
+                  Select New Owner
+                </FieldLabel>
                 <Select
                   value={watchTransfer("newOwnerMemberId")}
-                  onValueChange={(val) => setTransferValue("newOwnerMemberId", val, { shouldValidate: true })}
+                  onValueChange={(val) =>
+                    setTransferValue("newOwnerMemberId", val, {
+                      shouldValidate: true,
+                    })
+                  }
                 >
-                  <SelectTrigger id="newOwnerMemberId" className="h-9 text-xs font-sans">
+                  <SelectTrigger
+                    id="newOwnerMemberId"
+                    className="h-9 text-xs font-sans"
+                  >
                     <SelectValue placeholder="Choose an active member..." />
                   </SelectTrigger>
                   <SelectContent>
@@ -998,9 +1331,16 @@ export default function SettingsPage() {
                       .filter((m) => m.userId !== currentUser?.id)
                       .map((m) => (
                         <SelectItem key={m.id} value={m.id} className="text-xs">
-                          <span className="font-medium text-foreground">{m.fullName}</span>{" "}
-                          <span className="text-muted-foreground font-mono">({m.email})</span>{" "}
-                          <Badge variant="outline" className="ml-1.5 font-mono text-[9px] uppercase">
+                          <span className="font-medium text-foreground">
+                            {m.fullName}
+                          </span>{" "}
+                          <span className="text-muted-foreground font-mono">
+                            ({m.email})
+                          </span>{" "}
+                          <Badge
+                            variant="outline"
+                            className="ml-1.5 font-mono text-[9px] uppercase"
+                          >
                             {m.role}
                           </Badge>
                         </SelectItem>
@@ -1011,19 +1351,26 @@ export default function SettingsPage() {
               </Field>
 
               <div className="space-y-1.5">
-                <Label htmlFor="previousOwnerNewRole">Your New Role After Transfer</Label>
+                <Label htmlFor="previousOwnerNewRole">
+                  Your New Role After Transfer
+                </Label>
                 <Select
                   value={watchTransfer("previousOwnerNewRole")}
                   onValueChange={(val: "admin" | "member") =>
-                    setTransferValue("previousOwnerNewRole", val, { shouldValidate: true })
+                    setTransferValue("previousOwnerNewRole", val, {
+                      shouldValidate: true,
+                    })
                   }
                 >
-                  <SelectTrigger id="previousOwnerNewRole" className="h-9 text-xs font-sans">
+                  <SelectTrigger
+                    id="previousOwnerNewRole"
+                    className="h-9 text-xs font-sans"
+                  >
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="admin" className="text-xs">
-                      Admin (Recommended - Retains workspace & member management)
+                      Admin (Retains workspace & member management)
                     </SelectItem>
                     <SelectItem value="member" className="text-xs">
                       Member (Standard query & exploration access)
@@ -1033,7 +1380,10 @@ export default function SettingsPage() {
               </div>
 
               <Field error={transferErrors.confirmationPhrase?.message}>
-                <FieldLabel htmlFor="transferConfirmation" className="text-destructive font-medium">
+                <FieldLabel
+                  htmlFor="transferConfirmation"
+                  className="text-destructive font-medium"
+                >
                   Type &quot;TRANSFER_OWNERSHIP&quot; to authorize
                 </FieldLabel>
                 <Input

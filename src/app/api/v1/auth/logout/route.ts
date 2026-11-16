@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, clearSessionCookie } from "@/lib/auth/session";
+import { getCurrentUser, clearSessionCookie, clearSessionCookieOnResponse } from "@/lib/auth/session";
 import { db } from "@/db/connections/control-plane";
 import { userSessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -17,6 +17,18 @@ export async function POST() {
   }
 
   await clearSessionCookie();
-  return NextResponse.json({ success: true, message: "Logged out successfully" });
-}
 
+  const response = NextResponse.json(
+    { success: true, message: "Logged out successfully" },
+    {
+      headers: {
+        "Cache-Control": "private, no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+        "Clear-Site-Data": '"cookies", "storage"',
+      },
+    }
+  );
+
+  clearSessionCookieOnResponse(response);
+  return response;
+}

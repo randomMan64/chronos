@@ -3,7 +3,7 @@ import bcrypt from "bcryptjs";
 import { db } from "@/db/connections/control-plane";
 import { users, organizations, organizationMembers, workspaces, workspaceMembers, userSessions } from "@/db/schema";
 import { registerSchema } from "@/lib/validation";
-import { createSessionToken, setSessionCookie } from "@/lib/auth/session";
+import { createSessionToken, setSessionCookie, attachSessionCookieToResponse } from "@/lib/auth/session";
 import { AuditService } from "@/modules/audit/audit-service";
 import { handleApiError } from "@/lib/errors";
 import { EmailService } from "@/lib/email";
@@ -127,26 +127,38 @@ export async function POST(req: Request) {
       console.error("[Register] Failed to send welcome email:", emailErr);
     }
 
-    return NextResponse.json({
-      success: true,
-      user: {
-        id: newUser.id,
-        email: newUser.email,
-        fullName: newUser.fullName,
+    const response = NextResponse.json(
+      {
+        success: true,
+        user: {
+          id: newUser.id,
+          email: newUser.email,
+          fullName: newUser.fullName,
+        },
+        organization: {
+          id: newOrg.id,
+          name: newOrg.name,
+          slug: newOrg.slug,
+          role: "owner",
+        },
+        workspace: {
+          id: newWs.id,
+          name: newWs.name,
+          slug: newWs.slug,
+          environment: newWs.environment,
+        },
       },
-      organization: {
-        id: newOrg.id,
-        name: newOrg.name,
-        slug: newOrg.slug,
-        role: "owner",
-      },
-      workspace: {
-        id: newWs.id,
-        name: newWs.name,
-        slug: newWs.slug,
-        environment: newWs.environment,
-      },
-    });
+      {
+        headers: {
+          "Cache-Control": "private, no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
+      }
+    );
+
+    attachSessionCookieToResponse(response, sessionToken);
+
+    return response;
   } catch (err) {
     const error = handleApiError(err);
     return NextResponse.json(error.body, { status: error.status });

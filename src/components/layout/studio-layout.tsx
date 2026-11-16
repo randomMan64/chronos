@@ -16,12 +16,14 @@ import { Button } from "@/components/ui/button";
 import { LogOut } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { getInitials } from "@/lib/utils";
+import type { AuthenticatedSession } from "@/lib/auth/session";
 
 interface StudioLayoutProps {
   children: React.ReactNode;
+  initialSession?: AuthenticatedSession | null;
 }
 
-export function StudioLayout({ children }: StudioLayoutProps) {
+export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useTranslation();
@@ -40,29 +42,61 @@ export function StudioLayout({ children }: StudioLayoutProps) {
     email: string;
     fullName: string;
     avatarUrl?: string | null;
-  }>({
-    email: "admin@chronos.internal",
-    fullName: "System Administrator",
-    avatarUrl: null,
-  });
+  }>(() => ({
+    email: initialSession?.user?.email || "",
+    fullName: initialSession?.user?.fullName || "",
+    avatarUrl: initialSession?.user?.avatarUrl ?? null,
+  }));
 
-  const [currentOrg, setCurrentOrg] = React.useState({
-    id: "org-1",
-    name: "Enterprise Core",
-    role: "owner",
-  });
+  const [currentOrg, setCurrentOrg] = React.useState(() => ({
+    id: initialSession?.currentOrg?.id || "",
+    name: initialSession?.currentOrg?.name || "",
+    role: initialSession?.currentOrg?.role || "member",
+  }));
 
-  const [currentWorkspace, setCurrentWorkspace] = React.useState({
-    id: "ws-1",
-    name: "Primary Cluster",
-    environment: "production",
-  });
+  const [currentWorkspace, setCurrentWorkspace] = React.useState(() => ({
+    id: initialSession?.currentWorkspace?.id || "",
+    name: initialSession?.currentWorkspace?.name || "",
+    environment: initialSession?.currentWorkspace?.environment || "development",
+  }));
 
-  const [currentDatabase, setCurrentDatabase] = React.useState({
-    id: "db-1",
-    name: "neon-primary-pg",
-    status: "active",
-  });
+  const [currentDatabase, setCurrentDatabase] = React.useState(() => ({
+    id: initialSession?.currentDatabase?.id || "",
+    name: initialSession?.currentDatabase?.name || "No database selected",
+    status: initialSession?.currentDatabase?.status || "active",
+  }));
+
+  // Sync state if initialSession updates
+  React.useEffect(() => {
+    if (initialSession?.user) {
+      setCurrentUser({
+        email: initialSession.user.email,
+        fullName: initialSession.user.fullName,
+        avatarUrl: initialSession.user.avatarUrl ?? null,
+      });
+    }
+    if (initialSession?.currentOrg) {
+      setCurrentOrg({
+        id: initialSession.currentOrg.id,
+        name: initialSession.currentOrg.name,
+        role: initialSession.currentOrg.role || "member",
+      });
+    }
+    if (initialSession?.currentWorkspace) {
+      setCurrentWorkspace({
+        id: initialSession.currentWorkspace.id,
+        name: initialSession.currentWorkspace.name,
+        environment: initialSession.currentWorkspace.environment || "development",
+      });
+    }
+    if (initialSession?.currentDatabase) {
+      setCurrentDatabase({
+        id: initialSession.currentDatabase.id,
+        name: initialSession.currentDatabase.name,
+        status: initialSession.currentDatabase.status || "active",
+      });
+    }
+  }, [initialSession]);
 
   // Automatically close mobile menu on route change
   React.useEffect(() => {
@@ -98,18 +132,43 @@ export function StudioLayout({ children }: StudioLayoutProps) {
               avatarUrl: data.user.avatarUrl || null,
             });
           }
-          if (data.organizations?.[0]) {
+          if (data.currentOrg) {
+            setCurrentOrg({
+              id: data.currentOrg.id,
+              name: data.currentOrg.name,
+              role: data.currentOrg.role || "member",
+            });
+          } else if (data.organizations?.[0]) {
             setCurrentOrg({
               id: data.organizations[0].id,
               name: data.organizations[0].name,
-              role: data.organizations[0].role || "owner",
+              role: data.organizations[0].role || "member",
             });
           }
-          if (data.workspaces?.[0]) {
+          if (data.currentWorkspace) {
+            setCurrentWorkspace({
+              id: data.currentWorkspace.id,
+              name: data.currentWorkspace.name,
+              environment: data.currentWorkspace.environment || "development",
+            });
+          } else if (data.workspaces?.[0]) {
             setCurrentWorkspace({
               id: data.workspaces[0].id,
               name: data.workspaces[0].name,
               environment: data.workspaces[0].environment || "development",
+            });
+          }
+          if (data.currentDatabase) {
+            setCurrentDatabase({
+              id: data.currentDatabase.id,
+              name: data.currentDatabase.name,
+              status: data.currentDatabase.status || "active",
+            });
+          } else if (data.databases?.[0]) {
+            setCurrentDatabase({
+              id: data.databases[0].id,
+              name: data.databases[0].name,
+              status: data.databases[0].status || "active",
             });
           }
 

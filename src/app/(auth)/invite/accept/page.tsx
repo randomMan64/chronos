@@ -107,7 +107,8 @@ function InvitationAcceptContent() {
       setIsLoading(false);
       setData({
         state: "invalid",
-        message: "No invitation token provided. Please click the link in your invitation email.",
+        message:
+          "No invitation token provided. Please click the link in your invitation email.",
         userExists: false,
         isAlreadyMember: false,
         emailMismatch: false,
@@ -180,7 +181,7 @@ function InvitationAcceptContent() {
       }, 1200);
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : "Failed to accept invitation"
+        err instanceof Error ? err.message : "Failed to accept invitation",
       );
     } finally {
       setIsSubmitting(false);
@@ -215,7 +216,7 @@ function InvitationAcceptContent() {
       }, 1200);
     } catch (err: unknown) {
       setError(
-        err instanceof Error ? err.message : "Failed to accept invitation"
+        err instanceof Error ? err.message : "Failed to accept invitation",
       );
     } finally {
       setIsSubmitting(false);
@@ -259,7 +260,8 @@ function InvitationAcceptContent() {
             Invitation Accepted
           </CardTitle>
           <CardDescription className="text-xs">
-            You are now a member of {data?.invitation?.organizationName || "the organization"}.
+            You are now a member of{" "}
+            {data?.invitation?.organizationName || "the organization"}.
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center space-y-4 pt-2">
@@ -298,7 +300,8 @@ function InvitationAcceptContent() {
           </CardHeader>
           <CardContent className="space-y-4 pt-2 text-center">
             <p className="text-xs text-muted-foreground">
-              Your account has full access to this organization based on your assigned role.
+              Your account has full access to this organization based on your
+              assigned role.
             </p>
             <Link
               href="/dashboard"
@@ -328,7 +331,8 @@ function InvitationAcceptContent() {
           </CardHeader>
           <CardContent className="space-y-4 pt-2 text-center">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              If this was you, please sign in with your credentials to access your organization workspaces.
+              If this was you, please sign in with your credentials to access
+              your organization workspaces.
             </p>
             <Link
               href="/login"
@@ -389,7 +393,8 @@ function InvitationAcceptContent() {
           </CardHeader>
           <CardContent className="space-y-4 pt-2 text-center">
             <p className="text-xs text-muted-foreground leading-relaxed">
-              An administrator has revoked this invitation. If you believe this is an error, please reach out to the organization owner.
+              An administrator has revoked this invitation. If you believe this
+              is an error, please reach out to the organization owner.
             </p>
             <Link
               href="/login"
@@ -457,11 +462,16 @@ function InvitationAcceptContent() {
             </div>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
               This invitation was sent to{" "}
-              <strong className="text-foreground">{invitation.email}</strong>. You are currently signed in as{" "}
-              <strong className="text-foreground">{data.currentUser.email}</strong>.
+              <strong className="text-foreground">{invitation.email}</strong>.
+              You are currently signed in as{" "}
+              <strong className="text-foreground">
+                {data.currentUser.email}
+              </strong>
+              .
             </p>
             <p className="text-[11px] text-muted-foreground leading-relaxed">
-              Please sign in using the invited email address to accept this invitation.
+              Please sign in using the invited email address to accept this
+              invitation.
             </p>
           </div>
 
@@ -472,11 +482,16 @@ function InvitationAcceptContent() {
             </div>
             <div className="flex justify-between items-center text-[11px]">
               <span className="text-muted-foreground">Organization:</span>
-              <span className="font-semibold text-foreground">{invitation.organizationName}</span>
+              <span className="font-semibold text-foreground">
+                {invitation.organizationName}
+              </span>
             </div>
             <div className="flex justify-between items-center text-[11px]">
               <span className="text-muted-foreground">Assigned Role:</span>
-              <Badge variant="outline" className="text-[10px] font-mono uppercase">
+              <Badge
+                variant="outline"
+                className="text-[10px] font-mono uppercase"
+              >
                 {invitation.role}
               </Badge>
             </div>
@@ -488,7 +503,8 @@ function InvitationAcceptContent() {
               className="w-full h-8 text-xs font-medium cursor-pointer"
               onClick={handleSwitchAccount}
             >
-              <LogOut className="mr-1.5 h-3.5 w-3.5" /> Sign Out &amp; Switch Account
+              <LogOut className="mr-1.5 h-3.5 w-3.5" /> Sign Out &amp; Switch
+              Account
             </Button>
             <Link
               href="/dashboard"
@@ -511,7 +527,8 @@ function InvitationAcceptContent() {
             Accept Organization Invitation
           </CardTitle>
           <CardDescription className="text-xs">
-            Join <strong>{invitation.organizationName}</strong> with your existing account
+            Join <strong>{invitation.organizationName}</strong> with your
+            existing account
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -533,15 +550,20 @@ function InvitationAcceptContent() {
             </div>
             <div className="flex items-center justify-between pb-2 border-b border-border/60">
               <span className="text-muted-foreground flex items-center gap-1.5">
-                <User className="h-3.5 w-3.5 text-muted-foreground" /> Invited By
+                <User className="h-3.5 w-3.5 text-muted-foreground" /> Invited
+                By
               </span>
               <span className="text-foreground">{invitation.inviterName}</span>
             </div>
             <div className="flex items-center justify-between pb-2 border-b border-border/60">
               <span className="text-muted-foreground flex items-center gap-1.5">
-                <Shield className="h-3.5 w-3.5 text-muted-foreground" /> Assigned Role
+                <Shield className="h-3.5 w-3.5 text-muted-foreground" />{" "}
+                Assigned Role
               </span>
-              <Badge variant="info" className="text-[10px] font-mono uppercase px-1.5 py-0.5">
+              <Badge
+                variant="info"
+                className="text-[10px] font-mono uppercase px-1.5 py-0.5"
+              >
                 {invitation.role}
               </Badge>
             </div>
@@ -556,7 +578,12 @@ function InvitationAcceptContent() {
           </div>
 
           <div className="p-2.5 rounded-md bg-elevated/40 border border-border/60 text-[11px] text-muted-foreground flex items-center justify-between">
-            <span>Signed in as <strong className="text-foreground">{data.currentUser.fullName || data.currentUser.email}</strong></span>
+            <span>
+              Signed in as{" "}
+              <strong className="text-foreground">
+                {data.currentUser.fullName || data.currentUser.email}
+              </strong>
+            </span>
             <button
               type="button"
               onClick={handleSwitchAccount}
@@ -574,11 +601,13 @@ function InvitationAcceptContent() {
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Accepting Invitation...
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />{" "}
+                Accepting Invitation...
               </>
             ) : (
               <>
-                Accept Invitation &amp; Join <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                Accept Invitation &amp; Join{" "}
+                <ArrowRight className="ml-1 h-3.5 w-3.5" />
               </>
             )}
           </Button>
@@ -612,15 +641,20 @@ function InvitationAcceptContent() {
             </div>
             <div className="flex items-center justify-between pb-2 border-b border-border/60">
               <span className="text-muted-foreground flex items-center gap-1.5">
-                <User className="h-3.5 w-3.5 text-muted-foreground" /> Invited By
+                <User className="h-3.5 w-3.5 text-muted-foreground" /> Invited
+                By
               </span>
               <span className="text-foreground">{invitation.inviterName}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground flex items-center gap-1.5">
-                <Shield className="h-3.5 w-3.5 text-muted-foreground" /> Assigned Role
+                <Shield className="h-3.5 w-3.5 text-muted-foreground" />{" "}
+                Assigned Role
               </span>
-              <Badge variant="info" className="text-[10px] font-mono uppercase px-1.5 py-0.5">
+              <Badge
+                variant="info"
+                className="text-[10px] font-mono uppercase px-1.5 py-0.5"
+              >
                 {invitation.role}
               </Badge>
             </div>
@@ -628,14 +662,16 @@ function InvitationAcceptContent() {
 
           <p className="text-xs text-muted-foreground leading-relaxed">
             Please authenticate with your existing password to join{" "}
-            <strong>{invitation.organizationName}</strong>. You will be redirected right back to complete acceptance.
+            <strong>{invitation.organizationName}</strong>. You will be
+            redirected right back to complete acceptance.
           </p>
 
           <Link
             href={`/login?returnUrl=${encodeURIComponent(returnUrl)}`}
             className="inline-flex items-center justify-center w-full h-9 text-xs font-semibold rounded-md bg-primary text-primary-foreground shadow hover:opacity-90 transition-opacity"
           >
-            Sign in as {invitation.email} <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+            Sign in as {invitation.email}{" "}
+            <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
           </Link>
         </CardContent>
         <CardFooter className="pt-0 justify-center">
@@ -680,9 +716,13 @@ function InvitationAcceptContent() {
           </div>
           <div className="flex items-center justify-between pb-2 border-b border-border/60">
             <span className="text-muted-foreground flex items-center gap-1.5">
-              <Shield className="h-3.5 w-3.5 text-muted-foreground" /> Assigned Role
+              <Shield className="h-3.5 w-3.5 text-muted-foreground" /> Assigned
+              Role
             </span>
-            <Badge variant="info" className="text-[10px] font-mono uppercase px-1.5 py-0.5">
+            <Badge
+              variant="info"
+              className="text-[10px] font-mono uppercase px-1.5 py-0.5"
+            >
               {invitation.role}
             </Badge>
           </div>
@@ -752,7 +792,10 @@ function InvitationAcceptContent() {
           </Field>
 
           <Field error={errors.confirmPassword?.message}>
-            <FieldLabel htmlFor="confirmPassword" className="text-xs font-medium">
+            <FieldLabel
+              htmlFor="confirmPassword"
+              className="text-xs font-medium"
+            >
               Confirm Password
             </FieldLabel>
             <PasswordInput
@@ -772,7 +815,8 @@ function InvitationAcceptContent() {
           >
             {isSubmitting ? (
               <>
-                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Creating Account &amp; Joining...
+                <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Creating
+                Account &amp; Joining...
               </>
             ) : (
               <>
@@ -809,7 +853,6 @@ export default function AcceptInvitationPage() {
             className="h-12 w-12 drop-shadow-xs"
             priority
           />
-          <h1 className="text-lg font-bold tracking-tight">CHRONOS</h1>
           <p className="text-xs text-muted-foreground font-mono">
             Organization Onboarding
           </p>

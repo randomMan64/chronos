@@ -45,10 +45,10 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({
-  currentOrg = { id: "default", name: "Acme Corp", role: "owner" },
-  currentWorkspace = { id: "ws-primary", name: "Primary", environment: "development" },
-  currentDatabase = { id: "db-main", name: "production-pg", status: "active" },
-  user = { email: "admin@chronos.internal", fullName: "Admin User" },
+  currentOrg,
+  currentWorkspace,
+  currentDatabase,
+  user,
   onLogout,
   isCollapsed = false,
   onToggleCollapse,
@@ -58,6 +58,11 @@ export function AppSidebar({
   const pathname = usePathname();
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
   const { t } = useTranslation();
+
+  const safeOrg = currentOrg || { id: "", name: "", role: "" };
+  const safeWorkspace = currentWorkspace || { id: "", name: "", environment: "" };
+  const safeDatabase = currentDatabase || { id: "", name: "", status: "" };
+  const safeUser = user || { email: "", fullName: "", avatarUrl: null };
 
   const navigationItems = [
     {
@@ -180,13 +185,19 @@ export function AppSidebar({
                 <span className="text-[10px] uppercase font-mono text-muted-foreground tracking-wider">
                   {t("nav.organization")}
                 </span>
-                <span className="font-medium text-foreground truncate text-[11px]">
-                  {currentOrg.name}
-                </span>
+                {safeOrg.name ? (
+                  <span className="font-medium text-foreground truncate text-[11px]">
+                    {safeOrg.name}
+                  </span>
+                ) : (
+                  <div className="h-3 w-20 bg-muted/40 rounded animate-pulse my-0.5" />
+                )}
               </div>
-              <Badge variant="secondary" className="text-[9px] capitalize shrink-0 ml-1">
-                {currentOrg.role || "Member"}
-              </Badge>
+              {safeOrg.role && (
+                <Badge variant="secondary" className="text-[9px] capitalize shrink-0 ml-1">
+                  {safeOrg.role}
+                </Badge>
+              )}
             </div>
 
             {/* Workspace & Environment */}
@@ -195,22 +206,28 @@ export function AppSidebar({
                 <span className="text-[10px] uppercase font-mono text-muted-foreground tracking-wider">
                   {t("nav.workspace")}
                 </span>
-                <span className="font-medium text-foreground truncate text-[11px]">
-                  {currentWorkspace.name}
-                </span>
+                {safeWorkspace.name ? (
+                  <span className="font-medium text-foreground truncate text-[11px]">
+                    {safeWorkspace.name}
+                  </span>
+                ) : (
+                  <div className="h-3 w-16 bg-muted/40 rounded animate-pulse my-0.5" />
+                )}
               </div>
-              <Badge
-                variant={
-                  currentWorkspace.environment === "production"
-                    ? "destructive"
-                    : currentWorkspace.environment === "staging"
-                    ? "warning"
-                    : "info"
-                }
-                className="text-[9px] shrink-0 ml-1"
-              >
-                {currentWorkspace.environment || "dev"}
-              </Badge>
+              {safeWorkspace.environment && (
+                <Badge
+                  variant={
+                    safeWorkspace.environment === "production"
+                      ? "destructive"
+                      : safeWorkspace.environment === "staging"
+                      ? "warning"
+                      : "info"
+                  }
+                  className="text-[9px] shrink-0 ml-1"
+                >
+                  {safeWorkspace.environment}
+                </Badge>
+              )}
             </div>
 
             {/* Connected Database */}
@@ -218,17 +235,17 @@ export function AppSidebar({
               <div className="flex items-center gap-1.5 min-w-0">
                 <Server className="h-3 w-3 text-primary shrink-0" />
                 <span className="font-mono text-[11px] text-foreground truncate">
-                  {currentDatabase.name}
+                  {safeDatabase.name || "None"}
                 </span>
               </div>
-              <StatusIndicator status="active" />
+              {safeDatabase.status && <StatusIndicator status="active" />}
             </div>
           </div>
         ) : (
           <div className="p-2 border-b border-border flex flex-col items-center gap-2">
             <div
               className="h-8 w-8 rounded-md bg-panel flex items-center justify-center text-primary"
-              title={`Connected: ${currentDatabase.name}`}
+              title={safeDatabase.name ? `Connected: ${safeDatabase.name}` : undefined}
             >
               <Server className="h-4 w-4" />
             </div>
@@ -296,31 +313,41 @@ export function AppSidebar({
                 "w-full flex items-center rounded-lg transition-colors text-left group cursor-pointer hover:bg-panel",
                 isCollapsed && !isMobile ? "justify-center p-1.5" : "justify-between px-2 py-1.5"
               )}
-              title={user.fullName}
+              title={safeUser.fullName || safeUser.email}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <div
                   className="h-7 w-7 rounded-full bg-elevated border border-border flex items-center justify-center text-[10px] font-mono text-foreground shrink-0 font-semibold group-hover:border-foreground/30 transition-colors overflow-hidden tracking-tighter"
                 >
-                  {user.avatarUrl ? (
+                  {safeUser.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={user.avatarUrl}
-                      alt={user.fullName}
+                      src={safeUser.avatarUrl}
+                      alt={safeUser.fullName || "User"}
                       className="h-full w-full object-cover rounded-full"
                     />
+                  ) : safeUser.fullName || safeUser.email ? (
+                    getInitials(safeUser.fullName || safeUser.email)
                   ) : (
-                    getInitials(user.fullName)
+                    <div className="h-full w-full bg-muted/40 animate-pulse" />
                   )}
                 </div>
                 {(!isCollapsed || isMobile) && (
                   <div className="flex flex-col min-w-0">
-                    <span className="text-[11px] font-medium text-foreground truncate leading-tight">
-                      {user.fullName}
-                    </span>
-                    <span className="text-[10px] text-muted-foreground truncate font-mono">
-                      {user.email}
-                    </span>
+                    {safeUser.fullName ? (
+                      <span className="text-[11px] font-medium text-foreground truncate leading-tight">
+                        {safeUser.fullName}
+                      </span>
+                    ) : (
+                      <div className="h-3 w-16 bg-muted/40 rounded animate-pulse mb-1" />
+                    )}
+                    {safeUser.email ? (
+                      <span className="text-[10px] text-muted-foreground truncate font-mono">
+                        {safeUser.email}
+                      </span>
+                    ) : (
+                      <div className="h-2.5 w-24 bg-muted/30 rounded animate-pulse" />
+                    )}
                   </div>
                 )}
               </div>
@@ -345,24 +372,28 @@ export function AppSidebar({
             <div className="flex items-center px-2.5 py-2">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="h-8 w-8 rounded-full bg-elevated border border-border flex items-center justify-center text-xs font-mono text-foreground shrink-0 font-semibold overflow-hidden">
-                  {user.avatarUrl ? (
+                  {safeUser.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={user.avatarUrl}
-                      alt={user.fullName}
+                      src={safeUser.avatarUrl}
+                      alt={safeUser.fullName || "User"}
                       className="h-full w-full object-cover rounded-full"
                     />
+                  ) : safeUser.fullName || safeUser.email ? (
+                    getInitials(safeUser.fullName || safeUser.email)
                   ) : (
-                    getInitials(user.fullName)
+                    <div className="h-full w-full bg-muted/40 animate-pulse" />
                   )}
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-semibold text-foreground truncate">
-                    {user.fullName}
+                    {safeUser.fullName || safeUser.email || "Account"}
                   </span>
-                  <span className="text-[10px] text-muted-foreground truncate font-mono">
-                    {user.email}
-                  </span>
+                  {safeUser.email && (
+                    <span className="text-[10px] text-muted-foreground truncate font-mono">
+                      {safeUser.email}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

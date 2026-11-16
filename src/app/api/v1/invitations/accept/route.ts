@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, createSessionToken, setSessionCookie } from "@/lib/auth/session";
+import { getCurrentUser, createSessionToken, setSessionCookie, attachSessionCookieToResponse } from "@/lib/auth/session";
 import { InvitationService } from "@/modules/organizations/invitation-service";
 import { handleApiError } from "@/lib/errors";
 import { z } from "zod";
@@ -81,13 +81,25 @@ export async function POST(req: Request) {
 
     await setSessionCookie(sessionToken);
 
-    return NextResponse.json({
-      success: true,
-      message: "Account created and invitation accepted successfully.",
-      user: result.user,
-      organizationId: result.organizationId,
-      organizationName: result.organizationName,
-    });
+    const response = NextResponse.json(
+      {
+        success: true,
+        message: "Account created and invitation accepted successfully.",
+        user: result.user,
+        organizationId: result.organizationId,
+        organizationName: result.organizationName,
+      },
+      {
+        headers: {
+          "Cache-Control": "private, no-cache, no-store, must-revalidate",
+          Pragma: "no-cache",
+        },
+      }
+    );
+
+    attachSessionCookieToResponse(response, sessionToken);
+
+    return response;
   } catch (err) {
     const error = handleApiError(err);
     return NextResponse.json(error.body, { status: error.status });
