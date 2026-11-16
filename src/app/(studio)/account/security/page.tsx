@@ -11,6 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { DismissibleAlert } from "@/components/shared/dismissible-alert";
 import { formatDate } from "@/lib/utils";
 import {
@@ -115,6 +123,7 @@ export default function AccountSecurityPage() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [isChangingPassword, setIsChangingPassword] = React.useState(false);
   const [isRevoking, setIsRevoking] = React.useState(false);
+  const [showRevokeModal, setShowRevokeModal] = React.useState(false);
   const [alert, setAlert] = React.useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
   const {
@@ -169,8 +178,7 @@ export default function AccountSecurityPage() {
     }
   };
 
-  const handleRevokeOthers = async () => {
-    if (!confirm("Are you sure you want to sign out all other active sessions?")) return;
+  const handleConfirmRevokeOthers = async () => {
     try {
       setIsRevoking(true);
       setAlert(null);
@@ -181,6 +189,7 @@ export default function AccountSecurityPage() {
       if (!res.ok) throw new Error(result.error || "Failed to revoke sessions");
 
       setAlert({ type: "success", text: "All other sessions have been revoked." });
+      setShowRevokeModal(false);
       loadSecurityData();
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Failed to revoke sessions";
@@ -303,12 +312,12 @@ export default function AccountSecurityPage() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={handleRevokeOthers}
+                  onClick={() => setShowRevokeModal(true)}
                   disabled={isRevoking}
-                  className="text-xs h-8 text-destructive hover:bg-destructive/10 hover:border-destructive/40"
+                  className="text-xs h-8 text-destructive hover:bg-destructive/10 hover:border-destructive/40 cursor-pointer"
                 >
                   <LogOut className="h-3.5 w-3.5 mr-1.5" />
-                  {isRevoking ? "Revoking..." : "Revoke Other Sessions"}
+                  <span>Revoke Other Sessions</span>
                 </Button>
               )}
             </CardHeader>
@@ -416,6 +425,56 @@ export default function AccountSecurityPage() {
           </Card>
         </div>
       )}
+
+      {/* SHADCN DIALOG: Revoke Other Sessions Confirmation */}
+      <Dialog open={showRevokeModal} onOpenChange={setShowRevokeModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="space-y-1.5 pb-2">
+            <div className="flex items-center gap-2 text-destructive">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10">
+                <LogOut className="h-4 w-4" />
+              </div>
+              <DialogTitle className="text-base font-semibold text-foreground">
+                Revoke Other Active Sessions
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground pt-1 leading-normal">
+              Are you sure you want to sign out all other active sessions? This will immediately terminate access on any other browsers, workstations, or mobile devices.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive space-y-1">
+            <p className="font-semibold">Security Notice</p>
+            <p className="text-[11px] leading-relaxed text-destructive/90">
+              Only your current active session on this device will be preserved. Any active tokens on other devices will be invalidated.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border/50">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowRevokeModal(false)}
+              disabled={isRevoking}
+              className="text-xs h-8 cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              isLoading={isRevoking}
+              onClick={handleConfirmRevokeOthers}
+              className="text-xs h-8 cursor-pointer gap-1.5"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Revoke Other Sessions</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
