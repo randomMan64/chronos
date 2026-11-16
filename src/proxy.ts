@@ -16,6 +16,8 @@ const PUBLIC_PREFIXES = [
   "/invite",
   "/api/v1/auth/login",
   "/api/v1/auth/register",
+  "/api/v1/auth/forgot-password",
+  "/api/v1/auth/reset-password",
   "/api/v1/invitations",
   "/api/v1/health",
   "/api/v1/init",

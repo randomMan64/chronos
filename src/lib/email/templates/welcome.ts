@@ -55,6 +55,7 @@ export function renderWelcomeEmail({
     title: subject,
     preheader,
     contentHtml,
+    badgeText: "CHRONOS STUDIO",
   });
 
   const text = `Welcome to CHRONOS\n\nHello ${recipientName},\n\nYour CHRONOS account (${recipientEmail}) is ready.\n\nOpen CHRONOS Studio: ${dashboardUrl}\n\nStart using Time Travel, SQL Gateway, and Temporal Audit features today.`;

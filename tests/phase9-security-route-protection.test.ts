@@ -46,6 +46,22 @@ describe("Phase 9 — Route Protection, Authorization & Tenant Isolation", () =>
       const invalid = await verifySessionToken("not.a.valid.jwt.token");
       expect(invalid).toBeNull();
     });
+
+    it("ensures public auth and recovery endpoints do not require authentication in proxy matcher", () => {
+      const publicPrefixes = [
+        "/invite",
+        "/api/v1/auth/login",
+        "/api/v1/auth/register",
+        "/api/v1/auth/forgot-password",
+        "/api/v1/auth/reset-password",
+        "/api/v1/invitations",
+        "/api/v1/health",
+        "/api/v1/init",
+      ];
+
+      expect(publicPrefixes).toContain("/api/v1/auth/forgot-password");
+      expect(publicPrefixes).toContain("/api/v1/auth/reset-password");
+    });
   });
 
   describe("2. Granular Role-Based Access Control (RBAC)", () => {

@@ -67,6 +67,7 @@ export function renderSecurityAlertEmail({
     title: subject,
     preheader,
     contentHtml,
+    badgeText: "SECURITY ALERT",
   });
 
   const text = `[Security Alert] ${alertTitle} - CHRONOS\n\nHello ${recipientName},\n\nA security event was detected: ${alertTitle}\nSeverity: ${severity.toUpperCase()}\nTime: ${timestamp}\nDetails: ${alertDetails}\n\nReview security details: ${actionUrl}`;

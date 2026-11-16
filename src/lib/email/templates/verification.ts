@@ -52,6 +52,7 @@ export function renderVerificationEmail({
     title: subject,
     preheader,
     contentHtml,
+    badgeText: "ACCOUNT VERIFICATION",
   });
 
   const text = `Verify your CHRONOS email address\n\nHello ${recipientName},\n\nPlease verify your email address by visiting this link:\n${verificationUrl}\n\nThis link will expire in ${expiresInMinutes} minutes.\n\nIf you did not request this, you can safely ignore this email.`;

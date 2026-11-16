@@ -14,6 +14,8 @@ export interface BaseLayoutOptions {
   preheader?: string;
   contentHtml: string;
   supportEmail?: string;
+  badgeText?: string;
+  logoUrl?: string;
 }
 
 export function renderBaseLayout({
@@ -21,6 +23,8 @@ export function renderBaseLayout({
   preheader,
   contentHtml,
   supportEmail = "support@chronos.local",
+  badgeText = "SECURITY DISPATCH",
+  logoUrl = "cid:chronos-logo",
 }: BaseLayoutOptions): string {
   const currentYear = new Date().getFullYear();
 
@@ -79,20 +83,15 @@ export function renderBaseLayout({
         <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width:560px;background-color:#ffffff;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.04);">
           <!-- Header -->
           <tr>
-            <td style="padding:24px 32px;border-bottom:1px solid #f1f5f9;background-color:#090d16;">
+            <td style="padding:18px 32px;border-bottom:1px solid #1e293b;background-color:#090d16;">
               <table role="presentation" border="0" cellpadding="0" cellspacing="0" width="100%">
                 <tr>
-                  <td>
-                    <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:16px;font-weight:800;letter-spacing:0.12em;color:#ffffff;text-transform:uppercase;">
-                      CHRONOS
-                    </span>
-                    <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:10px;font-weight:600;letter-spacing:0.05em;color:#ea580c;margin-left:8px;padding:2px 6px;border:1px solid rgba(234,88,12,0.3);border-radius:3px;">
-                      CORE
-                    </span>
+                  <td valign="middle" align="left">
+                    <img src="${escapeHtml(logoUrl)}" alt="CHRONOS" width="44" height="40" style="display:block;width:44px;height:40px;max-height:40px;border:0;outline:none;text-decoration:none;" />
                   </td>
-                  <td align="right">
-                    <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:10px;color:#64748b;">
-                      SECURITY DISPATCH
+                  <td align="right" valign="middle">
+                    <span style="font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-size:10px;color:#64748b;letter-spacing:0.06em;text-transform:uppercase;">
+                      ${escapeHtml(badgeText)}
                     </span>
                   </td>
                 </tr>

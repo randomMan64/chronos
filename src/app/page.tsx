@@ -1,19 +1,16 @@
-import Link from "next/link";
 import { BrandLogo } from "@/components/shared/brand-logo";
+import { Badge } from "@/components/ui/badge";
 import {
-  Terminal,
-  Database,
-  Clock,
   Activity,
-  Shield,
-  Layers,
   ArrowRight,
+  Clock,
+  Database,
   GitBranch,
   Lock,
+  Shield,
+  Terminal,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
+import Link from "next/link";
 
 export default function LandingPage() {
   return (

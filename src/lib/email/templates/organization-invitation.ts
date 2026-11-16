@@ -71,6 +71,7 @@ export function renderOrganizationInvitationEmail({
     title: subject,
     preheader,
     contentHtml,
+    badgeText: "ORGANIZATION INVITATION",
   });
 
   const text = `Invitation to join ${organizationName} on CHRONOS\n\n${inviterName} has invited you to join ${organizationName} as a ${role.toUpperCase()}.\n\nAccept your invitation by visiting:\n${invitationUrl}\n\nThis invitation was sent to ${recipientEmail} and expires in ${expiresInDays} days.`;

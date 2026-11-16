@@ -1,5 +1,7 @@
 import { getEmailTransporter } from "./transporter";
 import { getEmailConfig, isEmailConfigured } from "./email-config";
+import fs from "fs";
+import path from "path";
 import {
   renderVerificationEmail,
   VerificationEmailProps,
@@ -60,6 +62,17 @@ async function sendWithRetry(
   const transporter = getEmailTransporter();
   let lastError: unknown = null;
 
+  const logoPath = path.join(process.cwd(), "public", "logo.png");
+  const defaultAttachments = fs.existsSync(logoPath)
+    ? [
+        {
+          filename: "logo.png",
+          path: logoPath,
+          cid: "chronos-logo",
+        },
+      ]
+    : [];
+
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
       const info = await transporter.sendMail({
@@ -68,6 +81,7 @@ async function sendWithRetry(
         subject: options.subject,
         html: options.html,
         text: options.text,
+        attachments: defaultAttachments,
       });
 
       // Verify that SMTP actually accepted at least one recipient
