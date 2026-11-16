@@ -1,4 +1,4 @@
-import { resolveUserContext, getCurrentUser } from "./session";
+import { resolveUserContext, getCurrentUser, validateSessionState } from "./session";
 import { UserContext, Permission, OrganizationRole, WorkspaceRole } from "@/lib/permissions/types";
 import { hasPermission } from "@/lib/permissions/resolver";
 import { db } from "@/db/connections/control-plane";
@@ -7,40 +7,50 @@ import { eq, and } from "drizzle-orm";
 
 export class AuthError extends Error {
   public statusCode: number;
-  constructor(message = "Authentication required. Please sign in.", statusCode = 401) {
+  public code: string;
+  constructor(message = "Authentication required. Please sign in.", statusCode = 401, code = "UNAUTHENTICATED") {
     super(message);
     this.name = "AuthError";
     this.statusCode = statusCode;
+    this.code = code;
   }
 }
 
 export class ForbiddenError extends Error {
   public statusCode: number;
-  constructor(message = "Access forbidden: Insufficient permissions.", statusCode = 403) {
+  public code: string;
+  constructor(message = "Access forbidden: Insufficient permissions.", statusCode = 403, code = "FORBIDDEN") {
     super(message);
     this.name = "ForbiddenError";
     this.statusCode = statusCode;
+    this.code = code;
   }
 }
 
 export class NotFoundError extends Error {
   public statusCode: number;
-  constructor(message = "Resource not found", statusCode = 404) {
+  public code: string;
+  constructor(message = "Resource not found", statusCode = 404, code = "NOT_FOUND") {
     super(message);
     this.name = "NotFoundError";
     this.statusCode = statusCode;
+    this.code = code;
   }
 }
 
 /**
- * Validates the user's active session. Throws 401 if unauthenticated.
+ * Validates the user's active session. Throws 401 if unauthenticated or revoked.
  */
 export async function requireAuth(): Promise<{ userId: string; email: string; sessionId?: string }> {
-  const user = await getCurrentUser();
-  if (!user || !user.userId) {
-    throw new AuthError("Authentication required. Please sign in.", 401);
+  const validation = await validateSessionState();
+  if (!validation.valid || !validation.user) {
+    throw new AuthError(
+      validation.message || "Authentication required. Please sign in.",
+      401,
+      validation.code || "UNAUTHENTICATED"
+    );
   }
-  return { userId: user.userId, email: user.email, sessionId: user.sessionId };
+  return { userId: validation.user.userId, email: validation.user.email, sessionId: validation.user.sessionId };
 }
 
 /**

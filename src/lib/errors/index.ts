@@ -24,10 +24,14 @@ export function handleApiError(error: unknown): {
   }
 
   if (typeof error === "object" && error !== null && "statusCode" in error) {
-    const custom = error as { statusCode: number; message: string };
+    const custom = error as { statusCode: number; message: string; code?: string; details?: unknown };
     return {
       status: custom.statusCode || 500,
-      body: { error: custom.message || "An unexpected error occurred" },
+      body: {
+        error: custom.message || "An unexpected error occurred",
+        code: custom.code,
+        details: custom.details,
+      },
     };
   }
 

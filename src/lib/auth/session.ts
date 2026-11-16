@@ -96,37 +96,78 @@ export function clearSessionCookieOnResponse(response: NextResponse): NextRespon
   return response;
 }
 
-export async function getCurrentUser(): Promise<SessionPayload | null> {
-  const cookieStore = await cookies();
-  const token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  if (!token) return null;
+export interface SessionValidationResult {
+  valid: boolean;
+  user: SessionPayload | null;
+  code: "SESSION_REVOKED" | "SESSION_EXPIRED" | "UNAUTHENTICATED" | null;
+  message: string | null;
+}
+
+export async function validateSessionState(tokenOverride?: string): Promise<SessionValidationResult> {
+  let token = tokenOverride;
+  if (!token) {
+    try {
+      const cookieStore = await cookies();
+      token = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+    } catch {
+      token = undefined;
+    }
+  }
+
+  if (!token) {
+    return {
+      valid: false,
+      user: null,
+      code: "UNAUTHENTICATED",
+      message: "Authentication required. Please sign in.",
+    };
+  }
 
   const payload = await verifySessionToken(token);
-  if (!payload || !payload.userId) return null;
+  if (!payload || !payload.userId) {
+    return {
+      valid: false,
+      user: null,
+      code: "UNAUTHENTICATED",
+      message: "Session token is invalid or expired.",
+    };
+  }
 
-  // If a sessionId exists in the token, verify it has not been revoked or expired
+  // Authoritative database check on user_sessions
   if (payload.sessionId) {
     try {
-      const activeSessions = await db
-        .select({ id: userSessions.id })
+      const [sess] = await db
+        .select({
+          id: userSessions.id,
+          revokedAt: userSessions.revokedAt,
+          expiresAt: userSessions.expiresAt,
+        })
         .from(userSessions)
-        .where(
-          and(
-            eq(userSessions.id, payload.sessionId),
-            isNull(userSessions.revokedAt),
-            gt(userSessions.expiresAt, new Date())
-          )
-        )
+        .where(eq(userSessions.id, payload.sessionId))
         .limit(1);
 
-      if (activeSessions.length === 0) {
-        return null;
+      if (!sess || sess.revokedAt !== null) {
+        return {
+          valid: false,
+          user: null,
+          code: "SESSION_REVOKED",
+          message: "Your session has been signed out because it was revoked from another device.",
+        };
+      }
+
+      if (new Date(sess.expiresAt) <= new Date()) {
+        return {
+          valid: false,
+          user: null,
+          code: "SESSION_EXPIRED",
+          message: "Your session has expired. Please sign in again.",
+        };
       }
     } catch {
-      // In isolated environments without database connection, fall back to verified JWT payload
+      // In isolated test environments without database, fall back to valid payload
     }
   } else {
-    // If token lacks explicit sessionId, verify the user still has non-revoked active sessions
+    // If token lacks explicit sessionId, check if user has active sessions
     try {
       const activeUserSessions = await db
         .select({ id: userSessions.id })
@@ -141,14 +182,29 @@ export async function getCurrentUser(): Promise<SessionPayload | null> {
         .limit(1);
 
       if (activeUserSessions.length === 0) {
-        return null;
+        return {
+          valid: false,
+          user: null,
+          code: "SESSION_REVOKED",
+          message: "Your session has been signed out because it was revoked from another device.",
+        };
       }
     } catch {
       // fallback
     }
   }
 
-  return payload;
+  return {
+    valid: true,
+    user: payload,
+    code: null,
+    message: null,
+  };
+}
+
+export async function getCurrentUser(): Promise<SessionPayload | null> {
+  const result = await validateSessionState();
+  return result.valid ? result.user : null;
 }
 
 export interface AuthenticatedSession {

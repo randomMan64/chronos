@@ -17,6 +17,7 @@ import { LogOut } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { getInitials } from "@/lib/utils";
 import type { AuthenticatedSession } from "@/lib/auth/session";
+import { installGlobalAuthInterceptor, startSessionWatchdog } from "@/lib/auth/auth-client";
 
 interface StudioLayoutProps {
   children: React.ReactNode;
@@ -114,38 +115,28 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isMobileMenuOpen]);
 
-  // Intercept 401 Unauthorized API responses across the studio app and immediately redirect to login
+  // 1. Centralized global 401 interceptor & session watchdog
   React.useEffect(() => {
-    const originalFetch = window.fetch;
-    window.fetch = async (...args) => {
-      const response = await originalFetch(...args);
-      if (response.status === 401) {
-        const url = typeof args[0] === "string" ? args[0] : (args[0] as Request)?.url || "";
-        if (!url.includes("/api/v1/auth/login") && !url.includes("/api/v1/auth/register")) {
-          window.location.href = "/login?revoked=true";
-        }
-      }
-      return response;
-    };
+    const uninstallInterceptor = installGlobalAuthInterceptor();
+    const stopWatchdog = startSessionWatchdog();
 
     return () => {
-      window.fetch = originalFetch;
+      uninstallInterceptor();
+      stopWatchdog();
     };
   }, []);
 
+  // 2. Initial profile and environment loader (runs ONCE on mount, not continuously polled)
   React.useEffect(() => {
     let isCancelled = false;
 
-    // Check active session status and populate user info
-    async function checkSession(isInitial = false) {
+    async function loadInitialProfile() {
       try {
         const res = await fetch("/api/v1/auth/me", { cache: "no-store" });
         if (res.status === 401) {
-          window.location.href = "/login?revoked=true";
+          window.location.href = "/login?reason=SESSION_REVOKED";
           return;
         }
-
-        if (!isInitial) return;
 
         if (res.ok && !isCancelled) {
           const data = await res.json();
@@ -230,32 +221,14 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
           }
         }
       } catch {
-        // Network error; do not boot immediately
+        // Network error during initial profile load
       }
     }
 
-    // Initial check on page load
-    checkSession(true);
-
-    // Heartbeat check every 5 seconds to instantly catch revoked sessions
-    const intervalId = setInterval(() => {
-      checkSession(false);
-    }, 5000);
-
-    // Also check on tab focus or visibility change
-    const onFocusOrVisible = () => {
-      if (document.visibilityState === "visible") {
-        checkSession(false);
-      }
-    };
-    window.addEventListener("focus", onFocusOrVisible);
-    document.addEventListener("visibilitychange", onFocusOrVisible);
+    loadInitialProfile();
 
     return () => {
       isCancelled = true;
-      clearInterval(intervalId);
-      window.removeEventListener("focus", onFocusOrVisible);
-      document.removeEventListener("visibilitychange", onFocusOrVisible);
     };
   }, []);
 

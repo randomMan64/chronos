@@ -36,40 +36,41 @@ export async function DELETE(
       );
     }
 
-    // 2. Mark session as revoked
-    await db
-      .update(userSessions)
-      .set({
-        revokedAt: new Date(),
-        revokeReason: "manual_revocation",
-      })
-      .where(eq(userSessions.id, targetSessionId));
+    // 2. Mark session as revoked and record audit log inside a transaction
+    await db.transaction(async (tx) => {
+      await tx
+        .update(userSessions)
+        .set({
+          revokedAt: new Date(),
+          revokeReason: "manual_revocation",
+        })
+        .where(eq(userSessions.id, targetSessionId));
 
-    // 3. Log audit event
-    const [membership] = await db
-      .select({ organizationId: organizationMembers.organizationId })
-      .from(organizationMembers)
-      .where(eq(organizationMembers.userId, sessionUser.userId))
-      .limit(1);
+      const [membership] = await tx
+        .select({ organizationId: organizationMembers.organizationId })
+        .from(organizationMembers)
+        .where(eq(organizationMembers.userId, sessionUser.userId))
+        .limit(1);
 
-    if (membership) {
-      const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined;
-      await db.insert(auditLogs).values({
-        organizationId: membership.organizationId,
-        actorId: sessionUser.userId,
-        actorEmail: sessionUser.email,
-        action: "user:session_revoked",
-        resourceType: "session",
-        resourceId: targetSessionId,
-        outcome: "success",
-        ipAddress: ipAddress ? ipAddress.slice(0, 45) : undefined,
-        metadata: {
-          revocationType: "individual",
-          targetSessionId,
-          isCurrentSession: targetSessionId === sessionUser.sessionId,
-        },
-      });
-    }
+      if (membership) {
+        const ipAddress = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || undefined;
+        await tx.insert(auditLogs).values({
+          organizationId: membership.organizationId,
+          actorId: sessionUser.userId,
+          actorEmail: sessionUser.email,
+          action: "user:session_revoked",
+          resourceType: "session",
+          resourceId: targetSessionId,
+          outcome: "success",
+          ipAddress: ipAddress ? ipAddress.slice(0, 45) : undefined,
+          metadata: {
+            revocationType: "individual",
+            targetSessionId,
+            isCurrentSession: targetSessionId === sessionUser.sessionId,
+          },
+        });
+      }
+    });
 
     const isCurrentSession = targetSessionId === sessionUser.sessionId;
 
