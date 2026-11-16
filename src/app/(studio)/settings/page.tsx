@@ -148,6 +148,15 @@ export default function SettingsPage() {
   const [showTransferModal, setShowTransferModal] = React.useState(false);
   const [isTransferring, setIsTransferring] = React.useState(false);
 
+  // Remove Member confirmation state
+  const [memberToRemove, setMemberToRemove] = React.useState<{
+    id: string;
+    fullName: string;
+    email: string;
+    role: string;
+  } | null>(null);
+  const [isRemovingMember, setIsRemovingMember] = React.useState(false);
+
   const {
     register: registerInvite,
     handleSubmit: handleInviteSubmit,
@@ -351,12 +360,12 @@ export default function SettingsPage() {
     }
   };
 
-  const handleRemoveMember = async (memberId: string) => {
-    if (!org || !canManageMembers || !confirm("Are you sure you want to remove this member?"))
-      return;
+  const handleConfirmRemoveMember = async () => {
+    if (!org || !canManageMembers || !memberToRemove) return;
+    setIsRemovingMember(true);
     try {
       const res = await fetch(
-        `/api/v1/organizations/${org.id}/members/${memberId}`,
+        `/api/v1/organizations/${org.id}/members/${memberToRemove.id}`,
         {
           method: "DELETE",
         },
@@ -364,8 +373,9 @@ export default function SettingsPage() {
       if (res.ok) {
         setMessage({
           type: "success",
-          text: "Member removed from organization",
+          text: `Member '${memberToRemove.fullName}' removed from organization`,
         });
+        setMemberToRemove(null);
         loadData();
       } else {
         const data = await res.json();
@@ -376,6 +386,8 @@ export default function SettingsPage() {
       }
     } catch {
       setMessage({ type: "error", text: "Failed to remove member" });
+    } finally {
+      setIsRemovingMember(false);
     }
   };
 
@@ -721,9 +733,9 @@ export default function SettingsPage() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handleRemoveMember(m.id)}
-                                  className="text-destructive hover:text-destructive/80 h-7 w-7"
-                                  title="Remove member"
+                                  onClick={() => setMemberToRemove(m)}
+                                  className="text-destructive hover:text-destructive/80 h-7 w-7 cursor-pointer"
+                                  title={`Remove ${m.fullName}`}
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
                                 </Button>
@@ -1461,6 +1473,66 @@ export default function SettingsPage() {
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* SHADCN DIALOG: Remove Member Confirmation */}
+      <Dialog
+        open={Boolean(memberToRemove)}
+        onOpenChange={(open) => {
+          if (!open) setMemberToRemove(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                <Trash2 className="h-4 w-4" />
+              </div>
+              <DialogTitle className="text-base font-semibold text-foreground">
+                Remove Organization Member
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground pt-1 leading-normal">
+              Are you sure you want to remove{" "}
+              <strong className="text-foreground font-semibold">
+                {memberToRemove?.fullName}
+              </strong>{" "}
+              (<span className="font-mono text-foreground">{memberToRemove?.email}</span>) from{" "}
+              <strong className="text-foreground font-semibold">{org?.name}</strong>?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive space-y-1">
+            <p className="font-semibold">Access Revocation Notice</p>
+            <p className="text-[11px] leading-relaxed text-destructive/90">
+              This member will immediately lose access to all workspaces, databases, queries, and organization resources.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setMemberToRemove(null)}
+              disabled={isRemovingMember}
+              className="text-xs h-8 cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              isLoading={isRemovingMember}
+              onClick={handleConfirmRemoveMember}
+              className="text-xs h-8 cursor-pointer gap-1.5"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Remove Member</span>
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
