@@ -123,16 +123,52 @@ CREATE TABLE IF NOT EXISTS saved_queries (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- 9.5 Devices
+CREATE TABLE IF NOT EXISTS devices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_key_hash VARCHAR(255) NOT NULL,
+  device_name VARCHAR(255) NOT NULL,
+  device_type VARCHAR(50) NOT NULL DEFAULT 'unknown',
+  manufacturer VARCHAR(100),
+  model VARCHAR(100),
+  operating_system VARCHAR(100) NOT NULL,
+  operating_system_version VARCHAR(50),
+  browser VARCHAR(100) NOT NULL,
+  browser_version VARCHAR(50),
+  first_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_seen_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT device_user_key_unique UNIQUE (user_id, device_key_hash)
+);
+
 -- 10. User Sessions
 CREATE TABLE IF NOT EXISTS user_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  device_id UUID REFERENCES devices(id) ON DELETE SET NULL,
   token_hash VARCHAR(255) NOT NULL UNIQUE,
   ip_address VARCHAR(45),
   user_agent TEXT,
+  country VARCHAR(100),
+  region VARCHAR(100),
+  city VARCHAR(100),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   expires_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  revoked_at TIMESTAMPTZ,
+  revoke_reason VARCHAR(100)
 );
+
+-- Safe migrations for user_sessions existing tables
+ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS device_id UUID REFERENCES devices(id) ON DELETE SET NULL;
+ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS country VARCHAR(100);
+ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS region VARCHAR(100);
+ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS city VARCHAR(100);
+ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS last_active_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMPTZ;
+ALTER TABLE user_sessions ADD COLUMN IF NOT EXISTS revoke_reason VARCHAR(100);
 
 -- 11. Audit Logs (Append-only)
 CREATE TABLE IF NOT EXISTS audit_logs (
@@ -290,6 +326,9 @@ CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_logs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_row_versions_lookup ON row_versions(database_id, schema_name, table_name, record_id);
 CREATE INDEX IF NOT EXISTS idx_row_versions_time ON row_versions(changed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_query_exec_db ON query_executions(database_id, executed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_devices_user ON devices(user_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_device ON user_sessions(device_id);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON user_sessions(user_id);
 `;
 
 export async function initializeDatabase(): Promise<{ success: boolean; message: string }> {

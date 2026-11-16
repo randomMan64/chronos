@@ -3,7 +3,14 @@ import bcrypt from "bcryptjs";
 import { db } from "@/db/connections/control-plane";
 import { users, userSessions, organizationMembers, organizations, workspaces } from "@/db/schema";
 import { loginSchema } from "@/lib/validation";
-import { createSessionToken, setSessionCookie, attachSessionCookieToResponse } from "@/lib/auth/session";
+import {
+  createSessionToken,
+  setSessionCookie,
+  attachSessionCookieToResponse,
+  attachDeviceCookieToResponse,
+  DEVICE_COOKIE_NAME,
+} from "@/lib/auth/session";
+import { parseUserAgent, resolveOrCreateDevice } from "@/lib/auth/device-detector";
 import { AuditService } from "@/modules/audit/audit-service";
 import { handleApiError } from "@/lib/errors";
 import { eq, and } from "drizzle-orm";
@@ -42,6 +49,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
+    // Detect device and resolve/create device record
+    const cookieHeader = req.headers.get("cookie") || "";
+    const deviceCookieMatch = cookieHeader.match(new RegExp(`(?:^|; )${DEVICE_COOKIE_NAME}=([^;]*)`));
+    const rawDeviceKey = deviceCookieMatch ? decodeURIComponent(deviceCookieMatch[1]) : null;
+
+    const deviceInfo = parseUserAgent(req.headers.get("user-agent"), req.headers);
+    const { device, deviceKey, isNewDevice } = await resolveOrCreateDevice({
+      userId: user.id,
+      rawDeviceKey,
+      deviceInfo,
+    });
+
     // Create Session
     const tokenHash = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -50,7 +69,14 @@ export async function POST(req: Request) {
       .insert(userSessions)
       .values({
         userId: user.id,
+        deviceId: device.id,
         tokenHash,
+        ipAddress: deviceInfo.ipAddress,
+        userAgent: deviceInfo.userAgent,
+        country: deviceInfo.country,
+        region: deviceInfo.region,
+        city: deviceInfo.city,
+        lastActiveAt: new Date(),
         expiresAt,
       })
       .returning();
@@ -85,7 +111,28 @@ export async function POST(req: Request) {
         .limit(1);
       defaultWs = wss[0] || null;
 
-      // Log audit
+      // Log new device audit event if applicable
+      if (isNewDevice) {
+        await AuditService.log({
+          organizationId: defaultOrg.id,
+          actorId: user.id,
+          actorEmail: user.email,
+          action: "user:new_device_login",
+          resourceType: "device",
+          resourceId: device.id,
+          outcome: "success",
+          ipAddress: deviceInfo.ipAddress || undefined,
+          metadata: {
+            deviceName: device.deviceName,
+            deviceType: device.deviceType,
+            browser: device.browser,
+            os: device.operatingSystem,
+            location: [deviceInfo.city, deviceInfo.country].filter(Boolean).join(", "),
+          },
+        });
+      }
+
+      // Log login audit
       await AuditService.log({
         organizationId: defaultOrg.id,
         actorId: user.id,
@@ -94,6 +141,11 @@ export async function POST(req: Request) {
         resourceType: "session",
         resourceId: newSession.id,
         outcome: "success",
+        ipAddress: deviceInfo.ipAddress || undefined,
+        metadata: {
+          deviceId: device.id,
+          deviceName: device.deviceName,
+        },
       });
     }
 
@@ -131,6 +183,7 @@ export async function POST(req: Request) {
     );
 
     attachSessionCookieToResponse(response, sessionToken);
+    attachDeviceCookieToResponse(response, deviceKey);
 
     return response;
   } catch (err) {

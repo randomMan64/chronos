@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { db } from "@/db/connections/control-plane";
-import { users, auditLogs, organizationMembers } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { users, auditLogs, organizationMembers, userSessions } from "@/db/schema";
+import { eq, and, ne } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { EmailService } from "@/lib/email";
@@ -70,6 +70,22 @@ export async function POST(req: Request) {
         updatedAt: new Date(),
       })
       .where(eq(users.id, user.id));
+
+    // Revoke all other active sessions for this user
+    if (sessionUser.sessionId) {
+      await db
+        .update(userSessions)
+        .set({
+          revokedAt: new Date(),
+          revokeReason: "password_change",
+        })
+        .where(
+          and(
+            eq(userSessions.userId, user.id),
+            ne(userSessions.id, sessionUser.sessionId)
+          )
+        );
+    }
 
     // Get user's primary org for audit trail
     const [primaryOrg] = await db

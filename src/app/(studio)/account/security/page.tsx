@@ -25,12 +25,17 @@ import {
   Shield,
   KeyRound,
   Laptop,
+  Smartphone,
+  Tablet,
+  Monitor,
   History,
   Lock,
   LogOut,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
+  Globe,
+  Trash2,
 } from "lucide-react";
 
 const passwordSchema = z
@@ -46,13 +51,33 @@ const passwordSchema = z
 
 type PasswordFormValues = z.infer<typeof passwordSchema>;
 
+interface DeviceInfo {
+  id?: string | null;
+  name: string;
+  type: "desktop" | "laptop" | "mobile" | "tablet" | "unknown" | string;
+  manufacturer?: string | null;
+  model?: string | null;
+  operatingSystem: string;
+  operatingSystemVersion?: string | null;
+  browser: string;
+  browserVersion?: string | null;
+  firstSeenAt?: string | Date | null;
+  lastSeenAt?: string | Date | null;
+}
+
 interface SessionItem {
   id: string;
   ipAddress?: string | null;
   userAgent?: string | null;
+  country?: string | null;
+  region?: string | null;
+  city?: string | null;
+  location?: string | null;
   createdAt: string;
   lastActiveAt?: string | null;
+  expiresAt?: string | null;
   isCurrent: boolean;
+  device?: DeviceInfo;
 }
 
 interface LoginEvent {
@@ -62,13 +87,25 @@ interface LoginEvent {
   userAgent?: string | null;
   timestamp?: string | Date | null;
   createdAt?: string | Date | null;
-  details?: unknown;
+  metadata?: unknown;
 }
 
 interface SecurityData {
-  currentSessionId: string;
   sessions: SessionItem[];
   loginHistory: LoginEvent[];
+}
+
+function getDeviceIcon(type?: string) {
+  switch (type?.toLowerCase()) {
+    case "mobile":
+      return <Smartphone className="h-4 w-4 text-primary" />;
+    case "tablet":
+      return <Tablet className="h-4 w-4 text-primary" />;
+    case "laptop":
+      return <Laptop className="h-4 w-4 text-primary" />;
+    default:
+      return <Monitor className="h-4 w-4 text-primary" />;
+  }
 }
 
 function SecuritySkeleton() {
@@ -126,6 +163,8 @@ export default function AccountSecurityPage() {
   const [isChangingPassword, setIsChangingPassword] = React.useState(false);
   const [isRevoking, setIsRevoking] = React.useState(false);
   const [showRevokeModal, setShowRevokeModal] = React.useState(false);
+  const [sessionToRevoke, setSessionToRevoke] = React.useState<SessionItem | null>(null);
+  const [isRevokingSingle, setIsRevokingSingle] = React.useState(false);
   const [loginHistoryPage, setLoginHistoryPage] = React.useState(1);
   const LOGIN_HISTORY_PAGE_SIZE = 5;
   const [alert, setAlert] = React.useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
@@ -172,8 +211,9 @@ export default function AccountSecurityPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Failed to update password");
 
-      setAlert({ type: "success", text: "Your password has been changed successfully." });
+      setAlert({ type: "success", text: "Your password has been changed successfully. Other sessions have been signed out." });
       resetPasswordForm();
+      loadSecurityData();
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : "Failed to update password";
       setAlert({ type: "error", text: errorMsg });
@@ -200,6 +240,34 @@ export default function AccountSecurityPage() {
       setAlert({ type: "error", text: errorMsg });
     } finally {
       setIsRevoking(false);
+    }
+  };
+
+  const handleConfirmRevokeSingle = async () => {
+    if (!sessionToRevoke) return;
+    try {
+      setIsRevokingSingle(true);
+      setAlert(null);
+      const res = await fetch(`/api/v1/account/security/sessions/${sessionToRevoke.id}`, {
+        method: "DELETE",
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to revoke session");
+
+      setAlert({ type: "success", text: result.message || "Session revoked successfully." });
+      const wasCurrent = sessionToRevoke.isCurrent;
+      setSessionToRevoke(null);
+
+      if (wasCurrent) {
+        window.location.href = "/login";
+        return;
+      }
+      loadSecurityData();
+    } catch (err: unknown) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to revoke session";
+      setAlert({ type: "error", text: errorMsg });
+    } finally {
+      setIsRevokingSingle(false);
     }
   };
 
@@ -307,16 +375,16 @@ export default function AccountSecurityPage() {
             </CardContent>
           </Card>
 
-          {/* Active Sessions Card */}
+          {/* Devices & Active Sessions Card */}
           <Card className="border-border/80 bg-panel/40">
-            <CardHeader className="pb-3 flex flex-row items-center justify-between gap-4">
+            <CardHeader className="pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div>
                 <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                  <Laptop className="h-4 w-4 text-primary" />
-                  Active Sessions
+                  <Monitor className="h-4 w-4 text-primary" />
+                  Devices &amp; Sessions
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Devices and locations currently signed in to your account
+                  Recognized devices and active login sessions associated with your account
                 </CardDescription>
               </div>
               {data && data.sessions.length > 1 && (
@@ -325,52 +393,99 @@ export default function AccountSecurityPage() {
                   size="sm"
                   onClick={() => setShowRevokeModal(true)}
                   disabled={isRevoking}
-                  className="text-xs h-8 text-destructive hover:bg-destructive/10 hover:border-destructive/40 cursor-pointer"
+                  className="text-xs h-8 text-destructive border-destructive/20 hover:bg-destructive/10 hover:border-destructive/40 cursor-pointer self-start sm:self-auto"
                 >
                   <LogOut className="h-3.5 w-3.5 mr-1.5" />
-                  <span>Revoke Other Sessions</span>
+                  <span>Sign Out All Other Sessions</span>
                 </Button>
               )}
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="rounded-lg border border-border divide-y divide-border overflow-hidden">
+              <div className="rounded-lg border border-border divide-y divide-border overflow-hidden bg-panel/20">
                 {data && data.sessions.length > 0 ? (
-                  data.sessions.map((session) => (
-                    <div
-                      key={session.id}
-                      className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-elevated/20 transition-colors"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="p-2 rounded bg-elevated border border-border text-foreground shrink-0 mt-0.5">
-                          <Laptop className="h-4 w-4" />
-                        </div>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-foreground">
-                              {session.userAgent ? session.userAgent.slice(0, 50) : "Web Browser"}
-                            </span>
-                            {session.isCurrent && (
-                              <Badge variant="outline" className="text-[10px] text-emerald-500 border-emerald-500/30 bg-emerald-500/10 font-mono">
-                                This Device
+                  data.sessions.map((session) => {
+                    const dev = session.device;
+                    const hardwareInfo = [dev?.manufacturer, dev?.model].filter(Boolean).join(" ");
+                    return (
+                      <div
+                        key={session.id}
+                        className="p-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-elevated/20 transition-colors"
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="p-2.5 rounded-lg bg-elevated border border-border text-foreground shrink-0 mt-0.5">
+                            {getDeviceIcon(dev?.type)}
+                          </div>
+                          <div className="space-y-1">
+                            {/* Device Name & Badges */}
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-semibold text-foreground">
+                                {dev?.name || session.userAgent?.slice(0, 45) || "Recognized Device"}
+                              </span>
+                              {session.isCurrent && (
+                                <Badge variant="outline" className="text-[10px] text-emerald-500 border-emerald-500/30 bg-emerald-500/10 font-mono">
+                                  This Device
+                                </Badge>
+                              )}
+                              <Badge variant="outline" className="text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10 font-mono">
+                                Active Session
                               </Badge>
-                            )}
-                          </div>
-                          <div className="text-[11px] text-muted-foreground font-mono">
-                            IP: {session.ipAddress || "127.0.0.1"} • Started: {formatDate(session.createdAt)}
+                            </div>
+
+                            {/* Device & Client Details */}
+                            <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                              <span>
+                                {dev?.operatingSystem || "OS"} {dev?.operatingSystemVersion ? `(${dev.operatingSystemVersion})` : ""}
+                              </span>
+                              <span>•</span>
+                              <span>
+                                {dev?.browser || "Browser"} {dev?.browserVersion ? `v${dev.browserVersion}` : ""}
+                              </span>
+                              {hardwareInfo && (
+                                <>
+                                  <span>•</span>
+                                  <span>Hardware: {hardwareInfo}</span>
+                                </>
+                              )}
+                            </div>
+
+                            {/* Network, Approximate Location & Timestamps */}
+                            <div className="text-[11px] text-muted-foreground font-mono flex flex-wrap items-center gap-x-2 gap-y-0.5 pt-0.5">
+                              <span className="flex items-center gap-1">
+                                <Globe className="h-3 w-3 text-muted-foreground" />
+                                {session.location || "Local Network"}
+                              </span>
+                              <span>•</span>
+                              <span>IP: {session.ipAddress || "127.0.0.1"}</span>
+                              <span>•</span>
+                              <span>First login: {formatDate(dev?.firstSeenAt || session.createdAt)}</span>
+                              <span>•</span>
+                              <span>Last active: {formatDate(session.lastActiveAt || session.createdAt)}</span>
+                            </div>
                           </div>
                         </div>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-2 md:self-center shrink-0 pt-2 md:pt-0">
+                          {session.isCurrent ? (
+                            <span className="text-[11px] text-emerald-500 flex items-center gap-1 font-mono">
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Current Session
+                            </span>
+                          ) : (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setSessionToRevoke(session)}
+                              className="text-xs h-7 text-destructive border-destructive/20 hover:bg-destructive/10 hover:border-destructive/40 cursor-pointer gap-1"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                              <span>Revoke</span>
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <div className="text-right text-[11px] text-muted-foreground font-mono sm:self-center">
-                        {session.isCurrent ? (
-                          <span className="text-emerald-500 flex items-center gap-1">
-                            <CheckCircle2 className="h-3 w-3" /> Active Now
-                          </span>
-                        ) : (
-                          <span>Last active: {session.lastActiveAt ? formatDate(session.lastActiveAt) : "Recently"}</span>
-                        )}
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 ) : (
                   <div className="p-4 text-xs text-muted-foreground text-center">
                     No active sessions recorded.
@@ -388,7 +503,7 @@ export default function AccountSecurityPage() {
                 Recent Login History
               </CardTitle>
               <CardDescription className="text-xs">
-                Audited access events and security verifications from the past 30 days
+                Audited access events and security verifications from the past 30 days (older records are automatically pruned)
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -417,7 +532,7 @@ export default function AccountSecurityPage() {
                           </td>
                           <td className="px-3.5 py-2.5">
                             <Badge variant="outline" className="text-[10px] text-emerald-500 font-mono">
-                              Success
+                              {log.action.includes("failed") ? "Failed" : "Success"}
                             </Badge>
                           </td>
                         </tr>
@@ -473,6 +588,67 @@ export default function AccountSecurityPage() {
           </Card>
         </div>
       )}
+
+      {/* SHADCN DIALOG: Revoke Single Session Confirmation */}
+      <Dialog open={!!sessionToRevoke} onOpenChange={(open) => !open && setSessionToRevoke(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="space-y-1.5 pb-2">
+            <div className="flex items-center gap-2 text-destructive">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10">
+                <LogOut className="h-4 w-4" />
+              </div>
+              <DialogTitle className="text-base font-semibold text-foreground">
+                Revoke Session
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground pt-1 leading-normal">
+              Are you sure you want to revoke this session? The device will be immediately signed out and required to re-authenticate.
+            </DialogDescription>
+          </DialogHeader>
+
+          {sessionToRevoke && (
+            <div className="rounded-md border border-border bg-panel p-3 text-xs space-y-1.5 font-mono">
+              <div className="text-foreground font-semibold flex items-center gap-2 text-xs">
+                {getDeviceIcon(sessionToRevoke.device?.type)}
+                <span>{sessionToRevoke.device?.name || "Session Device"}</span>
+              </div>
+              <div className="text-muted-foreground text-[11px]">
+                Location: {sessionToRevoke.location || "Local Network"}
+              </div>
+              <div className="text-muted-foreground text-[11px]">
+                IP Address: {sessionToRevoke.ipAddress || "127.0.0.1"}
+              </div>
+              <div className="text-muted-foreground text-[11px]">
+                Last Active: {formatDate(sessionToRevoke.lastActiveAt || sessionToRevoke.createdAt)}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border/50">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setSessionToRevoke(null)}
+              disabled={isRevokingSingle}
+              className="text-xs h-8 cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              isLoading={isRevokingSingle}
+              onClick={handleConfirmRevokeSingle}
+              className="text-xs h-8 cursor-pointer gap-1.5"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Revoke Session</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* SHADCN DIALOG: Revoke Other Sessions Confirmation */}
       <Dialog open={showRevokeModal} onOpenChange={setShowRevokeModal}>

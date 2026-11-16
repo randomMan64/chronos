@@ -1,5 +1,16 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser, createSessionToken, setSessionCookie, attachSessionCookieToResponse } from "@/lib/auth/session";
+import {
+  getCurrentUser,
+  createSessionToken,
+  setSessionCookie,
+  attachSessionCookieToResponse,
+  attachDeviceCookieToResponse,
+  DEVICE_COOKIE_NAME,
+} from "@/lib/auth/session";
+import { parseUserAgent, resolveOrCreateDevice } from "@/lib/auth/device-detector";
+import { db } from "@/db/connections/control-plane";
+import { userSessions } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { InvitationService } from "@/modules/organizations/invitation-service";
 import { handleApiError } from "@/lib/errors";
 import { z } from "zod";
@@ -72,6 +83,32 @@ export async function POST(req: Request) {
       password,
     });
 
+    // Detect device and resolve/create device record
+    const cookieHeader = req.headers.get("cookie") || "";
+    const deviceCookieMatch = cookieHeader.match(new RegExp(`(?:^|; )${DEVICE_COOKIE_NAME}=([^;]*)`));
+    const rawDeviceKey = deviceCookieMatch ? decodeURIComponent(deviceCookieMatch[1]) : null;
+
+    const deviceInfo = parseUserAgent(req.headers.get("user-agent"), req.headers);
+    const { device, deviceKey } = await resolveOrCreateDevice({
+      userId: result.user.id,
+      rawDeviceKey,
+      deviceInfo,
+    });
+
+    // Associate session with device and network metadata
+    await db
+      .update(userSessions)
+      .set({
+        deviceId: device.id,
+        ipAddress: deviceInfo.ipAddress,
+        userAgent: deviceInfo.userAgent,
+        country: deviceInfo.country,
+        region: deviceInfo.region,
+        city: deviceInfo.city,
+        lastActiveAt: new Date(),
+      })
+      .where(eq(userSessions.id, result.sessionId));
+
     // Establish authenticated session for the newly registered user
     const sessionToken = await createSessionToken({
       userId: result.user.id,
@@ -98,6 +135,7 @@ export async function POST(req: Request) {
     );
 
     attachSessionCookieToResponse(response, sessionToken);
+    attachDeviceCookieToResponse(response, deviceKey);
 
     return response;
   } catch (err) {

@@ -3,7 +3,14 @@ import bcrypt from "bcryptjs";
 import { db } from "@/db/connections/control-plane";
 import { users, organizations, organizationMembers, workspaces, workspaceMembers, userSessions } from "@/db/schema";
 import { registerSchema } from "@/lib/validation";
-import { createSessionToken, setSessionCookie, attachSessionCookieToResponse } from "@/lib/auth/session";
+import {
+  createSessionToken,
+  setSessionCookie,
+  attachSessionCookieToResponse,
+  attachDeviceCookieToResponse,
+  DEVICE_COOKIE_NAME,
+} from "@/lib/auth/session";
+import { parseUserAgent, resolveOrCreateDevice } from "@/lib/auth/device-detector";
 import { AuditService } from "@/modules/audit/audit-service";
 import { handleApiError } from "@/lib/errors";
 import { EmailService } from "@/lib/email";
@@ -84,7 +91,19 @@ export async function POST(req: Request) {
       role: "dba",
     });
 
-    // 6. Create Session
+    // 6. Detect device and resolve/create device record
+    const cookieHeader = req.headers.get("cookie") || "";
+    const deviceCookieMatch = cookieHeader.match(new RegExp(`(?:^|; )${DEVICE_COOKIE_NAME}=([^;]*)`));
+    const rawDeviceKey = deviceCookieMatch ? decodeURIComponent(deviceCookieMatch[1]) : null;
+
+    const deviceInfo = parseUserAgent(req.headers.get("user-agent"), req.headers);
+    const { device, deviceKey } = await resolveOrCreateDevice({
+      userId: newUser.id,
+      rawDeviceKey,
+      deviceInfo,
+    });
+
+    // 7. Create Session
     const tokenHash = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
 
@@ -92,7 +111,14 @@ export async function POST(req: Request) {
       .insert(userSessions)
       .values({
         userId: newUser.id,
+        deviceId: device.id,
         tokenHash,
+        ipAddress: deviceInfo.ipAddress,
+        userAgent: deviceInfo.userAgent,
+        country: deviceInfo.country,
+        region: deviceInfo.region,
+        city: deviceInfo.city,
+        lastActiveAt: new Date(),
         expiresAt,
       })
       .returning();
@@ -157,6 +183,7 @@ export async function POST(req: Request) {
     );
 
     attachSessionCookieToResponse(response, sessionToken);
+    attachDeviceCookieToResponse(response, deviceKey);
 
     return response;
   } catch (err) {

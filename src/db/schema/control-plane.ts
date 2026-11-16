@@ -213,6 +213,34 @@ export const savedQueries = pgTable(
   ]
 );
 
+// 9.5 Devices
+export const devices = pgTable(
+  "devices",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    deviceKeyHash: varchar("device_key_hash", { length: 255 }).notNull(),
+    deviceName: varchar("device_name", { length: 255 }).notNull(),
+    deviceType: varchar("device_type", { length: 50 }).notNull().default("unknown"),
+    manufacturer: varchar("manufacturer", { length: 100 }),
+    model: varchar("model", { length: 100 }),
+    operatingSystem: varchar("operating_system", { length: 100 }).notNull(),
+    operatingSystemVersion: varchar("operating_system_version", { length: 50 }),
+    browser: varchar("browser", { length: 100 }).notNull(),
+    browserVersion: varchar("browser_version", { length: 50 }),
+    firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).defaultNow().notNull(),
+    lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).defaultNow().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("device_user_key_idx").on(table.userId, table.deviceKeyHash),
+    index("devices_user_idx").on(table.userId),
+  ]
+);
+
 // 10. User Sessions
 export const userSessions = pgTable(
   "user_sessions",
@@ -221,15 +249,23 @@ export const userSessions = pgTable(
     userId: uuid("user_id")
       .references(() => users.id, { onDelete: "cascade" })
       .notNull(),
+    deviceId: uuid("device_id").references(() => devices.id, { onDelete: "set null" }),
     tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
     ipAddress: varchar("ip_address", { length: 45 }),
     userAgent: text("user_agent"),
-    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    country: varchar("country", { length: 100 }),
+    region: varchar("region", { length: 100 }),
+    city: varchar("city", { length: 100 }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    lastActiveAt: timestamp("last_active_at", { withTimezone: true }).defaultNow().notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    revokeReason: varchar("revoke_reason", { length: 100 }),
   },
   (table) => [
     uniqueIndex("session_token_idx").on(table.tokenHash),
     index("session_user_idx").on(table.userId),
+    index("session_device_idx").on(table.deviceId),
   ]
 );
 
@@ -336,7 +372,27 @@ export const usersRelations = relations(users, ({ many }) => ({
   orgMemberships: many(organizationMembers),
   workspaceMemberships: many(workspaceMembers),
   sessions: many(userSessions),
+  devices: many(devices),
   savedQueries: many(savedQueries),
+}));
+
+export const devicesRelations = relations(devices, ({ one, many }) => ({
+  user: one(users, {
+    fields: [devices.userId],
+    references: [users.id],
+  }),
+  sessions: many(userSessions),
+}));
+
+export const userSessionsRelations = relations(userSessions, ({ one }) => ({
+  user: one(users, {
+    fields: [userSessions.userId],
+    references: [users.id],
+  }),
+  device: one(devices, {
+    fields: [userSessions.deviceId],
+    references: [devices.id],
+  }),
 }));
 
 export const organizationsRelations = relations(organizations, ({ many }) => ({

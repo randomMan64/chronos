@@ -96,7 +96,11 @@ export async function POST(req: Request) {
 
     // 8. Revoke all active sessions for this user (security requirement)
     await db
-      .delete(userSessions)
+      .update(userSessions)
+      .set({
+        revokedAt: new Date(),
+        revokeReason: "password_reset",
+      })
       .where(eq(userSessions.userId, user.id));
 
     // 9. Log audit event

@@ -11,7 +11,7 @@ import {
   databases,
   databasePermissions,
 } from "@/db/schema";
-import { eq, and, gt } from "drizzle-orm";
+import { eq, and, gt, isNull } from "drizzle-orm";
 import { UserContext, OrganizationRole, WorkspaceRole } from "@/lib/permissions/types";
 import { resolvePermissions } from "@/lib/permissions/resolver";
 import {
@@ -60,6 +60,28 @@ export function attachSessionCookieToResponse(response: NextResponse, token: str
   return response;
 }
 
+export const DEVICE_COOKIE_NAME = "chronos_device_id";
+
+export function getDeviceCookieOptions() {
+  return {
+    httpOnly: true,
+    secure: shouldUseSecureCookie(),
+    sameSite: "lax" as const,
+    path: "/",
+    maxAge: 365 * 24 * 60 * 60, // 1 year
+  };
+}
+
+export async function setDeviceCookie(deviceKey: string) {
+  const cookieStore = await cookies();
+  cookieStore.set(DEVICE_COOKIE_NAME, deviceKey, getDeviceCookieOptions());
+}
+
+export function attachDeviceCookieToResponse(response: NextResponse, deviceKey: string): NextResponse {
+  response.cookies.set(DEVICE_COOKIE_NAME, deviceKey, getDeviceCookieOptions());
+  return response;
+}
+
 export async function clearSessionCookie() {
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE_NAME);
@@ -91,6 +113,7 @@ export async function getCurrentUser(): Promise<SessionPayload | null> {
         .where(
           and(
             eq(userSessions.id, payload.sessionId),
+            isNull(userSessions.revokedAt),
             gt(userSessions.expiresAt, new Date())
           )
         )
