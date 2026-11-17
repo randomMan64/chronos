@@ -55,7 +55,7 @@ export function AppHeader({
         {segments.length > 1 && (
           <>
             <ChevronRight className="h-3 w-3 text-muted-foreground/60 shrink-0" />
-            <span className="font-mono text-primary truncate max-w-[120px]">
+            <span className="font-mono text-primary truncate max-w-30">
               {segments[1]}
             </span>
           </>
@@ -65,7 +65,7 @@ export function AppHeader({
       {/* Center / Right controls */}
       <div className="flex items-center gap-2 sm:gap-3 shrink-0">
         {/* Database indicator */}
-        <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 rounded border border-border bg-panel text-xs max-w-[140px] sm:max-w-[200px]">
+        <div className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-2.5 py-1 rounded border border-border bg-panel text-xs max-w-35 sm:max-w-50">
           <Database className="h-3 w-3 text-primary shrink-0" />
           <span className="font-mono text-[10px] sm:text-[11px] text-foreground truncate">
             {currentDatabaseName}
