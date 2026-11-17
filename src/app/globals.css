@@ -149,11 +149,19 @@ pre,
 }
 
 /* Custom Sleek Scrollbars */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
+/* Standard Firefox scrollbars fallback */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
 }
 
+/* WebKit / Chromium (Chrome, Edge, Brave, Electron) Custom Scrollbars */
 ::-webkit-scrollbar,
 *::-webkit-scrollbar {
   width: 6px;
@@ -190,11 +198,6 @@ pre,
 }
 
 /* Scrollbar utility classes */
-.scrollbar-thin {
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-
 .scrollbar-thin::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -211,6 +214,12 @@ pre,
 
 .scrollbar-thin::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
+}
+
+.scrollbar-thin::-webkit-scrollbar-button {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
 }
 
 .scrollbar-none,

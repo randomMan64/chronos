@@ -111,6 +111,7 @@ class UserDatabaseManager {
     config: DatabaseConnectionConfig,
     sql: string,
     options: {
+      params?: any[];
       isReadOnly?: boolean;
       maxRows?: number;
       timeoutMs?: number;
@@ -132,8 +133,10 @@ class UserDatabaseManager {
         await client.query("BEGIN TRANSACTION READ ONLY");
       }
 
-      // Execute the query
-      const res = await client.query(sql);
+      // Execute the query with optional parameterization
+      const res = options.params && options.params.length > 0
+        ? await client.query(sql, options.params)
+        : await client.query(sql);
 
       if (options.isReadOnly) {
         await client.query("COMMIT");

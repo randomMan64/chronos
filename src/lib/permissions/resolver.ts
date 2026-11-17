@@ -30,6 +30,9 @@ export const ROLE_PERMISSIONS: Record<ChronosRole, Permission[]> = {
     "database:register",
     "database:manage",
     "database:delete",
+    "record:insert",
+    "record:update",
+    "record:delete",
     // Audit & compliance
     "audit:read",
     "audit:export",
@@ -51,6 +54,9 @@ export const ROLE_PERMISSIONS: Record<ChronosRole, Permission[]> = {
     "query:execute",
     "query:write",
     "query:export",
+    "record:insert",
+    "record:update",
+    "record:delete",
     "history:read",
     "history:restore",
     "transaction:inspect",
@@ -74,6 +80,9 @@ export const ROLE_PERMISSIONS: Record<ChronosRole, Permission[]> = {
     "query:execute",
     "query:write",
     "query:export",
+    "record:insert",
+    "record:update",
+    "record:delete",
     "history:read",
     "history:restore",
     "transaction:inspect",
@@ -204,8 +213,17 @@ export function resolvePermissions(params: {
   // 3. Database Grants Override / Restrict
   if (params.databaseGrants) {
     if (params.databaseGrants.canRead) permissions.add("query:read");
-    if (params.databaseGrants.canWrite) permissions.add("query:write");
-    else permissions.delete("query:write"); // Explicit denial
+    if (params.databaseGrants.canWrite) {
+      permissions.add("query:write");
+      permissions.add("record:insert");
+      permissions.add("record:update");
+      permissions.add("record:delete");
+    } else {
+      permissions.delete("query:write"); // Explicit denial
+      permissions.delete("record:insert");
+      permissions.delete("record:update");
+      permissions.delete("record:delete");
+    }
 
     if (params.databaseGrants.canExecuteDdl) permissions.add("schema:write");
     else permissions.delete("schema:write");
@@ -217,6 +235,38 @@ export function resolvePermissions(params: {
   }
 
   return permissions;
+}
+
+export function resolveTablePermissions(
+  effectivePermissions: Set<Permission> | Set<string> | Permission[] | string[] | undefined | null,
+  databaseGrants?: { canWrite?: boolean; canRead?: boolean } | null
+): {
+  canSelect: boolean;
+  canInsert: boolean;
+  canUpdate: boolean;
+  canDelete: boolean;
+} {
+  const canRead = hasPermission(effectivePermissions, "query:read");
+  const canWrite = hasPermission(effectivePermissions, "query:write");
+  const canInsert = hasPermission(effectivePermissions, "record:insert") || canWrite;
+  const canUpdate = hasPermission(effectivePermissions, "record:update") || canWrite;
+  const canDelete = hasPermission(effectivePermissions, "record:delete") || canWrite;
+
+  if (databaseGrants && databaseGrants.canWrite === false) {
+    return {
+      canSelect: canRead,
+      canInsert: false,
+      canUpdate: false,
+      canDelete: false,
+    };
+  }
+
+  return {
+    canSelect: canRead,
+    canInsert: canRead && canInsert,
+    canUpdate: canRead && canUpdate,
+    canDelete: canRead && canDelete,
+  };
 }
 
 export function hasPermission(
