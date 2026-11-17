@@ -4,7 +4,7 @@ import { users, emailVerificationTokens } from "@/db/schema";
 import { eq, and, isNull, desc } from "drizzle-orm";
 import crypto from "crypto";
 import { EmailService } from "@/lib/email";
-import { normalizeEmail, isValidEmailSyntax } from "@/lib/auth/email-validator";
+import { validateEmail } from "@/lib/auth/email-validator";
 import { handleApiError } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -17,14 +17,21 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const rawEmail = typeof body.email === "string" ? body.email : "";
 
-    if (!rawEmail || !isValidEmailSyntax(rawEmail)) {
+    const validation = validateEmail(rawEmail);
+    if (!validation.valid) {
       return NextResponse.json(
-        { error: "A valid email address is required.", code: "INVALID_EMAIL" },
+        {
+          error:
+            validation.code === "DISPOSABLE_EMAIL"
+              ? "Temporary or disposable email addresses are not allowed. Please use a permanent email address."
+              : "A valid email address is required.",
+          code: validation.code,
+        },
         { status: 400 }
       );
     }
 
-    const email = normalizeEmail(rawEmail);
+    const email = validation.normalizedEmail;
 
     // 1. Check rate limit based on most recent token for this email
     const [latestToken] = await db

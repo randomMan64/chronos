@@ -3,6 +3,7 @@ import { db } from "@/db/connections/control-plane";
 import { users, passwordResetTokens } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { EmailService } from "@/lib/email";
+import { validateEmail } from "@/lib/auth/email-validator";
 import crypto from "crypto";
 import { z } from "zod";
 
@@ -52,7 +53,25 @@ export async function POST(req: Request) {
       );
     }
 
-    const email = parsed.data.email.toLowerCase().trim();
+    const emailValidation = validateEmail(parsed.data.email);
+    if (!emailValidation.valid) {
+      if (emailValidation.isDisposable) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: "DISPOSABLE_EMAIL",
+            error: "Temporary or disposable email addresses are not allowed.",
+          },
+          { status: 400 }
+        );
+      }
+      return NextResponse.json(
+        { error: "Please provide a valid email address." },
+        { status: 400 }
+      );
+    }
+
+    const email = emailValidation.normalizedEmail;
     const ip = req.headers.get("x-forwarded-for") || "unknown";
 
     // Rate limiting per IP and email to mitigate abuse

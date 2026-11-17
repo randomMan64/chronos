@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireOrganizationAccess, requirePermission } from "@/lib/auth/guards";
 import { InvitationService } from "@/modules/organizations/invitation-service";
 import { inviteMemberSchema } from "@/lib/validation";
+import { validateEmail } from "@/lib/auth/email-validator";
 import { handleApiError } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -42,15 +43,51 @@ export async function POST(
       );
     }
 
+    // Centralized server-side validation: reject disposable and invalid emails BEFORE any action
+    const emailValidation = validateEmail(parsed.data.email);
+    if (!emailValidation.valid) {
+      if (emailValidation.isDisposable) {
+        return NextResponse.json(
+          {
+            success: false,
+            code: "DISPOSABLE_EMAIL",
+            message:
+              "Temporary or disposable email addresses are not allowed. Please use a permanent email address.",
+          },
+          { status: 400 }
+        );
+      }
+
+      return NextResponse.json(
+        {
+          success: false,
+          code: "INVALID_EMAIL",
+          message: emailValidation.error || "Invalid email address format.",
+        },
+        { status: 400 }
+      );
+    }
+
     const invite = await InvitationService.createInvitation({
       organizationId: params.id,
-      email: parsed.data.email,
+      email: emailValidation.normalizedEmail,
       role: parsed.data.role,
       invitedBy: context.userId,
     });
 
     return NextResponse.json({ invitation: invite }, { status: 201 });
-  } catch (err) {
+  } catch (err: any) {
+    if (err?.code === "DISPOSABLE_EMAIL") {
+      return NextResponse.json(
+        {
+          success: false,
+          code: "DISPOSABLE_EMAIL",
+          message:
+            "Temporary or disposable email addresses are not allowed. Please use a permanent email address.",
+        },
+        { status: 400 }
+      );
+    }
     const error = handleApiError(err);
     return NextResponse.json(error.body, { status: error.status });
   }

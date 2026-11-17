@@ -4,11 +4,7 @@ import { db } from "@/db/connections/control-plane";
 import { users, emailVerificationTokens } from "@/db/schema";
 import { registerSchema } from "@/lib/validation";
 import { EmailService } from "@/lib/email";
-import {
-  normalizeEmail,
-  isValidEmailSyntax,
-  isDisposableEmail,
-} from "@/lib/auth/email-validator";
+import { validateEmail } from "@/lib/auth/email-validator";
 import { handleApiError } from "@/lib/errors";
 import { eq, and, isNull } from "drizzle-orm";
 import crypto from "crypto";
@@ -30,27 +26,23 @@ export async function POST(req: Request) {
 
     const { email: rawEmail, password, fullName, organizationName } = parsed.data;
 
-    // 1. Strict RFC email syntax check
-    if (!isValidEmailSyntax(rawEmail)) {
-      return NextResponse.json(
-        { error: "Invalid email address format.", code: "INVALID_EMAIL" },
-        { status: 400 }
-      );
-    }
-
-    // 2. Reject disposable / temporary email domains
-    if (isDisposableEmail(rawEmail)) {
+    // Centralized server-side validation: strict RFC syntax & disposable domain check
+    const emailValidation = validateEmail(rawEmail);
+    if (!emailValidation.valid) {
       return NextResponse.json(
         {
+          success: false,
           error:
-            "Temporary and disposable email addresses are not permitted. Please use a valid, permanent email address.",
-          code: "DISPOSABLE_EMAIL",
+            emailValidation.code === "DISPOSABLE_EMAIL"
+              ? "Temporary or disposable email addresses are not allowed. Please use a permanent email address."
+              : "Invalid email address format.",
+          code: emailValidation.code,
         },
         { status: 400 }
       );
     }
 
-    const email = normalizeEmail(rawEmail);
+    const email = emailValidation.normalizedEmail;
     const passwordHash = await bcrypt.hash(password, 12);
     const orgName = organizationName?.trim() || `${fullName.split(" ")[0]}'s Team`;
 

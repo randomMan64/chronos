@@ -14,7 +14,7 @@ import { eq, and, or } from "drizzle-orm";
 import { OrganizationRole } from "@/lib/permissions/types";
 import { AuditService } from "@/modules/audit/audit-service";
 import { EmailService } from "@/lib/email";
-import { isDisposableEmail } from "@/lib/auth/email-validator";
+import { validateEmail, isDisposableEmail } from "@/lib/auth/email-validator";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -65,7 +65,20 @@ export class InvitationService {
     role: OrganizationRole;
     invitedBy: string;
   }) {
-    const normalizedEmail = params.email.toLowerCase().trim();
+    // 0. Strict server-side email validation: syntax & disposable domain check
+    // Executed BEFORE token generation, database insert, and SMTP email dispatch
+    const validation = validateEmail(params.email);
+    if (!validation.valid) {
+      const err = new Error(
+        validation.error ||
+          "Temporary or disposable email addresses are not allowed. Please use a permanent email address."
+      );
+      (err as any).statusCode = 400;
+      (err as any).code = validation.code || "DISPOSABLE_EMAIL";
+      throw err;
+    }
+
+    const normalizedEmail = validation.normalizedEmail;
 
     // 1. Prevent duplicate active invitations
     const existing = await db
@@ -698,5 +711,65 @@ export class InvitationService {
     }
 
     return revoked || null;
+  }
+
+  /**
+   * Administrative cleanup for invalid/disposable pending invitations.
+   * Scans pending invitations, checks if the email is disposable, and marks them revoked.
+   * Preserves historical records and logs an audit trail.
+   */
+  public static async cleanupDisposableInvitations(params?: {
+    organizationId?: string;
+    actorId?: string;
+  }) {
+    const pending = params?.organizationId
+      ? await db
+          .select()
+          .from(invitations)
+          .where(
+            and(
+              eq(invitations.organizationId, params.organizationId),
+              eq(invitations.status, "pending")
+            )
+          )
+      : await db
+          .select()
+          .from(invitations)
+          .where(eq(invitations.status, "pending"));
+
+    const revoked: Array<{ id: string; email: string; organizationId: string }> = [];
+
+    for (const invite of pending) {
+      if (isDisposableEmail(invite.email)) {
+        await db
+          .update(invitations)
+          .set({ status: "revoked" })
+          .where(eq(invitations.id, invite.id));
+
+        await AuditService.log({
+          organizationId: invite.organizationId,
+          actorId: params?.actorId || invite.invitedBy || undefined,
+          action: "members:revoke_invite",
+          resourceType: "invitation",
+          resourceId: invite.id,
+          metadata: {
+            email: invite.email,
+            reason: "disposable_email_cleanup",
+          },
+        });
+
+        revoked.push({
+          id: invite.id,
+          email: invite.email,
+          organizationId: invite.organizationId,
+        });
+      }
+    }
+
+    return {
+      scannedCount: pending.length,
+      revokedCount: revoked.length,
+      revoked,
+    };
   }
 }
