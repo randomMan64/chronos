@@ -283,13 +283,16 @@ export default function SqlEditorPage() {
           <div className="flex items-center gap-1.5 text-xs">
             <Database className="h-3.5 w-3.5 text-primary shrink-0" />
             <Select value={selectedDbId} onValueChange={setSelectedDbId}>
-              <SelectTrigger className="h-7 text-xs font-mono w-36 sm:w-48">
+              <SelectTrigger className="h-7 text-xs font-mono w-44 sm:w-60">
                 <SelectValue placeholder="Select Database" />
               </SelectTrigger>
               <SelectContent>
                 {databases.map((db) => (
                   <SelectItem key={db.id} value={db.id} className="text-xs font-mono">
-                    {db.name} ({db.environment})
+                    <span className="truncate">{db.name}</span>
+                    <span className="text-[10px] text-muted-foreground ml-1.5 shrink-0 font-sans">
+                      ({db.environment})
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>

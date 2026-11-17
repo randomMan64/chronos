@@ -137,6 +137,7 @@ export default function ExplorerPage() {
     error?: string;
   } | null>(null);
   const [isRegistering, setIsRegistering] = React.useState(false);
+  const [registerError, setRegisterError] = React.useState<string | null>(null);
   const [activeOrgId, setActiveOrgId] = React.useState<string>("");
   const [activeWsId, setActiveWsId] = React.useState<string>("");
 
@@ -247,13 +248,23 @@ export default function ExplorerPage() {
     setIsTesting(true);
     setTestResult(null);
     try {
-      const res = await fetch("/api/v1/databases/test-connection", {
+      const res = await fetch("/api/v1/databases/test", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ connectionString: watchedConn }),
       });
-      const data = await res.json();
-      setTestResult(data);
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        setTestResult({
+          ok: false,
+          error:
+            data?.error ||
+            data?.message ||
+            `HTTP ${res.status}: Failed to test connection`,
+        });
+        return;
+      }
+      setTestResult(data || { ok: false, error: "Empty response from server" });
     } catch (err: unknown) {
       setTestResult({
         ok: false,
@@ -269,6 +280,7 @@ export default function ExplorerPage() {
     if (!activeOrgId) return;
 
     setIsRegistering(true);
+    setRegisterError(null);
     try {
       const res = await fetch("/api/v1/databases", {
         method: "POST",
@@ -288,6 +300,7 @@ export default function ExplorerPage() {
       setShowRegisterModal(false);
       resetDbForm();
       setTestResult(null);
+      setRegisterError(null);
 
       // Refresh databases list
       const dbRes = await fetch(
@@ -299,7 +312,9 @@ export default function ExplorerPage() {
         if (data.database?.id) setSelectedDbId(data.database.id);
       }
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : "Failed to register database");
+      setRegisterError(
+        err instanceof Error ? err.message : "Failed to register database",
+      );
     } finally {
       setIsRegistering(false);
     }
@@ -348,7 +363,7 @@ export default function ExplorerPage() {
               setOffset(0);
             }}
           >
-            <SelectTrigger className="h-7 text-xs font-mono">
+            <SelectTrigger className="h-8 text-xs font-mono w-full">
               <SelectValue placeholder="Select Database" />
             </SelectTrigger>
             <SelectContent>
@@ -358,7 +373,10 @@ export default function ExplorerPage() {
                   value={db.id}
                   className="font-mono text-xs"
                 >
-                  {db.name} ({db.environment})
+                  <span className="truncate">{db.name}</span>
+                  <span className="text-[10px] text-muted-foreground ml-1.5 shrink-0 font-sans">
+                    ({db.environment})
+                  </span>
                 </SelectItem>
               ))}
               {databases.length === 0 && (
@@ -487,14 +505,14 @@ export default function ExplorerPage() {
             onClick={() => setIsNavDrawerOpen(false)}
             aria-hidden="true"
           />
-          <div className="relative z-50 w-70 max-w-[85vw] h-full bg-sidebar border-r border-border flex flex-col shadow-2xl animate-in slide-in-from-left duration-200">
+          <div className="relative z-50 w-75 max-w-[85vw] h-full bg-sidebar border-r border-border flex flex-col shadow-2xl animate-in slide-in-from-left duration-200">
             {renderTableNav(true)}
           </div>
         </div>
       )}
 
       {/* DESKTOP LEFT PANEL: Databases, Schemas, and Tables Tree */}
-      <div className="hidden lg:flex w-65 shrink-0 border border-border bg-sidebar rounded-md flex-col justify-between overflow-hidden">
+      <div className="hidden lg:flex w-72 xl:w-80 shrink-0 border border-border bg-sidebar rounded-md flex-col justify-between overflow-hidden">
         {renderTableNav(false)}
       </div>
 
@@ -790,7 +808,15 @@ export default function ExplorerPage() {
       </div>
 
       {/* SHADCN DIALOG: Register New PostgreSQL Database */}
-      <Dialog open={showRegisterModal} onOpenChange={setShowRegisterModal}>
+      <Dialog
+        open={showRegisterModal}
+        onOpenChange={(open) => {
+          setShowRegisterModal(open);
+          if (!open) {
+            setRegisterError(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Register PostgreSQL Database</DialogTitle>
@@ -897,6 +923,18 @@ export default function ExplorerPage() {
                 </div>
               )}
             </div>
+
+            {registerError && (
+              <div className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2.5 animate-in fade-in-0">
+                <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+                <div className="space-y-0.5 min-w-0">
+                  <div className="font-semibold text-xs">Registration Failed</div>
+                  <div className="text-[11px] leading-relaxed text-destructive/90">
+                    {registerError}
+                  </div>
+                </div>
+              </div>
+            )}
 
             <DialogFooter className="pt-4">
               <Button

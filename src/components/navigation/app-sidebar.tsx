@@ -137,7 +137,7 @@ export function AppSidebar({
       )}
     >
       {/* Top Organization & Brand section */}
-      <div className="overflow-y-auto overflow-x-hidden flex-1">
+      <div className="overflow-y-auto overflow-x-hidden flex-1 scrollbar-thin">
         {/* Brand header */}
         <div
           className={cn(
