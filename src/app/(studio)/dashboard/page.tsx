@@ -126,7 +126,7 @@ export default function DashboardPage() {
           label="Control Plane Status"
           value="Operational"
           subValue="Latency < 5ms"
-          icon={<Server className="h-4 w-4 text-emerald-500 dark:text-[#34D399]" />}
+          icon={<Server className="h-4 w-4 text-emerald-500" />}
           isLoading={isLoading}
         />
         <MetricDisplay
@@ -140,7 +140,7 @@ export default function DashboardPage() {
           label="Audit Integrity"
           value="Append-Only"
           subValue="Zero modification policy"
-          icon={<ShieldCheck className="h-4 w-4 text-amber-500 dark:text-[#FBBF24]" />}
+          icon={<ShieldCheck className="h-4 w-4 text-amber-500" />}
           isLoading={isLoading}
         />
       </div>
@@ -280,11 +280,13 @@ export default function DashboardPage() {
                 ) : (
                   activeDbs.map((db) => (
                     <tr key={db.id} className="hover:bg-elevated/40">
-                      <td className="p-3 font-semibold text-foreground flex items-center gap-2">
-                        <Server className="h-3.5 w-3.5 text-primary" />
-                        <span>{db.name}</span>
+                      <td className="p-3 font-semibold text-foreground align-middle">
+                        <div className="flex items-center gap-2">
+                          <Server className="h-3.5 w-3.5 text-primary shrink-0" />
+                          <span>{db.name}</span>
+                        </div>
                       </td>
-                      <td className="p-3">
+                      <td className="p-3 align-middle">
                         <Badge
                           variant={
                             db.environment === "production"
@@ -298,13 +300,13 @@ export default function DashboardPage() {
                           {db.environment}
                         </Badge>
                       </td>
-                      <td className="p-3">
+                      <td className="p-3 align-middle">
                         <StatusIndicator status="active" label={db.status} />
                       </td>
-                      <td className="p-3 text-[11px] text-muted-foreground">
+                      <td className="p-3 align-middle text-[11px] text-muted-foreground">
                         {formatDate(db.lastTestedAt)}
                       </td>
-                      <td className="p-3 text-right">
+                      <td className="p-3 align-middle text-right">
                         <Link
                           href={`/explorer`}
                           className="text-[11px] text-primary hover:underline"

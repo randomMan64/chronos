@@ -134,6 +134,70 @@ export default function ExplorerPage() {
     canDelete: boolean;
   }>({ canSelect: true, canInsert: false, canUpdate: false, canDelete: false });
 
+  // User Session & Role Permissions for UI Guarding
+  const [userRole, setUserRole] = React.useState<string>("");
+  const [userPermissions, setUserPermissions] = React.useState<string[]>([]);
+
+  const isReadOnlyRole = React.useMemo(() => {
+    const r = (userRole || "").toLowerCase().trim();
+    return [
+      "database_engineer",
+      "engineer",
+      "db_engineer",
+      "data_analyst",
+      "analyst",
+      "auditor",
+      "audit",
+      "member",
+    ].includes(r);
+  }, [userRole]);
+
+  const effectiveCanUpdate = React.useMemo(() => {
+    if (isReadOnlyRole) return false;
+    if (!tablePermissions.canUpdate) return false;
+    if (
+      userPermissions.length > 0 &&
+      !userPermissions.includes("record:update") &&
+      !userPermissions.includes("query:write")
+    ) {
+      return false;
+    }
+    return true;
+  }, [isReadOnlyRole, tablePermissions.canUpdate, userPermissions]);
+
+  const effectiveCanInsert = React.useMemo(() => {
+    if (isReadOnlyRole) return false;
+    if (!tablePermissions.canInsert) return false;
+    if (
+      userPermissions.length > 0 &&
+      !userPermissions.includes("record:insert") &&
+      !userPermissions.includes("query:write")
+    ) {
+      return false;
+    }
+    return true;
+  }, [isReadOnlyRole, tablePermissions.canInsert, userPermissions]);
+
+  const effectiveCanDelete = React.useMemo(() => {
+    if (isReadOnlyRole) return false;
+    if (!tablePermissions.canDelete) return false;
+    if (
+      userPermissions.length > 0 &&
+      !userPermissions.includes("record:delete") &&
+      !userPermissions.includes("query:write")
+    ) {
+      return false;
+    }
+    return true;
+  }, [isReadOnlyRole, tablePermissions.canDelete, userPermissions]);
+
+  const effectiveCanTimeTravel = React.useMemo(() => {
+    if (userPermissions.length > 0 && !userPermissions.includes("history:read")) {
+      return false;
+    }
+    return true;
+  }, [userPermissions]);
+
   // Record Editing State
   const [isEditingRecord, setIsEditingRecord] = React.useState<boolean>(false);
   const [editedValues, setEditedValues] = React.useState<Record<string, any>>({});
@@ -201,6 +265,11 @@ export default function ExplorerPage() {
         const meRes = await fetch("/api/v1/auth/me");
         if (meRes.ok) {
           const me = await meRes.json();
+          const role = me.currentOrg?.role || me.organizations?.[0]?.role || "";
+          setUserRole(role);
+          if (Array.isArray(me.permissions)) {
+            setUserPermissions(me.permissions);
+          }
           const org = me.organizations?.[0];
           const ws = me.workspaces?.[0];
           if (org) {
@@ -292,6 +361,12 @@ export default function ExplorerPage() {
     setEditErrors({});
   }, [selectedTable?.tableName, selectedRow?.id]);
 
+  // Reset table permissions & active selection when table changes
+  React.useEffect(() => {
+    setTablePermissions({ canSelect: true, canInsert: false, canUpdate: false, canDelete: false });
+    setSelectedRow(null);
+  }, [selectedTable?.tableName]);
+
   // Record Data Types & Helpers
   const isNumericType = (type: string) =>
     ["int", "integer", "smallint", "bigint", "numeric", "decimal", "real", "double precision", "float"].some(
@@ -304,7 +379,7 @@ export default function ExplorerPage() {
 
   // Editing Handlers
   const startEdit = () => {
-    if (!selectedRow || !tablePermissions.canUpdate) return;
+    if (!selectedRow || !effectiveCanUpdate) return;
     setIsEditingRecord(true);
     setConcurrencyConflict(null);
     setEditErrors({});
@@ -449,7 +524,7 @@ export default function ExplorerPage() {
 
   // Insertion Handlers
   const initNewRecord = () => {
-    if (!selectedTable) return;
+    if (!selectedTable || !effectiveCanInsert) return;
     const initial: Record<string, any> = {};
     for (const col of selectedTable.columns) {
       if (col.isPrimaryKey && col.columnDefault?.includes("nextval")) {
@@ -462,7 +537,7 @@ export default function ExplorerPage() {
   };
 
   const executeInsertRecord = async () => {
-    if (!selectedDbId || !selectedTable) return;
+    if (!selectedDbId || !selectedTable || !effectiveCanInsert) return;
     setIsInsertingRecord(true);
     try {
       const errors: Record<string, string> = {};
@@ -542,7 +617,7 @@ export default function ExplorerPage() {
 
   // Deletion Handlers
   const executeDeleteRecord = async () => {
-    if (!selectedDbId || !selectedTable || !selectedRow) return;
+    if (!selectedDbId || !selectedTable || !selectedRow || !effectiveCanDelete) return;
     setIsDeletingRecord(true);
     try {
       const pkCols = selectedTable.columns.filter((c) => c.isPrimaryKey);
@@ -651,20 +726,33 @@ export default function ExplorerPage() {
             NULL
           </div>
         ) : isBooleanType(col.dataType) ? (
-          <select
-            value={val === true ? "true" : val === false ? "false" : ""}
-            onChange={(e) =>
-              onChange(
-                col.columnName,
-                e.target.value === "true" ? true : e.target.value === "false" ? false : null
-              )
-            }
-            className="w-full h-7 px-2 rounded border border-border bg-panel text-xs font-mono text-foreground focus:outline-hidden focus:ring-1 focus:ring-primary"
+          <Select
+            value={val === true ? "true" : val === false ? "false" : isNull ? "__null__" : undefined}
+            onValueChange={(newVal) => {
+              if (newVal === "__null__") {
+                onChange(col.columnName, null);
+              } else {
+                onChange(col.columnName, newVal === "true");
+              }
+            }}
           >
-            <option value="">Select boolean</option>
-            <option value="true">true</option>
-            <option value="false">false</option>
-          </select>
+            <SelectTrigger className="w-full h-7 px-2 text-xs font-mono bg-panel border-border text-foreground focus:ring-1 focus:ring-primary">
+              <SelectValue placeholder="Select boolean" />
+            </SelectTrigger>
+            <SelectContent className="bg-panel border-border font-mono text-xs z-50">
+              <SelectItem value="true" className="font-mono text-xs text-emerald-400">
+                true
+              </SelectItem>
+              <SelectItem value="false" className="font-mono text-xs text-destructive">
+                false
+              </SelectItem>
+              {col.isNullable && (
+                <SelectItem value="__null__" className="font-mono text-xs text-muted-foreground italic">
+                  NULL
+                </SelectItem>
+              )}
+            </SelectContent>
+          </Select>
         ) : isJsonType(col.dataType) ? (
           <textarea
             value={typeof val === "object" ? JSON.stringify(val, null, 2) : String(val ?? "")}
@@ -1018,7 +1106,7 @@ export default function ExplorerPage() {
 
               {/* Actions & Sub-view switcher */}
               <div className="flex items-center gap-2">
-                {tablePermissions.canInsert && (
+                {effectiveCanInsert && (
                   <Button
                     size="sm"
                     variant="outline"
@@ -1205,6 +1293,14 @@ export default function ExplorerPage() {
                             <span className="text-xs font-semibold text-foreground">
                               Record Inspector
                             </span>
+                            {!effectiveCanUpdate && !effectiveCanDelete && (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] font-mono text-muted-foreground ml-1"
+                              >
+                                Read-Only
+                              </Badge>
+                            )}
                           </>
                         )}
                       </div>
@@ -1232,7 +1328,7 @@ export default function ExplorerPage() {
                           </>
                         ) : (
                           <>
-                            {tablePermissions.canUpdate && (
+                            {effectiveCanUpdate && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1242,7 +1338,7 @@ export default function ExplorerPage() {
                                 <Edit3 className="h-2.5 w-2.5 mr-1 text-primary" /> Edit
                               </Button>
                             )}
-                            {tablePermissions.canDelete && (
+                            {effectiveCanDelete && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1252,12 +1348,14 @@ export default function ExplorerPage() {
                                 <Trash2 className="h-2.5 w-2.5 mr-1" /> Delete
                               </Button>
                             )}
-                            <Link
-                              href={`/temporal?table=${selectedTable.tableName}&recordId=${selectedRow.id || ""}`}
-                              className="text-[11px] font-mono text-primary hover:underline flex items-center gap-1 ml-1"
-                            >
-                              <Clock className="h-3 w-3" /> Time Travel
-                            </Link>
+                            {effectiveCanTimeTravel && (
+                              <Link
+                                href={`/temporal?table=${selectedTable.tableName}&recordId=${selectedRow.id || ""}`}
+                                className="text-[11px] font-mono text-primary hover:underline flex items-center gap-1 ml-1"
+                              >
+                                <Clock className="h-3 w-3" /> Time Travel
+                              </Link>
+                            )}
                             <button
                               onClick={() => setSelectedRow(null)}
                               className="text-xs text-muted-foreground hover:text-foreground cursor-pointer ml-1"
@@ -1647,8 +1745,8 @@ export default function ExplorerPage() {
           </DialogHeader>
 
           <div className="space-y-3 pt-2">
-            <div className="p-3 bg-panel rounded border border-border text-xs font-mono text-muted-foreground overflow-auto max-h-40 scrollbar-thin">
-              <pre>{JSON.stringify(selectedRow, null, 2)}</pre>
+            <div className="p-3 bg-sidebar/50 rounded-md border border-border text-xs font-mono text-muted-foreground overflow-auto max-h-44 scrollbar-thin">
+              <pre className="whitespace-pre-wrap break-all text-[11px] font-mono leading-relaxed">{JSON.stringify(selectedRow, null, 2)}</pre>
             </div>
 
             <div className="rounded-md border border-destructive/20 bg-destructive/10 p-2.5 text-xs text-destructive flex items-start gap-2">

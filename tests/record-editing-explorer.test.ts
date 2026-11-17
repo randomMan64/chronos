@@ -96,6 +96,37 @@ describe("Database Explorer Record-Level Editing & Permissions", () => {
       expect(tablePerms.canInsert).toBe(false);
       expect(tablePerms.canDelete).toBe(false);
     });
+
+    it("enforces role ceiling: Database Engineer with stale canWrite database grants is strictly prevented from editing", () => {
+      const dbEngWithWriteGrant = resolvePermissions({
+        orgRole: "database_engineer",
+        workspaceRole: "database_engineer",
+        databaseGrants: {
+          role: "dba",
+          canRead: true,
+          canWrite: true, // Stale grant from registration
+          canExecuteDdl: true,
+          canRestore: true,
+          canExplain: true,
+        },
+      });
+
+      expect(hasPermission(dbEngWithWriteGrant, "query:read")).toBe(true);
+      expect(hasPermission(dbEngWithWriteGrant, "performance:inspect")).toBe(true);
+      // Strictly disallowed by role ceiling:
+      expect(hasPermission(dbEngWithWriteGrant, "query:write")).toBe(false);
+      expect(hasPermission(dbEngWithWriteGrant, "record:insert")).toBe(false);
+      expect(hasPermission(dbEngWithWriteGrant, "record:update")).toBe(false);
+      expect(hasPermission(dbEngWithWriteGrant, "record:delete")).toBe(false);
+      expect(hasPermission(dbEngWithWriteGrant, "schema:write")).toBe(false);
+      expect(hasPermission(dbEngWithWriteGrant, "history:restore")).toBe(false);
+
+      const tablePerms = resolveTablePermissions(dbEngWithWriteGrant);
+      expect(tablePerms.canSelect).toBe(true);
+      expect(tablePerms.canInsert).toBe(false);
+      expect(tablePerms.canUpdate).toBe(false);
+      expect(tablePerms.canDelete).toBe(false);
+    });
   });
 
   describe("2. Safe Identifier Quoting & Primary Key Immutability", () => {

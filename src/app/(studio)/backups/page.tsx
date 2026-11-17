@@ -1,14 +1,46 @@
 "use client";
 
-import * as React from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
+import { DismissibleAlert } from "@/components/shared/dismissible-alert";
+import { StatusIndicator } from "@/components/shared/status-indicator";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Field, FieldLabel, FieldError } from "@/components/ui/field";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { formatDate } from "@/lib/utils";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  AlertTriangle,
+  Database,
+  Plus,
+  RefreshCw,
+  RotateCcw,
+} from "lucide-react";
+import * as React from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 const createSnapshotSchema = z.object({
   name: z.string().min(1, "Snapshot identifier is required"),
@@ -20,43 +52,12 @@ interface RestoreSnapshotFormValues {
 }
 
 const restoreSnapshotSchema = z.object({
-  confirmationPhrase: z.string().refine((val): val is string => val === "RESTORE_SNAPSHOT", {
-    message: 'Type "RESTORE_SNAPSHOT" to confirm',
-  }),
+  confirmationPhrase: z
+    .string()
+    .refine((val): val is string => val === "RESTORE_SNAPSHOT", {
+      message: 'Type "RESTORE_SNAPSHOT" to confirm',
+    }),
 });
-import { Badge } from "@/components/ui/badge";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { StatusIndicator } from "@/components/shared/status-indicator";
-import { EmptyState } from "@/components/shared/empty-state";
-import { DismissibleAlert } from "@/components/shared/dismissible-alert";
-import {
-  Archive,
-  Database,
-  RotateCcw,
-  Clock,
-  Plus,
-  RefreshCw,
-  AlertTriangle,
-  CheckCircle2,
-  Server,
-  Layers,
-} from "lucide-react";
-import { formatDate } from "@/lib/utils";
-import Link from "next/link";
 
 interface SnapshotItem {
   id: string;
@@ -70,7 +71,9 @@ interface SnapshotItem {
 }
 
 export default function BackupsPage() {
-  const [databases, setDatabases] = React.useState<Array<{ id: string; name: string }>>([]);
+  const [databases, setDatabases] = React.useState<
+    Array<{ id: string; name: string }>
+  >([]);
   const [selectedDbId, setSelectedDbId] = React.useState<string>("");
   const [activeOrgId, setActiveOrgId] = React.useState<string>("");
   const [activeWsId, setActiveWsId] = React.useState<string>("");
@@ -80,7 +83,9 @@ export default function BackupsPage() {
 
   // Create Snapshot Modal
   const [showCreateModal, setShowCreateModal] = React.useState(false);
-  const [snapshotType, setSnapshotType] = React.useState<"manual" | "daily" | "pitr_point">("manual");
+  const [snapshotType, setSnapshotType] = React.useState<
+    "manual" | "daily" | "pitr_point"
+  >("manual");
   const [isCreating, setIsCreating] = React.useState(false);
 
   const {
@@ -97,7 +102,8 @@ export default function BackupsPage() {
 
   // Recovery Modal
   const [showRestoreModal, setShowRestoreModal] = React.useState(false);
-  const [selectedSnapshot, setSelectedSnapshot] = React.useState<SnapshotItem | null>(null);
+  const [selectedSnapshot, setSelectedSnapshot] =
+    React.useState<SnapshotItem | null>(null);
   const [isRestoring, setIsRestoring] = React.useState(false);
 
   const {
@@ -112,7 +118,10 @@ export default function BackupsPage() {
     defaultValues: { confirmationPhrase: "" },
   });
 
-  const [message, setMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = React.useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   // 1. Initial Load: Fetch Session & Databases
   React.useEffect(() => {
@@ -127,7 +136,9 @@ export default function BackupsPage() {
             setActiveOrgId(org.id);
             if (ws) setActiveWsId(ws.id);
 
-            const dbRes = await fetch(`/api/v1/databases?organizationId=${org.id}`);
+            const dbRes = await fetch(
+              `/api/v1/databases?organizationId=${org.id}`,
+            );
             if (dbRes.ok) {
               const data = await dbRes.json();
               setDatabases(data.databases || []);
@@ -187,12 +198,18 @@ export default function BackupsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create snapshot");
 
-      setMessage({ type: "success", text: `Snapshot '${values.name}' created successfully!` });
+      setMessage({
+        type: "success",
+        text: `Snapshot '${values.name}' created successfully!`,
+      });
       setShowCreateModal(false);
       resetCreateSnapshot();
       loadSnapshots();
     } catch (err: unknown) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Creation failed" });
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Creation failed",
+      });
     } finally {
       setIsCreating(false);
     }
@@ -200,7 +217,8 @@ export default function BackupsPage() {
 
   // Execute Restore
   const handleRestore = async (values: RestoreSnapshotFormValues) => {
-    if (!selectedSnapshot || !selectedDbId || !activeOrgId || !activeWsId) return;
+    if (!selectedSnapshot || !selectedDbId || !activeOrgId || !activeWsId)
+      return;
     setIsRestoring(true);
     setMessage(null);
 
@@ -220,11 +238,17 @@ export default function BackupsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Recovery failed");
 
-      setMessage({ type: "success", text: data.message || "Recovery workflow initiated" });
+      setMessage({
+        type: "success",
+        text: data.message || "Recovery workflow initiated",
+      });
       setShowRestoreModal(false);
       resetRestore();
     } catch (err: unknown) {
-      setMessage({ type: "error", text: err instanceof Error ? err.message : "Recovery failed" });
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Recovery failed",
+      });
     } finally {
       setIsRestoring(false);
     }
@@ -236,21 +260,34 @@ export default function BackupsPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-semibold text-foreground">Backup & Recovery Center</h1>
+            <h1 className="text-base font-semibold text-foreground">
+              Backup & Recovery Center
+            </h1>
             <Badge variant="outline" className="font-mono text-[10px]">
               Neon PITR & Snapshots
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            Point-in-time recovery points, cluster snapshots, and recovery authorization
+            Point-in-time recovery points, cluster snapshots, and recovery
+            authorization
           </p>
         </div>
 
         <div className="flex items-center gap-2 flex-wrap">
-          <Button size="sm" onClick={() => setShowCreateModal(true)} className="h-8 text-xs cursor-pointer">
+          <Button
+            size="sm"
+            onClick={() => setShowCreateModal(true)}
+            className="h-8 text-xs cursor-pointer"
+          >
             <Plus className="h-3.5 w-3.5 mr-1" /> Create Snapshot
           </Button>
-          <Button variant="outline" size="sm" onClick={loadSnapshots} isLoading={isLoading} className="h-8 text-xs cursor-pointer">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadSnapshots}
+            isLoading={isLoading}
+            className="h-8 text-xs cursor-pointer"
+          >
             <RefreshCw className="h-3 w-3 mr-1" /> Refresh
           </Button>
         </div>
@@ -269,7 +306,11 @@ export default function BackupsPage() {
             </SelectTrigger>
             <SelectContent>
               {databases.map((db) => (
-                <SelectItem key={db.id} value={db.id} className="text-xs font-mono">
+                <SelectItem
+                  key={db.id}
+                  value={db.id}
+                  className="text-xs font-mono"
+                >
                   {db.name}
                 </SelectItem>
               ))}
@@ -295,7 +336,8 @@ export default function BackupsPage() {
             </span>
           </div>
           <CardDescription>
-            Chronos preserves cryptographic PITR checkpoints to safely restore or branch production databases.
+            Chronos preserves cryptographic PITR checkpoints to safely restore
+            or branch production databases.
           </CardDescription>
         </CardHeader>
         <CardContent className="p-0">
@@ -314,9 +356,14 @@ export default function BackupsPage() {
               <tbody className="divide-y divide-border">
                 {snapshots.map((s) => (
                   <tr key={s.id} className="hover:bg-elevated/40">
-                    <td className="p-3 font-semibold text-foreground">{s.name}</td>
+                    <td className="p-3 font-semibold text-foreground">
+                      {s.name}
+                    </td>
                     <td className="p-3">
-                      <Badge variant="outline" className="capitalize text-[10px]">
+                      <Badge
+                        variant="outline"
+                        className="capitalize text-[10px]"
+                      >
                         {s.snapshotType.replace("_", " ")}
                       </Badge>
                     </td>
@@ -326,7 +373,9 @@ export default function BackupsPage() {
                     <td className="p-3 text-[11px] text-primary">
                       {formatDate(s.recoveryPoint)}
                     </td>
-                    <td className="p-3 text-[11px] text-muted-foreground">{formatDate(s.createdAt)}</td>
+                    <td className="p-3 text-[11px] text-muted-foreground">
+                      {formatDate(s.createdAt)}
+                    </td>
                     <td className="p-3 text-right">
                       <Button
                         variant="destructive"
@@ -344,8 +393,12 @@ export default function BackupsPage() {
                 ))}
                 {snapshots.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-xs text-muted-foreground">
-                      No cluster snapshots recorded yet. Create one with &quot;Create Snapshot&quot;.
+                    <td
+                      colSpan={6}
+                      className="p-8 text-center text-xs text-muted-foreground"
+                    >
+                      No cluster snapshots recorded yet. Create one with
+                      &quot;Create Snapshot&quot;.
                     </td>
                   </tr>
                 )}
@@ -361,12 +414,19 @@ export default function BackupsPage() {
           <DialogHeader>
             <DialogTitle>Create Cluster Snapshot Point</DialogTitle>
             <DialogDescription>
-              Records an authenticated recovery point reference for this database
+              Records an authenticated recovery point reference for this
+              database
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreateSnapshotSubmit(handleCreateSnapshot)} noValidate className="space-y-3 pt-2">
+          <form
+            onSubmit={handleCreateSnapshotSubmit(handleCreateSnapshot)}
+            noValidate
+            className="space-y-3 pt-2"
+          >
             <Field error={createSnapshotErrors.name?.message}>
-              <FieldLabel htmlFor="snapshotName">Snapshot Identifier</FieldLabel>
+              <FieldLabel htmlFor="snapshotName">
+                Snapshot Identifier
+              </FieldLabel>
               <Input
                 id="snapshotName"
                 placeholder="pre-migration-checkpoint"
@@ -379,7 +439,9 @@ export default function BackupsPage() {
               <Label>Snapshot Type</Label>
               <Select
                 value={snapshotType}
-                onValueChange={(val: "manual" | "daily" | "pitr_point") => setSnapshotType(val)}
+                onValueChange={(val: "manual" | "daily" | "pitr_point") =>
+                  setSnapshotType(val)
+                }
               >
                 <SelectTrigger className="h-8">
                   <SelectValue />
@@ -387,7 +449,9 @@ export default function BackupsPage() {
                 <SelectContent>
                   <SelectItem value="manual">Manual Checkpoint</SelectItem>
                   <SelectItem value="daily">Daily Scheduled</SelectItem>
-                  <SelectItem value="pitr_point">Point-in-Time Milestone</SelectItem>
+                  <SelectItem value="pitr_point">
+                    Point-in-Time Milestone
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -414,20 +478,32 @@ export default function BackupsPage() {
           <DialogContent className="sm:max-w-md border-destructive/40">
             <DialogHeader>
               <DialogTitle className="text-destructive flex items-center gap-1.5">
-                <AlertTriangle className="h-4 w-4" /> Confirm Full Database Recovery
+                <AlertTriangle className="h-4 w-4" /> Confirm Full Database
+                Recovery
               </DialogTitle>
               <DialogDescription>
-                Full recovery initiates a branch or roll-forward to the snapshot point. This is a destructive operation.
+                Full recovery initiates a branch or roll-forward to the snapshot
+                point. This is a destructive operation.
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleRestoreSubmit(handleRestore)} noValidate className="space-y-3 pt-2">
+            <form
+              onSubmit={handleRestoreSubmit(handleRestore)}
+              noValidate
+              className="space-y-3 pt-2"
+            >
               <div className="p-2.5 rounded bg-sidebar border border-border space-y-1 font-mono text-[11px]">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Target Snapshot:</span>
-                  <span className="text-foreground font-semibold">{selectedSnapshot.name}</span>
+                  <span className="text-muted-foreground">
+                    Target Snapshot:
+                  </span>
+                  <span className="text-foreground font-semibold">
+                    {selectedSnapshot.name}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Recovery Timestamp:</span>
+                  <span className="text-muted-foreground">
+                    Recovery Timestamp:
+                  </span>
                   <span className="text-primary">
                     {formatDate(selectedSnapshot.recoveryPoint)}
                   </span>
@@ -435,7 +511,10 @@ export default function BackupsPage() {
               </div>
 
               <Field error={restoreErrors.confirmationPhrase?.message}>
-                <FieldLabel htmlFor="confirmationPhrase" className="text-destructive font-medium">
+                <FieldLabel
+                  htmlFor="confirmationPhrase"
+                  className="text-destructive font-medium"
+                >
                   Type &quot;RESTORE_SNAPSHOT&quot; to authorize this recovery
                 </FieldLabel>
                 <Input

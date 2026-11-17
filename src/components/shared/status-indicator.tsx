@@ -30,8 +30,8 @@ export function StatusIndicator({ status, label, className, pulse = false }: Sta
   };
 
   return (
-    <div className={cn("inline-flex items-center gap-1.5", className)}>
-      <span className="relative flex h-2 w-2">
+    <div className={cn("inline-flex items-center gap-1.5 align-middle", className)}>
+      <span className="relative flex h-2 w-2 shrink-0 items-center justify-center">
         {pulse && (
           <span
             className={cn(
@@ -42,7 +42,11 @@ export function StatusIndicator({ status, label, className, pulse = false }: Sta
         )}
         <span className={cn("relative inline-flex h-2 w-2 rounded-full", getStatusColor())} />
       </span>
-      {label && <span className="text-[11px] font-mono capitalize text-muted-foreground">{label}</span>}
+      {label && (
+        <span className="text-[11px] font-mono capitalize text-muted-foreground leading-none select-none">
+          {label}
+        </span>
+      )}
     </div>
   );
 }

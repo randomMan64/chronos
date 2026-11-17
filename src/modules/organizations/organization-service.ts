@@ -6,6 +6,7 @@ import {
   workspaces,
   workspaceMembers,
   databases,
+  databasePermissions,
   invitations,
 } from "@/db/schema";
 import { eq, and, sql, count } from "drizzle-orm";
@@ -244,6 +245,56 @@ export class OrganizationService {
             and(
               eq(workspaceMembers.workspaceId, ws.id),
               eq(workspaceMembers.userId, targetMember.userId)
+            )
+          );
+      }
+
+      // Synchronize database permissions for this user across org databases
+      const orgDatabases = await tx
+        .select({ id: databases.id })
+        .from(databases)
+        .where(eq(databases.organizationId, params.organizationId));
+
+      const roleDatabaseDefaults: Record<string, {
+        role: string;
+        canRead: boolean;
+        canWrite: boolean;
+        canExecuteDdl: boolean;
+        canRestore: boolean;
+        canExplain: boolean;
+      }> = {
+        owner: { role: "owner", canRead: true, canWrite: true, canExecuteDdl: true, canRestore: true, canExplain: true },
+        dba: { role: "dba", canRead: true, canWrite: true, canExecuteDdl: true, canRestore: true, canExplain: true },
+        developer: { role: "developer", canRead: true, canWrite: true, canExecuteDdl: false, canRestore: true, canExplain: false },
+        database_engineer: { role: "database_engineer", canRead: true, canWrite: false, canExecuteDdl: false, canRestore: false, canExplain: true },
+        data_analyst: { role: "data_analyst", canRead: true, canWrite: false, canExecuteDdl: false, canRestore: false, canExplain: false },
+        auditor: { role: "auditor", canRead: true, canWrite: false, canExecuteDdl: false, canRestore: false, canExplain: false },
+      };
+
+      const dbDefaults = roleDatabaseDefaults[normalizedNewRole] || {
+        role: normalizedNewRole,
+        canRead: true,
+        canWrite: false,
+        canExecuteDdl: false,
+        canRestore: false,
+        canExplain: false,
+      };
+
+      for (const dbRecord of orgDatabases) {
+        await tx
+          .update(databasePermissions)
+          .set({
+            role: dbDefaults.role,
+            canRead: dbDefaults.canRead,
+            canWrite: dbDefaults.canWrite,
+            canExecuteDdl: dbDefaults.canExecuteDdl,
+            canRestore: dbDefaults.canRestore,
+            canExplain: dbDefaults.canExplain,
+          })
+          .where(
+            and(
+              eq(databasePermissions.databaseId, dbRecord.id),
+              eq(databasePermissions.userId, targetMember.userId)
             )
           );
       }

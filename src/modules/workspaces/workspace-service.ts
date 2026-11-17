@@ -1,7 +1,8 @@
 import { db } from "@/db/connections/control-plane";
-import { workspaces, workspaceMembers, users } from "@/db/schema";
+import { workspaces, workspaceMembers, users, databases, databasePermissions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { WorkspaceRole } from "@/lib/permissions/types";
+import { normalizeRole } from "@/lib/permissions/roles";
 import { AuditService } from "@/modules/audit/audit-service";
 import crypto from "crypto";
 
@@ -105,6 +106,56 @@ export class WorkspaceService {
       .returning();
 
     if (updated) {
+      const canonicalRole = normalizeRole(params.newRole);
+      const roleDatabaseDefaults: Record<string, {
+        role: string;
+        canRead: boolean;
+        canWrite: boolean;
+        canExecuteDdl: boolean;
+        canRestore: boolean;
+        canExplain: boolean;
+      }> = {
+        owner: { role: "owner", canRead: true, canWrite: true, canExecuteDdl: true, canRestore: true, canExplain: true },
+        dba: { role: "dba", canRead: true, canWrite: true, canExecuteDdl: true, canRestore: true, canExplain: true },
+        developer: { role: "developer", canRead: true, canWrite: true, canExecuteDdl: false, canRestore: true, canExplain: false },
+        database_engineer: { role: "database_engineer", canRead: true, canWrite: false, canExecuteDdl: false, canRestore: false, canExplain: true },
+        data_analyst: { role: "data_analyst", canRead: true, canWrite: false, canExecuteDdl: false, canRestore: false, canExplain: false },
+        auditor: { role: "auditor", canRead: true, canWrite: false, canExecuteDdl: false, canRestore: false, canExplain: false },
+      };
+
+      const dbDefaults = roleDatabaseDefaults[canonicalRole] || {
+        role: canonicalRole,
+        canRead: true,
+        canWrite: false,
+        canExecuteDdl: false,
+        canRestore: false,
+        canExplain: false,
+      };
+
+      const wsDatabases = await db
+        .select({ id: databases.id })
+        .from(databases)
+        .where(eq(databases.workspaceId, params.workspaceId));
+
+      for (const dbRecord of wsDatabases) {
+        await db
+          .update(databasePermissions)
+          .set({
+            role: dbDefaults.role,
+            canRead: dbDefaults.canRead,
+            canWrite: dbDefaults.canWrite,
+            canExecuteDdl: dbDefaults.canExecuteDdl,
+            canRestore: dbDefaults.canRestore,
+            canExplain: dbDefaults.canExplain,
+          })
+          .where(
+            and(
+              eq(databasePermissions.databaseId, dbRecord.id),
+              eq(databasePermissions.userId, updated.userId)
+            )
+          );
+      }
+
       await AuditService.log({
         organizationId: params.organizationId,
         workspaceId: params.workspaceId,

@@ -164,6 +164,31 @@ export const WORKSPACE_ROLE_PERMISSIONS: Record<string, Permission[]> = {
   engineer: ROLE_PERMISSIONS.database_engineer,
 };
 
+function getRoleWriteCapability(role: string | null | undefined): boolean {
+  if (!role) return false;
+  const raw = role.trim().toLowerCase();
+  if (raw === "database_engineer" || raw === "engineer" || raw === "db_engineer") return false;
+  if (raw === "data_analyst" || raw === "analyst") return false;
+  if (raw === "auditor" || raw === "audit") return false;
+  if (raw === "member") return false;
+  if (raw === "owner" || raw === "dba" || raw === "developer" || raw === "admin" || raw === "dev") return true;
+  return false;
+}
+
+function getRoleDdlCapability(role: string | null | undefined): boolean {
+  if (!role) return false;
+  const raw = role.trim().toLowerCase();
+  if (raw === "owner" || raw === "dba" || raw === "admin") return true;
+  return false;
+}
+
+function getRoleRestoreCapability(role: string | null | undefined): boolean {
+  if (!role) return false;
+  const raw = role.trim().toLowerCase();
+  if (raw === "owner" || raw === "dba" || raw === "developer" || raw === "admin" || raw === "dev") return true;
+  return false;
+}
+
 /**
  * Resolves the effective permissions for a user given their organization role,
  * workspace role, and any explicit database grants.
@@ -210,28 +235,67 @@ export function resolvePermissions(params: {
     }
   }
 
-  // 3. Database Grants Override / Restrict
+  // 3. Database Grants Override / Restrict with strict Role Ceiling
+  const orgCanWrite = getRoleWriteCapability(params.orgRole);
+  const wsCanWrite = getRoleWriteCapability(params.workspaceRole);
+  const isWriteCapable = params.workspaceRole ? wsCanWrite : orgCanWrite;
+
+  const orgCanDdl = getRoleDdlCapability(params.orgRole);
+  const wsCanDdl = getRoleDdlCapability(params.workspaceRole);
+  const isDdlCapable = params.workspaceRole ? wsCanDdl : orgCanDdl;
+
+  const orgCanRestore = getRoleRestoreCapability(params.orgRole);
+  const wsCanRestore = getRoleRestoreCapability(params.workspaceRole);
+  const isRestoreCapable = params.workspaceRole ? wsCanRestore : orgCanRestore;
+
   if (params.databaseGrants) {
-    if (params.databaseGrants.canRead) permissions.add("query:read");
-    if (params.databaseGrants.canWrite) {
+    if (params.databaseGrants.canRead) {
+      permissions.add("query:read");
+    } else {
+      permissions.delete("query:read");
+    }
+
+    if (params.databaseGrants.canWrite && isWriteCapable) {
       permissions.add("query:write");
       permissions.add("record:insert");
       permissions.add("record:update");
       permissions.add("record:delete");
     } else {
-      permissions.delete("query:write"); // Explicit denial
+      permissions.delete("query:write"); // Explicit denial or role ceiling
       permissions.delete("record:insert");
       permissions.delete("record:update");
       permissions.delete("record:delete");
     }
 
-    if (params.databaseGrants.canExecuteDdl) permissions.add("schema:write");
-    else permissions.delete("schema:write");
+    if (params.databaseGrants.canExecuteDdl && isDdlCapable) {
+      permissions.add("schema:write");
+    } else {
+      permissions.delete("schema:write");
+    }
 
-    if (params.databaseGrants.canRestore) permissions.add("history:restore");
-    else permissions.delete("history:restore");
+    if (params.databaseGrants.canRestore && isRestoreCapable) {
+      permissions.add("history:restore");
+    } else {
+      permissions.delete("history:restore");
+    }
 
-    if (params.databaseGrants.canExplain) permissions.add("performance:inspect");
+    if (params.databaseGrants.canExplain) {
+      permissions.add("performance:inspect");
+    }
+  }
+
+  // Final role ceiling assertion: if user is not write-capable, NEVER leave write permissions in the set
+  if (!isWriteCapable) {
+    permissions.delete("query:write");
+    permissions.delete("record:insert");
+    permissions.delete("record:update");
+    permissions.delete("record:delete");
+  }
+  if (!isDdlCapable) {
+    permissions.delete("schema:write");
+  }
+  if (!isRestoreCapable) {
+    permissions.delete("history:restore");
   }
 
   return permissions;
