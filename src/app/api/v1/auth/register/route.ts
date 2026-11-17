@@ -1,20 +1,16 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/db/connections/control-plane";
-import { users, organizations, organizationMembers, workspaces, workspaceMembers, userSessions } from "@/db/schema";
+import { users, emailVerificationTokens } from "@/db/schema";
 import { registerSchema } from "@/lib/validation";
-import {
-  createSessionToken,
-  setSessionCookie,
-  attachSessionCookieToResponse,
-  attachDeviceCookieToResponse,
-  DEVICE_COOKIE_NAME,
-} from "@/lib/auth/session";
-import { parseUserAgent, resolveOrCreateDevice } from "@/lib/auth/device-detector";
-import { AuditService } from "@/modules/audit/audit-service";
-import { handleApiError } from "@/lib/errors";
 import { EmailService } from "@/lib/email";
-import { eq } from "drizzle-orm";
+import {
+  normalizeEmail,
+  isValidEmailSyntax,
+  isDisposableEmail,
+} from "@/lib/auth/email-validator";
+import { handleApiError } from "@/lib/errors";
+import { eq, and, isNull } from "drizzle-orm";
 import crypto from "crypto";
 
 export const runtime = "nodejs";
@@ -32,163 +28,130 @@ export async function POST(req: Request) {
       );
     }
 
-    const { email, password, fullName, organizationName } = parsed.data;
+    const { email: rawEmail, password, fullName, organizationName } = parsed.data;
 
-    // Check if user already exists
-    const existing = await db.select().from(users).where(eq(users.email, email.toLowerCase())).limit(1);
-    if (existing.length > 0) {
-      return NextResponse.json({ error: "An account with this email already exists" }, { status: 409 });
+    // 1. Strict RFC email syntax check
+    if (!isValidEmailSyntax(rawEmail)) {
+      return NextResponse.json(
+        { error: "Invalid email address format.", code: "INVALID_EMAIL" },
+        { status: 400 }
+      );
     }
 
+    // 2. Reject disposable / temporary email domains
+    if (isDisposableEmail(rawEmail)) {
+      return NextResponse.json(
+        {
+          error:
+            "Temporary and disposable email addresses are not permitted. Please use a valid, permanent email address.",
+          code: "DISPOSABLE_EMAIL",
+        },
+        { status: 400 }
+      );
+    }
+
+    const email = normalizeEmail(rawEmail);
     const passwordHash = await bcrypt.hash(password, 12);
-    const orgName = organizationName || `${fullName.split(" ")[0]}'s Team`;
-    const orgSlug = orgName
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/(^-|-$)/g, "") + "-" + crypto.randomBytes(3).toString("hex");
+    const orgName = organizationName?.trim() || `${fullName.split(" ")[0]}'s Team`;
 
-    // 1. Create User
-    const [newUser] = await db
-      .insert(users)
-      .values({
-        email: email.toLowerCase(),
-        passwordHash,
-        fullName,
-      })
-      .returning();
+    // 3. Check if user already exists
+    const [existing] = await db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
 
-    // 2. Create Default Organization
-    const [newOrg] = await db
-      .insert(organizations)
-      .values({
-        name: orgName,
-        slug: orgSlug,
-      })
-      .returning();
+    let targetUserId: string;
 
-    // 3. Assign User as Organization Owner
-    await db.insert(organizationMembers).values({
-      organizationId: newOrg.id,
-      userId: newUser.id,
-      role: "owner",
+    if (existing) {
+      if (existing.isEmailVerified) {
+        return NextResponse.json(
+          { error: "An account with this email already exists" },
+          { status: 409 }
+        );
+      }
+
+      // Existing user is unverified: update profile, password, pending org name
+      await db
+        .update(users)
+        .set({
+          fullName,
+          passwordHash,
+          pendingOrganizationName: orgName,
+          updatedAt: new Date(),
+        })
+        .where(eq(users.id, existing.id));
+
+      targetUserId = existing.id;
+
+      // Invalidate prior unconsumed tokens
+      await db
+        .update(emailVerificationTokens)
+        .set({ consumedAt: new Date() })
+        .where(
+          and(
+            eq(emailVerificationTokens.userId, existing.id),
+            isNull(emailVerificationTokens.consumedAt)
+          )
+        );
+    } else {
+      // Create new pending unverified user
+      const [newUser] = await db
+        .insert(users)
+        .values({
+          email,
+          passwordHash,
+          fullName,
+          isEmailVerified: false,
+          pendingOrganizationName: orgName,
+        })
+        .returning();
+
+      targetUserId = newUser.id;
+    }
+
+    // 4. Generate 256-bit cryptographically secure verification token
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+    await db.insert(emailVerificationTokens).values({
+      userId: targetUserId,
+      tokenHash,
+      email,
+      expiresAt,
     });
 
-    // 4. Create First Workspace (Default: development)
-    const [newWs] = await db
-      .insert(workspaces)
-      .values({
-        organizationId: newOrg.id,
-        name: "Primary Workspace",
-        slug: "primary",
-        environment: "development",
-      })
-      .returning();
-
-    // 5. Assign User as Workspace DBA/Admin
-    await db.insert(workspaceMembers).values({
-      workspaceId: newWs.id,
-      userId: newUser.id,
-      role: "dba",
-    });
-
-    // 6. Detect device and resolve/create device record
-    const cookieHeader = req.headers.get("cookie") || "";
-    const deviceCookieMatch = cookieHeader.match(new RegExp(`(?:^|; )${DEVICE_COOKIE_NAME}=([^;]*)`));
-    const rawDeviceKey = deviceCookieMatch ? decodeURIComponent(deviceCookieMatch[1]) : null;
-
-    const deviceInfo = parseUserAgent(req.headers.get("user-agent"), req.headers);
-    const { device, deviceKey } = await resolveOrCreateDevice({
-      userId: newUser.id,
-      rawDeviceKey,
-      deviceInfo,
-    });
-
-    // 7. Create Session
-    const tokenHash = crypto.randomBytes(32).toString("hex");
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-    const [newSession] = await db
-      .insert(userSessions)
-      .values({
-        userId: newUser.id,
-        deviceId: device.id,
-        tokenHash,
-        ipAddress: deviceInfo.ipAddress,
-        userAgent: deviceInfo.userAgent,
-        country: deviceInfo.country,
-        region: deviceInfo.region,
-        city: deviceInfo.city,
-        lastActiveAt: new Date(),
-        expiresAt,
-      })
-      .returning();
-
-    const sessionToken = await createSessionToken({
-      userId: newUser.id,
-      email: newUser.email,
-      sessionId: newSession.id,
-    });
-
-    await setSessionCookie(sessionToken);
-
-    // Audit Log
-    await AuditService.log({
-      organizationId: newOrg.id,
-      workspaceId: newWs.id,
-      actorId: newUser.id,
-      actorEmail: newUser.email,
-      action: "user:register",
-      resourceType: "user",
-      resourceId: newUser.id,
-      outcome: "success",
-      metadata: { organizationName: newOrg.name, workspaceName: newWs.name },
-    });
-
-    // 8. Dispatch Welcome Email (awaited for reliability)
+    // 5. Dispatch Verification Email (do not block account creation if SMTP fails)
     try {
-      await EmailService.sendWelcomeEmail(newUser.email, {
-        recipientName: newUser.fullName,
+      await EmailService.sendVerificationEmail(email, {
+        recipientName: fullName,
+        verificationToken: rawToken,
+        expiresInMinutes: 30,
       });
     } catch (emailErr) {
-      console.error("[Register] Failed to send welcome email:", emailErr);
+      console.error("[Register] Failed to send verification email:", emailErr);
     }
 
-    const response = NextResponse.json(
+    // 6. Return response WITHOUT session or device cookies
+    return NextResponse.json(
       {
         success: true,
-        user: {
-          id: newUser.id,
-          email: newUser.email,
-          fullName: newUser.fullName,
-        },
-        organization: {
-          id: newOrg.id,
-          name: newOrg.name,
-          slug: newOrg.slug,
-          role: "owner",
-        },
-        workspace: {
-          id: newWs.id,
-          name: newWs.name,
-          slug: newWs.slug,
-          environment: newWs.environment,
-        },
+        email,
+        requiresVerification: true,
+        message:
+          "Account created successfully. A verification link has been sent to your email address.",
       },
       {
+        status: 201,
         headers: {
           "Cache-Control": "private, no-cache, no-store, must-revalidate",
           Pragma: "no-cache",
         },
       }
     );
-
-    attachSessionCookieToResponse(response, sessionToken);
-    attachDeviceCookieToResponse(response, deviceKey);
-
-    return response;
   } catch (err) {
     const error = handleApiError(err);
     return NextResponse.json(error.body, { status: error.status });
   }
 }
-

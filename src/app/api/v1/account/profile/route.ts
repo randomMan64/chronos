@@ -38,6 +38,8 @@ export async function GET() {
         email: users.email,
         fullName: users.fullName,
         avatarUrl: users.avatarUrl,
+        isEmailVerified: users.isEmailVerified,
+        emailVerifiedAt: users.emailVerifiedAt,
         createdAt: users.createdAt,
       })
       .from(users)

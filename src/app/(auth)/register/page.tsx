@@ -76,7 +76,7 @@ export default function RegisterPage() {
         throw new Error(data.error || "Failed to create account");
       }
 
-      router.push("/dashboard");
+      router.push(`/verify-email/pending?email=${encodeURIComponent(values.email)}`);
     } catch (err: unknown) {
       setServerError(
         err instanceof Error ? err.message : "Registration failed",

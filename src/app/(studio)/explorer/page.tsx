@@ -487,14 +487,14 @@ export default function ExplorerPage() {
             onClick={() => setIsNavDrawerOpen(false)}
             aria-hidden="true"
           />
-          <div className="relative z-50 w-[280px] max-w-[85vw] h-full bg-sidebar border-r border-border flex flex-col shadow-2xl animate-in slide-in-from-left duration-200">
+          <div className="relative z-50 w-70 max-w-[85vw] h-full bg-sidebar border-r border-border flex flex-col shadow-2xl animate-in slide-in-from-left duration-200">
             {renderTableNav(true)}
           </div>
         </div>
       )}
 
       {/* DESKTOP LEFT PANEL: Databases, Schemas, and Tables Tree */}
-      <div className="hidden lg:flex w-[260px] shrink-0 border border-border bg-sidebar rounded-md flex-col justify-between overflow-hidden">
+      <div className="hidden lg:flex w-65 shrink-0 border border-border bg-sidebar rounded-md flex-col justify-between overflow-hidden">
         {renderTableNav(false)}
       </div>
 
@@ -609,7 +609,7 @@ export default function ExplorerPage() {
                             {columns.map((c) => (
                               <td
                                 key={c}
-                                className="p-2 border-r border-border/40 truncate max-w-[220px]"
+                                className="p-2 border-r border-border/40 truncate max-w-55"
                               >
                                 {r[c] === null ? (
                                   <span className="text-muted-foreground italic">
@@ -726,7 +726,7 @@ export default function ExplorerPage() {
                             <span className="text-[#FBBF24]">NO</span>
                           )}
                         </td>
-                        <td className="p-2.5 text-muted-foreground truncate max-w-[200px]">
+                        <td className="p-2.5 text-muted-foreground truncate max-w-50">
                           {c.columnDefault || "—"}
                         </td>
                         <td className="p-2.5">

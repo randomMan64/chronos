@@ -38,7 +38,10 @@ function LoginForm() {
   const returnUrl = searchParams.get("returnUrl") || searchParams.get("redirect");
 
   const [serverError, setServerError] = React.useState<string | null>(null);
+  const [unverifiedEmail, setUnverifiedEmail] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+
+  const isVerifiedBanner = searchParams.get("verified") === "true";
 
   const {
     register,
@@ -56,6 +59,7 @@ function LoginForm() {
 
   const onSubmit = async (values: LoginFormValues) => {
     setServerError(null);
+    setUnverifiedEmail(null);
     setIsLoading(true);
 
     try {
@@ -67,6 +71,9 @@ function LoginForm() {
 
       const data = await res.json();
       if (!res.ok) {
+        if (data.code === "EMAIL_UNVERIFIED") {
+          setUnverifiedEmail(data.email || values.email);
+        }
         throw new Error(data.error || "Failed to sign in");
       }
 
@@ -98,6 +105,12 @@ function LoginForm() {
       </CardHeader>
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <CardContent className="space-y-3">
+          {isVerifiedBanner && (
+            <div className="rounded border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-xs text-emerald-600 dark:text-emerald-400">
+              Email verified successfully! You can now sign in.
+            </div>
+          )}
+
           {(searchParams.get("reason") === "SESSION_REVOKED" || searchParams.get("revoked") === "true") && (
             <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-600 dark:text-amber-400">
               Your session has been signed out because it was revoked from another device.
@@ -105,8 +118,18 @@ function LoginForm() {
           )}
 
           {serverError && (
-            <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive">
-              {serverError}
+            <div className="rounded border border-destructive/30 bg-destructive/10 p-2 text-xs text-destructive space-y-1.5">
+              <p>{serverError}</p>
+              {unverifiedEmail && (
+                <div className="pt-1">
+                  <Link
+                    href={`/verify-email/pending?email=${encodeURIComponent(unverifiedEmail)}`}
+                    className="font-medium underline underline-offset-2 hover:text-destructive/80"
+                  >
+                    Resend verification email &rarr;
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 

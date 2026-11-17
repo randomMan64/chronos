@@ -11,9 +11,18 @@ CREATE TABLE IF NOT EXISTS users (
   full_name VARCHAR(255) NOT NULL,
   avatar_url TEXT,
   is_active BOOLEAN NOT NULL DEFAULT true,
+  is_email_verified BOOLEAN NOT NULL DEFAULT false,
+  email_verified_at TIMESTAMPTZ,
+  pending_organization_name VARCHAR(255),
+  pending_invitation_id UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_email_verified BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS email_verified_at TIMESTAMPTZ;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_organization_name VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS pending_invitation_id UUID;
+UPDATE users SET is_email_verified = true, email_verified_at = NOW() WHERE email = 'admin@chronos.internal' AND is_email_verified = false;
 
 -- 2. Organizations
 CREATE TABLE IF NOT EXISTS organizations (
@@ -219,6 +228,20 @@ CREATE TABLE IF NOT EXISTS user_preferences (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   CONSTRAINT user_preferences_user_unique UNIQUE (user_id)
 );
+
+-- 13.5 Email Verification Tokens
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash VARCHAR(255) NOT NULL UNIQUE,
+  email VARCHAR(255) NOT NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_email_verification_token ON email_verification_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_email_verification_user ON email_verification_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_verification_email ON email_verification_tokens(email);
 
 -- 14. Password Reset Tokens
 CREATE TABLE IF NOT EXISTS password_reset_tokens (

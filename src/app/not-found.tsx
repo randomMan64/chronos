@@ -1,18 +1,12 @@
-import Link from "next/link";
 import { BrandLogo } from "@/components/shared/brand-logo";
-import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { buttonVariants } from "@/components/ui/button";
-import { Compass, Home, Terminal, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Compass, Home, Terminal } from "lucide-react";
+import Link from "next/link";
 
 export default function NotFound() {
   return (
     <div className="relative min-h-screen w-full bg-background text-foreground flex flex-col items-center justify-center p-4 select-none">
-      {/* Top right theme toggle adhering to the active theme */}
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
       <div className="w-full max-w-md space-y-5 text-center">
         {/* Brand Header */}
         <div className="flex flex-col items-center space-y-1">

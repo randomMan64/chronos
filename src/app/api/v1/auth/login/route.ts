@@ -49,6 +49,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid email or password" }, { status: 401 });
     }
 
+    // Check email verification status
+    if (user.isEmailVerified === false) {
+      return NextResponse.json(
+        {
+          error: "Please verify your email address before signing in.",
+          code: "EMAIL_UNVERIFIED",
+          email: user.email,
+        },
+        { status: 403 }
+      );
+    }
+
     // Detect device and resolve/create device record
     const cookieHeader = req.headers.get("cookie") || "";
     const deviceCookieMatch = cookieHeader.match(new RegExp(`(?:^|; )${DEVICE_COOKIE_NAME}=([^;]*)`));

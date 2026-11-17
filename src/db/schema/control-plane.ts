@@ -22,6 +22,10 @@ export const users = pgTable(
     fullName: varchar("full_name", { length: 255 }).notNull(),
     avatarUrl: text("avatar_url"),
     isActive: boolean("is_active").default(true).notNull(),
+    isEmailVerified: boolean("is_email_verified").default(false).notNull(),
+    emailVerifiedAt: timestamp("email_verified_at", { withTimezone: true }),
+    pendingOrganizationName: varchar("pending_organization_name", { length: 255 }),
+    pendingInvitationId: uuid("pending_invitation_id"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
@@ -345,6 +349,27 @@ export const userPreferences = pgTable(
   },
   (table) => [
     uniqueIndex("user_preferences_user_idx").on(table.userId),
+  ]
+);
+
+// 13.5 Email Verification Tokens
+export const emailVerificationTokens = pgTable(
+  "email_verification_tokens",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    tokenHash: varchar("token_hash", { length: 255 }).notNull().unique(),
+    email: varchar("email", { length: 255 }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("email_verification_token_idx").on(table.tokenHash),
+    index("email_verification_user_idx").on(table.userId),
+    index("email_verification_email_idx").on(table.email),
   ]
 );
 

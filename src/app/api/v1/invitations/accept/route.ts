@@ -83,61 +83,15 @@ export async function POST(req: Request) {
       password,
     });
 
-    // Detect device and resolve/create device record
-    const cookieHeader = req.headers.get("cookie") || "";
-    const deviceCookieMatch = cookieHeader.match(new RegExp(`(?:^|; )${DEVICE_COOKIE_NAME}=([^;]*)`));
-    const rawDeviceKey = deviceCookieMatch ? decodeURIComponent(deviceCookieMatch[1]) : null;
-
-    const deviceInfo = parseUserAgent(req.headers.get("user-agent"), req.headers);
-    const { device, deviceKey } = await resolveOrCreateDevice({
-      userId: result.user.id,
-      rawDeviceKey,
-      deviceInfo,
-    });
-
-    // Associate session with device and network metadata
-    await db
-      .update(userSessions)
-      .set({
-        deviceId: device.id,
-        ipAddress: deviceInfo.ipAddress,
-        userAgent: deviceInfo.userAgent,
-        country: deviceInfo.country,
-        region: deviceInfo.region,
-        city: deviceInfo.city,
-        lastActiveAt: new Date(),
-      })
-      .where(eq(userSessions.id, result.sessionId));
-
-    // Establish authenticated session for the newly registered user
-    const sessionToken = await createSessionToken({
-      userId: result.user.id,
+    return NextResponse.json({
+      success: true,
+      requiresVerification: true,
       email: result.user.email,
-      sessionId: result.sessionId,
+      organizationId: result.organizationId,
+      organizationName: result.organizationName,
+      message:
+        "Account created successfully. Please check your email to verify your address and complete joining the organization.",
     });
-
-    await setSessionCookie(sessionToken);
-
-    const response = NextResponse.json(
-      {
-        success: true,
-        message: "Account created and invitation accepted successfully.",
-        user: result.user,
-        organizationId: result.organizationId,
-        organizationName: result.organizationName,
-      },
-      {
-        headers: {
-          "Cache-Control": "private, no-cache, no-store, must-revalidate",
-          Pragma: "no-cache",
-        },
-      }
-    );
-
-    attachSessionCookieToResponse(response, sessionToken);
-    attachDeviceCookieToResponse(response, deviceKey);
-
-    return response;
   } catch (err) {
     const error = handleApiError(err);
     return NextResponse.json(error.body, { status: error.status });

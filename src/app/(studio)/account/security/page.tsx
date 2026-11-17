@@ -1,47 +1,53 @@
 "use client";
 
-import * as React from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { AccountNav } from "@/components/account/account-nav";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Field, FieldLabel, FieldError } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
+import { DismissibleAlert } from "@/components/shared/dismissible-alert";
 import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { DismissibleAlert } from "@/components/shared/dismissible-alert";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/utils";
+import { zodResolver } from "@hookform/resolvers/zod";
 import {
-  Shield,
-  KeyRound,
-  Laptop,
-  Smartphone,
-  Tablet,
-  Monitor,
-  History,
-  Lock,
-  LogOut,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   Globe,
+  History,
+  KeyRound,
+  Laptop,
+  LogOut,
+  Monitor,
+  Smartphone,
+  Tablet,
   Trash2,
 } from "lucide-react";
+import * as React from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 const passwordSchema = z
   .object({
     currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z.string().min(8, "New password must be at least 8 characters"),
+    newPassword: z
+      .string()
+      .min(8, "New password must be at least 8 characters"),
     confirmPassword: z.string().min(1, "Please confirm your new password"),
   })
   .refine((data) => data.newPassword === data.confirmPassword, {
@@ -163,11 +169,15 @@ export default function AccountSecurityPage() {
   const [isChangingPassword, setIsChangingPassword] = React.useState(false);
   const [isRevoking, setIsRevoking] = React.useState(false);
   const [showRevokeModal, setShowRevokeModal] = React.useState(false);
-  const [sessionToRevoke, setSessionToRevoke] = React.useState<SessionItem | null>(null);
+  const [sessionToRevoke, setSessionToRevoke] =
+    React.useState<SessionItem | null>(null);
   const [isRevokingSingle, setIsRevokingSingle] = React.useState(false);
   const [loginHistoryPage, setLoginHistoryPage] = React.useState(1);
   const LOGIN_HISTORY_PAGE_SIZE = 5;
-  const [alert, setAlert] = React.useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
+  const [alert, setAlert] = React.useState<{
+    type: "success" | "error" | "info";
+    text: string;
+  } | null>(null);
 
   const {
     register,
@@ -211,11 +221,15 @@ export default function AccountSecurityPage() {
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Failed to update password");
 
-      setAlert({ type: "success", text: "Your password has been changed successfully. Other sessions have been signed out." });
+      setAlert({
+        type: "success",
+        text: "Your password has been changed successfully. Other sessions have been signed out.",
+      });
       resetPasswordForm();
       loadSecurityData();
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to update password";
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to update password";
       setAlert({ type: "error", text: errorMsg });
     } finally {
       setIsChangingPassword(false);
@@ -226,17 +240,24 @@ export default function AccountSecurityPage() {
     try {
       setIsRevoking(true);
       setAlert(null);
-      const res = await fetch("/api/v1/account/security/sessions/revoke-others", {
-        method: "POST",
-      });
+      const res = await fetch(
+        "/api/v1/account/security/sessions/revoke-others",
+        {
+          method: "POST",
+        },
+      );
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Failed to revoke sessions");
 
-      setAlert({ type: "success", text: "All other sessions have been revoked." });
+      setAlert({
+        type: "success",
+        text: "All other sessions have been revoked.",
+      });
       setShowRevokeModal(false);
       loadSecurityData();
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to revoke sessions";
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to revoke sessions";
       setAlert({ type: "error", text: errorMsg });
     } finally {
       setIsRevoking(false);
@@ -248,13 +269,19 @@ export default function AccountSecurityPage() {
     try {
       setIsRevokingSingle(true);
       setAlert(null);
-      const res = await fetch(`/api/v1/account/security/sessions/${sessionToRevoke.id}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/v1/account/security/sessions/${sessionToRevoke.id}`,
+        {
+          method: "DELETE",
+        },
+      );
       const result = await res.json();
       if (!res.ok) throw new Error(result.error || "Failed to revoke session");
 
-      setAlert({ type: "success", text: result.message || "Session revoked successfully." });
+      setAlert({
+        type: "success",
+        text: result.message || "Session revoked successfully.",
+      });
       const wasCurrent = sessionToRevoke.isCurrent;
       setSessionToRevoke(null);
 
@@ -264,7 +291,8 @@ export default function AccountSecurityPage() {
       }
       loadSecurityData();
     } catch (err: unknown) {
-      const errorMsg = err instanceof Error ? err.message : "Failed to revoke session";
+      const errorMsg =
+        err instanceof Error ? err.message : "Failed to revoke session";
       setAlert({ type: "error", text: errorMsg });
     } finally {
       setIsRevokingSingle(false);
@@ -272,19 +300,23 @@ export default function AccountSecurityPage() {
   };
 
   const totalLoginEvents = data?.loginHistory || [];
-  const totalLoginPages = Math.ceil(totalLoginEvents.length / LOGIN_HISTORY_PAGE_SIZE) || 1;
+  const totalLoginPages =
+    Math.ceil(totalLoginEvents.length / LOGIN_HISTORY_PAGE_SIZE) || 1;
   const paginatedLoginHistory = totalLoginEvents.slice(
     (loginHistoryPage - 1) * LOGIN_HISTORY_PAGE_SIZE,
-    loginHistoryPage * LOGIN_HISTORY_PAGE_SIZE
+    loginHistoryPage * LOGIN_HISTORY_PAGE_SIZE,
   );
 
   return (
     <div className="space-y-5 w-full pb-10">
       {/* Header */}
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Account</h1>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">
+          Account
+        </h1>
         <p className="text-xs text-muted-foreground">
-          Manage your personal profile, credentials, and individual system preferences
+          Manage your personal profile, credentials, and individual system
+          preferences
         </p>
       </div>
 
@@ -310,7 +342,8 @@ export default function AccountSecurityPage() {
                 Change Password
               </CardTitle>
               <CardDescription className="text-xs">
-                Ensure your account uses a secure password of at least 8 characters
+                Ensure your account uses a secure password of at least 8
+                characters
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -320,7 +353,10 @@ export default function AccountSecurityPage() {
                 className="space-y-4 max-w-md"
               >
                 <Field error={errors.currentPassword?.message}>
-                  <FieldLabel htmlFor="currentPassword" className="text-xs font-medium">
+                  <FieldLabel
+                    htmlFor="currentPassword"
+                    className="text-xs font-medium"
+                  >
                     Current Password
                   </FieldLabel>
                   <Input
@@ -334,7 +370,10 @@ export default function AccountSecurityPage() {
                 </Field>
 
                 <Field error={errors.newPassword?.message}>
-                  <FieldLabel htmlFor="newPassword" className="text-xs font-medium">
+                  <FieldLabel
+                    htmlFor="newPassword"
+                    className="text-xs font-medium"
+                  >
                     New Password
                   </FieldLabel>
                   <Input
@@ -348,7 +387,10 @@ export default function AccountSecurityPage() {
                 </Field>
 
                 <Field error={errors.confirmPassword?.message}>
-                  <FieldLabel htmlFor="confirmPassword" className="text-xs font-medium">
+                  <FieldLabel
+                    htmlFor="confirmPassword"
+                    className="text-xs font-medium"
+                  >
                     Confirm New Password
                   </FieldLabel>
                   <Input
@@ -368,7 +410,9 @@ export default function AccountSecurityPage() {
                     disabled={isChangingPassword}
                     className="text-xs h-8 px-4"
                   >
-                    {isChangingPassword ? "Updating Password..." : "Update Password"}
+                    {isChangingPassword
+                      ? "Updating Password..."
+                      : "Update Password"}
                   </Button>
                 </div>
               </form>
@@ -384,7 +428,8 @@ export default function AccountSecurityPage() {
                   Devices &amp; Sessions
                 </CardTitle>
                 <CardDescription className="text-xs">
-                  Recognized devices and active login sessions associated with your account
+                  Recognized devices and active login sessions associated with
+                  your account
                 </CardDescription>
               </div>
               {data && data.sessions.length > 1 && (
@@ -401,11 +446,13 @@ export default function AccountSecurityPage() {
               )}
             </CardHeader>
             <CardContent className="space-y-3">
-              <div className="rounded-lg border border-border divide-y divide-border overflow-hidden bg-panel/20">
+              <div className="rounded-lg border divide-y divide-border overflow-hidden bg-panel/20">
                 {data && data.sessions.length > 0 ? (
                   data.sessions.map((session) => {
                     const dev = session.device;
-                    const hardwareInfo = [dev?.manufacturer, dev?.model].filter(Boolean).join(" ");
+                    const hardwareInfo = [dev?.manufacturer, dev?.model]
+                      .filter(Boolean)
+                      .join(" ");
                     return (
                       <div
                         key={session.id}
@@ -419,14 +466,22 @@ export default function AccountSecurityPage() {
                             {/* Device Name & Badges */}
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-xs font-semibold text-foreground">
-                                {dev?.name || session.userAgent?.slice(0, 45) || "Recognized Device"}
+                                {dev?.name ||
+                                  session.userAgent?.slice(0, 45) ||
+                                  "Recognized Device"}
                               </span>
                               {session.isCurrent && (
-                                <Badge variant="outline" className="text-[10px] text-emerald-500 border-emerald-500/30 bg-emerald-500/10 font-mono">
+                                <Badge
+                                  variant="outline"
+                                  className="text-[10px] text-emerald-500 border-emerald-500/30 bg-emerald-500/10 font-mono"
+                                >
                                   This Device
                                 </Badge>
                               )}
-                              <Badge variant="outline" className="text-[10px] text-emerald-600 dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10 font-mono">
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] dark:text-emerald-400 border-emerald-500/30 bg-emerald-500/10 font-mono"
+                              >
                                 Active Session
                               </Badge>
                             </div>
@@ -434,11 +489,17 @@ export default function AccountSecurityPage() {
                             {/* Device & Client Details */}
                             <div className="text-[11px] text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-0.5">
                               <span>
-                                {dev?.operatingSystem || "OS"} {dev?.operatingSystemVersion ? `(${dev.operatingSystemVersion})` : ""}
+                                {dev?.operatingSystem || "OS"}{" "}
+                                {dev?.operatingSystemVersion
+                                  ? `(${dev.operatingSystemVersion})`
+                                  : ""}
                               </span>
                               <span>•</span>
                               <span>
-                                {dev?.browser || "Browser"} {dev?.browserVersion ? `v${dev.browserVersion}` : ""}
+                                {dev?.browser || "Browser"}{" "}
+                                {dev?.browserVersion
+                                  ? `v${dev.browserVersion}`
+                                  : ""}
                               </span>
                               {hardwareInfo && (
                                 <>
@@ -455,11 +516,23 @@ export default function AccountSecurityPage() {
                                 {session.location || "Local Network"}
                               </span>
                               <span>•</span>
-                              <span>IP: {session.ipAddress || "127.0.0.1"}</span>
+                              <span>
+                                IP: {session.ipAddress || "127.0.0.1"}
+                              </span>
                               <span>•</span>
-                              <span>First login: {formatDate(dev?.firstSeenAt || session.createdAt)}</span>
+                              <span>
+                                First login:{" "}
+                                {formatDate(
+                                  dev?.firstSeenAt || session.createdAt,
+                                )}
+                              </span>
                               <span>•</span>
-                              <span>Last active: {formatDate(session.lastActiveAt || session.createdAt)}</span>
+                              <span>
+                                Last active:{" "}
+                                {formatDate(
+                                  session.lastActiveAt || session.createdAt,
+                                )}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -468,7 +541,8 @@ export default function AccountSecurityPage() {
                         <div className="flex items-center gap-2 md:self-center shrink-0 pt-2 md:pt-0">
                           {session.isCurrent ? (
                             <span className="text-[11px] text-emerald-500 flex items-center gap-1 font-mono">
-                              <CheckCircle2 className="h-3.5 w-3.5" /> Current Session
+                              <CheckCircle2 className="h-3.5 w-3.5" /> Current
+                              Session
                             </span>
                           ) : (
                             <Button
@@ -503,7 +577,8 @@ export default function AccountSecurityPage() {
                 Recent Login History
               </CardTitle>
               <CardDescription className="text-xs">
-                Audited access events and security verifications from the past 30 days (older records are automatically pruned)
+                Audited access events and security verifications from the past
+                30 days (older records are automatically pruned)
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -520,9 +595,15 @@ export default function AccountSecurityPage() {
                   <tbody className="divide-y divide-border">
                     {paginatedLoginHistory.length > 0 ? (
                       paginatedLoginHistory.map((log) => (
-                        <tr key={log.id} className="hover:bg-elevated/20 transition-colors">
+                        <tr
+                          key={log.id}
+                          className="hover:bg-elevated/20 transition-colors"
+                        >
                           <td className="px-3.5 py-2.5 font-medium text-foreground">
-                            {log.action.replace("user:", "").replace("user.", "").replace(/[:._]/g, " ")}
+                            {log.action
+                              .replace("user:", "")
+                              .replace("user.", "")
+                              .replace(/[:._]/g, " ")}
                           </td>
                           <td className="px-3.5 py-2.5 font-mono text-muted-foreground text-[11px]">
                             {log.ipAddress || "127.0.0.1"}
@@ -531,15 +612,23 @@ export default function AccountSecurityPage() {
                             {formatDate(log.timestamp || log.createdAt)}
                           </td>
                           <td className="px-3.5 py-2.5">
-                            <Badge variant="outline" className="text-[10px] text-emerald-500 font-mono">
-                              {log.action.includes("failed") ? "Failed" : "Success"}
+                            <Badge
+                              variant="outline"
+                              className="text-[10px] text-emerald-500 font-mono"
+                            >
+                              {log.action.includes("failed")
+                                ? "Failed"
+                                : "Success"}
                             </Badge>
                           </td>
                         </tr>
                       ))
                     ) : (
                       <tr>
-                        <td colSpan={4} className="px-3.5 py-4 text-center text-xs text-muted-foreground">
+                        <td
+                          colSpan={4}
+                          className="px-3.5 py-4 text-center text-xs text-muted-foreground"
+                        >
                           No recent login history recorded.
                         </td>
                       </tr>
@@ -551,9 +640,13 @@ export default function AccountSecurityPage() {
                 {totalLoginEvents.length > LOGIN_HISTORY_PAGE_SIZE && (
                   <div className="h-10 border-t border-border px-3.5 flex items-center justify-between bg-panel text-xs">
                     <div className="flex items-center gap-2 text-muted-foreground font-mono text-[11px]">
-                      Showing {(loginHistoryPage - 1) * LOGIN_HISTORY_PAGE_SIZE + 1}–
-                      {Math.min(loginHistoryPage * LOGIN_HISTORY_PAGE_SIZE, totalLoginEvents.length)} of{" "}
-                      {totalLoginEvents.length}
+                      Showing{" "}
+                      {(loginHistoryPage - 1) * LOGIN_HISTORY_PAGE_SIZE + 1}–
+                      {Math.min(
+                        loginHistoryPage * LOGIN_HISTORY_PAGE_SIZE,
+                        totalLoginEvents.length,
+                      )}{" "}
+                      of {totalLoginEvents.length}
                     </div>
 
                     <div className="flex items-center gap-1.5">
@@ -562,7 +655,9 @@ export default function AccountSecurityPage() {
                         variant="outline"
                         size="sm"
                         disabled={loginHistoryPage === 1}
-                        onClick={() => setLoginHistoryPage((p) => Math.max(1, p - 1))}
+                        onClick={() =>
+                          setLoginHistoryPage((p) => Math.max(1, p - 1))
+                        }
                         className="h-6 px-2 text-[10px] cursor-pointer"
                       >
                         <ChevronLeft className="h-3 w-3 mr-0.5" /> Prev
@@ -575,7 +670,11 @@ export default function AccountSecurityPage() {
                         variant="outline"
                         size="sm"
                         disabled={loginHistoryPage >= totalLoginPages}
-                        onClick={() => setLoginHistoryPage((p) => Math.min(totalLoginPages, p + 1))}
+                        onClick={() =>
+                          setLoginHistoryPage((p) =>
+                            Math.min(totalLoginPages, p + 1),
+                          )
+                        }
                         className="h-6 px-2 text-[10px] cursor-pointer"
                       >
                         Next <ChevronRight className="h-3 w-3 ml-0.5" />
@@ -590,7 +689,10 @@ export default function AccountSecurityPage() {
       )}
 
       {/* SHADCN DIALOG: Revoke Single Session Confirmation */}
-      <Dialog open={!!sessionToRevoke} onOpenChange={(open) => !open && setSessionToRevoke(null)}>
+      <Dialog
+        open={!!sessionToRevoke}
+        onOpenChange={(open) => !open && setSessionToRevoke(null)}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader className="space-y-1.5 pb-2">
             <div className="flex items-center gap-2 text-destructive">
@@ -602,7 +704,8 @@ export default function AccountSecurityPage() {
               </DialogTitle>
             </div>
             <DialogDescription className="text-xs text-muted-foreground pt-1 leading-normal">
-              Are you sure you want to revoke this session? The device will be immediately signed out and required to re-authenticate.
+              Are you sure you want to revoke this session? The device will be
+              immediately signed out and required to re-authenticate.
             </DialogDescription>
           </DialogHeader>
 
@@ -619,7 +722,10 @@ export default function AccountSecurityPage() {
                 IP Address: {sessionToRevoke.ipAddress || "127.0.0.1"}
               </div>
               <div className="text-muted-foreground text-[11px]">
-                Last Active: {formatDate(sessionToRevoke.lastActiveAt || sessionToRevoke.createdAt)}
+                Last Active:{" "}
+                {formatDate(
+                  sessionToRevoke.lastActiveAt || sessionToRevoke.createdAt,
+                )}
               </div>
             </div>
           )}
@@ -663,14 +769,17 @@ export default function AccountSecurityPage() {
               </DialogTitle>
             </div>
             <DialogDescription className="text-xs text-muted-foreground pt-1 leading-normal">
-              Are you sure you want to sign out all other active sessions? This will immediately terminate access on any other browsers, workstations, or mobile devices.
+              Are you sure you want to sign out all other active sessions? This
+              will immediately terminate access on any other browsers,
+              workstations, or mobile devices.
             </DialogDescription>
           </DialogHeader>
 
           <div className="rounded-md border border-destructive/20 bg-destructive/10 p-3 text-xs text-destructive space-y-1">
             <p className="font-semibold">Security Notice</p>
             <p className="text-[11px] leading-relaxed text-destructive/90">
-              Only your current active session on this device will be preserved. Any active tokens on other devices will be invalidated.
+              Only your current active session on this device will be preserved.
+              Any active tokens on other devices will be invalidated.
             </p>
           </div>
 

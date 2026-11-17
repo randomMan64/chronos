@@ -141,17 +141,22 @@ export async function validateSessionState(tokenOverride?: string): Promise<Sess
           id: userSessions.id,
           revokedAt: userSessions.revokedAt,
           expiresAt: userSessions.expiresAt,
+          isEmailVerified: users.isEmailVerified,
         })
         .from(userSessions)
+        .innerJoin(users, eq(users.id, userSessions.userId))
         .where(eq(userSessions.id, payload.sessionId))
         .limit(1);
 
-      if (!sess || sess.revokedAt !== null) {
+      if (!sess || sess.revokedAt !== null || sess.isEmailVerified === false) {
         return {
           valid: false,
           user: null,
           code: "SESSION_REVOKED",
-          message: "Your session has been signed out because it was revoked from another device.",
+          message:
+            sess?.isEmailVerified === false
+              ? "Your email address is not verified. Please verify your email."
+              : "Your session has been signed out because it was revoked from another device.",
         };
       }
 
@@ -271,12 +276,13 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedSession | 
         fullName: users.fullName,
         avatarUrl: users.avatarUrl,
         isActive: users.isActive,
+        isEmailVerified: users.isEmailVerified,
       })
       .from(users)
       .where(and(eq(users.id, sessionUser.userId), eq(users.isActive, true)))
       .limit(1);
 
-    if (!user) return null;
+    if (!user || user.isEmailVerified === false) return null;
 
     // 1. Fetch user's organizations
     const orgMemberships = await db

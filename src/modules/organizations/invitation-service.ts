@@ -8,11 +8,13 @@ import {
   workspaceMembers,
   userSessions,
   auditLogs,
+  emailVerificationTokens,
 } from "@/db/schema";
 import { eq, and, or } from "drizzle-orm";
 import { OrganizationRole } from "@/lib/permissions/types";
 import { AuditService } from "@/modules/audit/audit-service";
 import { EmailService } from "@/lib/email";
+import { isDisposableEmail } from "@/lib/auth/email-validator";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
@@ -440,6 +442,10 @@ export class InvitationService {
         throw new Error("Authenticated user account not found.");
       }
 
+      if (user.isEmailVerified === false) {
+        throw new Error("Please verify your email address before accepting invitations.");
+      }
+
       if (user.email.toLowerCase() !== invite.email.toLowerCase()) {
         throw new Error(
           `This invitation was sent to ${invite.email}. Please sign in using the invited email address.`
@@ -606,7 +612,11 @@ export class InvitationService {
         );
       }
 
-      // 3. Hash password and create user
+      if (isDisposableEmail(invite.email)) {
+        throw new Error("Temporary and disposable email addresses are not permitted.");
+      }
+
+      // 3. Hash password and create pending unverified user with pending invitation
       const passwordHash = await bcrypt.hash(params.password, 12);
       const [newUser] = await tx
         .insert(users)
@@ -615,78 +625,42 @@ export class InvitationService {
           fullName: params.fullName.trim(),
           passwordHash,
           isActive: true,
+          isEmailVerified: false,
+          pendingInvitationId: invite.id,
         })
         .returning();
 
-      // 4. Create Organization Membership with the assigned role (never Owner!)
-      await tx.insert(organizationMembers).values({
-        organizationId: invite.organizationId,
+      // 4. Generate verification token (30 minutes expiry)
+      const rawToken = crypto.randomBytes(32).toString("hex");
+      const verificationTokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+      const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+      await tx.insert(emailVerificationTokens).values({
         userId: newUser.id,
-        role: invite.role,
+        tokenHash: verificationTokenHash,
+        email: newUser.email,
+        expiresAt,
       });
 
-      // 5. Add to primary workspace if exists
-      const [primaryWs] = await tx
-        .select()
-        .from(workspaces)
-        .where(eq(workspaces.organizationId, invite.organizationId))
-        .limit(1);
-
-      if (primaryWs) {
-        await tx.insert(workspaceMembers).values({
-          workspaceId: primaryWs.id,
-          userId: newUser.id,
-          role: invite.role === "admin" || invite.role === "owner" ? "dba" : "developer",
+      // 5. Send verification email
+      try {
+        await EmailService.sendVerificationEmail(newUser.email, {
+          recipientName: newUser.fullName,
+          verificationToken: rawToken,
+          expiresInMinutes: 30,
         });
+      } catch (err) {
+        console.error("[InvitationService] Failed to send verification email:", err);
       }
-
-      // 6. Mark invitation as accepted
-      const acceptedAt = new Date();
-      await tx
-        .update(invitations)
-        .set({
-          status: "accepted",
-          acceptedAt,
-        })
-        .where(eq(invitations.id, invite.id));
-
-      // 7. Create session in database
-      const sessionTokenHash = crypto.randomBytes(32).toString("hex");
-      const sessionExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-      const [newSession] = await tx
-        .insert(userSessions)
-        .values({
-          userId: newUser.id,
-          tokenHash: sessionTokenHash,
-          expiresAt: sessionExpiresAt,
-        })
-        .returning();
-
-      // 8. Record audit log
-      await tx.insert(auditLogs).values({
-        organizationId: invite.organizationId,
-        actorId: newUser.id,
-        actorEmail: newUser.email,
-        action: "members:accept_invite_registered",
-        resourceType: "invitation",
-        resourceId: invite.id,
-        outcome: "success",
-        metadata: {
-          role: invite.role,
-          organizationName: org.name,
-          acceptedAt: acceptedAt.toISOString(),
-        },
-      });
 
       return {
         success: true,
+        requiresVerification: true,
         user: {
           id: newUser.id,
           email: newUser.email,
           fullName: newUser.fullName,
         },
-        sessionId: newSession.id,
         organizationId: invite.organizationId,
         organizationName: org.name,
         organizationSlug: org.slug,

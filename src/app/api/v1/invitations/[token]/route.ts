@@ -97,19 +97,14 @@ export async function POST(
       password,
     });
 
-    const sessionToken = await createSessionToken({
-      userId: result.user.id,
-      email: result.user.email,
-      sessionId: result.sessionId,
-    });
-
-    await setSessionCookie(sessionToken);
-
     return NextResponse.json({
       success: true,
-      user: result.user,
+      requiresVerification: true,
+      email: result.user.email,
       organizationId: result.organizationId,
       organizationName: result.organizationName,
+      message:
+        "Account created successfully. Please check your email to verify your address and complete joining the organization.",
     });
   } catch (err) {
     const error = handleApiError(err);

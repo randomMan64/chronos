@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -24,6 +25,7 @@ import {
   Building2,
   Calendar,
   CheckCircle2,
+  AlertCircle,
   Shield,
   User,
   Info,
@@ -58,6 +60,8 @@ interface ProfileData {
     email: string;
     fullName: string;
     avatarUrl?: string | null;
+    isEmailVerified?: boolean;
+    emailVerifiedAt?: string | null;
     createdAt: string;
   };
   organizations: Array<{
@@ -270,13 +274,42 @@ export default function AccountProfilePage() {
                     >
                       Personal Account
                     </Badge>
+                    {data.user.isEmailVerified ? (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] bg-emerald-500/10 dark:text-emerald-400 border-emerald-500/30 font-medium inline-flex items-center gap-1 font-mono"
+                      >
+                        <CheckCircle2 className="h-3 w-3 text-emerald-500" />
+                        Verified
+                      </Badge>
+                    ) : (
+                      <Badge
+                        variant="outline"
+                        className="text-[10px] bg-amber-500/10 dark:text-amber-400 border-amber-500/30 font-medium inline-flex items-center gap-1 font-mono"
+                      >
+                        <AlertCircle className="h-3 w-3 text-amber-500" />
+                        Unverified
+                      </Badge>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground font-mono flex-wrap">
                     <span>{data.user.email}</span>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
-                    <span>Member since {formatDate(data.user.createdAt)}</span>
+                  <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground flex-wrap">
+                    <div className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>
+                        Member since {formatDate(data.user.createdAt)}
+                      </span>
+                    </div>
+                    {data.user.emailVerifiedAt && (
+                      <>
+                        <span className="text-muted-foreground/40">•</span>
+                        <span className="dark:text-emerald-400">
+                          Verified on {formatDate(data.user.emailVerifiedAt)}
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
