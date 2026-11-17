@@ -35,10 +35,13 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const returnUrl = searchParams.get("returnUrl") || searchParams.get("redirect");
+  const returnUrl =
+    searchParams.get("returnUrl") || searchParams.get("redirect");
 
   const [serverError, setServerError] = React.useState<string | null>(null);
-  const [unverifiedEmail, setUnverifiedEmail] = React.useState<string | null>(null);
+  const [unverifiedEmail, setUnverifiedEmail] = React.useState<string | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = React.useState(false);
 
   const isVerifiedBanner = searchParams.get("verified") === "true";
@@ -111,9 +114,11 @@ function LoginForm() {
             </div>
           )}
 
-          {(searchParams.get("reason") === "SESSION_REVOKED" || searchParams.get("revoked") === "true") && (
+          {(searchParams.get("reason") === "SESSION_REVOKED" ||
+            searchParams.get("revoked") === "true") && (
             <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-600">
-              Your session has been signed out because it was revoked from another device.
+              Your session has been signed out because it was revoked from
+              another device.
             </div>
           )}
 
@@ -138,7 +143,7 @@ function LoginForm() {
             <Input
               id="email"
               type="email"
-              placeholder="admin@chronos.internal"
+              placeholder="hello@gmail.com"
               autoComplete="email"
               {...register("email")}
             />
