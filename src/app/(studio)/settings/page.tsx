@@ -42,7 +42,7 @@ type WorkspaceFormValues = z.infer<typeof workspaceSchema>;
 interface TransferFormValues {
   newOwnerMemberId: string;
   confirmationPhrase: string;
-  previousOwnerNewRole?: "admin" | "member";
+  previousOwnerNewRole?: string;
 }
 
 const transferSchema = z.object({
@@ -52,7 +52,7 @@ const transferSchema = z.object({
     .refine((val): val is string => val === "TRANSFER_OWNERSHIP", {
       message: 'Type "TRANSFER_OWNERSHIP" to confirm',
     }),
-  previousOwnerNewRole: z.enum(["admin", "member"]).default("admin"),
+  previousOwnerNewRole: z.string().default("dba"),
 });
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import {
@@ -64,6 +64,15 @@ import {
 } from "@/components/ui/select";
 import { formatDate, getInitials } from "@/lib/utils";
 import { DismissibleAlert } from "@/components/shared/dismissible-alert";
+import {
+  CHRONOS_ROLES,
+  CHRONOS_ROLE_KEYS,
+  ChronosRole,
+  canAssignRole,
+  getAssignableRoles,
+  normalizeRole,
+} from "@/lib/permissions/roles";
+import { getPermissionsMatrix } from "@/lib/permissions/resolver";
 import {
   Users,
   Shield,
@@ -138,7 +147,7 @@ export default function SettingsPage() {
   >([]);
 
   // Form states
-  const [inviteRole, setInviteRole] = React.useState("member");
+  const [inviteRole, setInviteRole] = React.useState("developer");
   const [isInviting, setIsInviting] = React.useState(false);
 
   const [wsEnv, setWsEnv] = React.useState<
@@ -216,9 +225,20 @@ export default function SettingsPage() {
     defaultValues: {
       newOwnerMemberId: "",
       confirmationPhrase: "",
-      previousOwnerNewRole: "admin",
+      previousOwnerNewRole: "dba",
     },
   });
+
+  const currentUserRole = org?.role;
+  const assignableMemberRoles = React.useMemo(() => {
+    return getAssignableRoles(currentUserRole, { allowOwner: false });
+  }, [currentUserRole]);
+
+  const assignableInviteRoles = React.useMemo(() => {
+    return getAssignableRoles(currentUserRole, { allowOwner: isOwner });
+  }, [currentUserRole, isOwner]);
+
+  const matrixRows = React.useMemo(() => getPermissionsMatrix(), []);
 
   const [isLoading, setIsLoading] = React.useState(true);
   const [pendingRoles, setPendingRoles] = React.useState<
@@ -688,28 +708,41 @@ export default function SettingsPage() {
                               {m.email}
                             </td>
                             <td className="p-3">
-                              {/* Requirement 1 & 2: The currently authenticated Organization Owner must not be able to modify their own role. Replace their role dropdown and Apply button with a non-interactive Owner badge or locked role indicator. */}
-                              {isSelf && isOwner ? (
+                              {isSelf ? (
+                                <div className="flex items-center gap-1.5 py-0.5">
+                                  <Badge
+                                    variant={isOwner ? "warning" : "outline"}
+                                    className="font-mono text-[10px] capitalize flex items-center gap-1"
+                                  >
+                                    {isOwner && <Crown className="h-3 w-3 text-warning" />}
+                                    {CHRONOS_ROLES[normalizeRole(m.role)]?.label || m.role}
+                                  </Badge>
+                                  <span
+                                    className="text-[10px] text-muted-foreground flex items-center gap-0.5"
+                                    title="You cannot modify your own role directly"
+                                  >
+                                    <Lock className="h-3 w-3" /> You
+                                  </span>
+                                </div>
+                              ) : isOwner ? (
                                 <div className="flex items-center gap-1.5 py-0.5">
                                   <Badge
                                     variant="warning"
                                     className="font-mono text-[10px] capitalize flex items-center gap-1"
                                   >
-                                    <Crown className="h-3 w-3 text-warning" />{" "}
-                                    Owner
+                                    <Crown className="h-3 w-3 text-warning" /> Owner
                                   </Badge>
                                   <span
                                     className="text-[10px] text-muted-foreground flex items-center gap-0.5"
-                                    title="Owner role cannot be self-modified directly"
+                                    title="Owner role cannot be modified directly"
                                   >
                                     <Lock className="h-3 w-3" /> Locked
                                   </span>
                                 </div>
-                              ) : canManageMembers && !isOwner ? (
-                                /* Requirement 5: Allow users with members:manage permission to manage the roles of other members */
+                              ) : canManageMembers ? (
                                 <div className="flex items-center gap-2">
                                   <Select
-                                    value={pendingRoles[m.id] ?? m.role}
+                                    value={pendingRoles[m.id] ?? normalizeRole(m.role)}
                                     onValueChange={(val) =>
                                       setPendingRoles((prev) => ({
                                         ...prev,
@@ -717,22 +750,19 @@ export default function SettingsPage() {
                                       }))
                                     }
                                   >
-                                    <SelectTrigger className="h-7 w-28 text-xs font-mono">
+                                    <SelectTrigger className="h-7 w-40 text-xs font-mono">
                                       <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem
-                                        value="admin"
-                                        className="text-xs font-mono"
-                                      >
-                                        Admin
-                                      </SelectItem>
-                                      <SelectItem
-                                        value="member"
-                                        className="text-xs font-mono"
-                                      >
-                                        Member
-                                      </SelectItem>
+                                      {assignableMemberRoles.map((roleKey) => (
+                                        <SelectItem
+                                          key={roleKey}
+                                          value={roleKey}
+                                          className="text-xs font-mono"
+                                        >
+                                          {CHRONOS_ROLES[roleKey]?.label || roleKey}
+                                        </SelectItem>
+                                      ))}
                                     </SelectContent>
                                   </Select>
                                   <Button
@@ -757,19 +787,10 @@ export default function SettingsPage() {
                                 </div>
                               ) : (
                                 <Badge
-                                  variant={
-                                    m.role === "owner"
-                                      ? "warning"
-                                      : m.role === "admin"
-                                        ? "info"
-                                        : "outline"
-                                  }
+                                  variant="outline"
                                   className="font-mono text-[10px] capitalize"
                                 >
-                                  {m.role === "owner" && (
-                                    <Crown className="h-3 w-3 mr-1 inline text-warning" />
-                                  )}
-                                  {m.role}
+                                  {CHRONOS_ROLES[normalizeRole(m.role)]?.label || m.role}
                                 </Badge>
                               )}
                             </td>
@@ -858,24 +879,20 @@ export default function SettingsPage() {
                     <FieldError />
                   </Field>
                   <Select value={inviteRole} onValueChange={setInviteRole}>
-                    <SelectTrigger className="h-9 w-full sm:w-40 text-xs shrink-0 font-sans">
+                    <SelectTrigger className="h-9 w-full sm:w-48 text-xs shrink-0 font-sans">
                       <span className="text-xs truncate leading-none">
                         <span className="text-muted-foreground">Role:</span>{" "}
-                        <span className="capitalize font-medium text-foreground">
-                          {inviteRole}
+                        <span className="font-medium text-foreground">
+                          {CHRONOS_ROLES[normalizeRole(inviteRole)]?.label || inviteRole}
                         </span>
                       </span>
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="member" className="text-xs font-mono">
-                        Member
-                      </SelectItem>
-                      <SelectItem value="admin" className="text-xs font-mono">
-                        Admin
-                      </SelectItem>
-                      <SelectItem value="owner" className="text-xs font-mono">
-                        Owner
-                      </SelectItem>
+                      {assignableInviteRoles.map((roleKey) => (
+                        <SelectItem key={roleKey} value={roleKey} className="text-xs font-mono">
+                          {CHRONOS_ROLES[roleKey]?.label || roleKey}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <Button
@@ -955,8 +972,8 @@ export default function SettingsPage() {
                               {inv.email}
                             </td>
                             <td className="p-3">
-                              <Badge variant="outline" className="capitalize">
-                                {inv.role}
+                              <Badge variant="outline" className="capitalize font-mono text-[10px]">
+                                {CHRONOS_ROLES[normalizeRole(inv.role)]?.label || inv.role}
                               </Badge>
                             </td>
                             <td className="p-3">
@@ -1190,168 +1207,61 @@ export default function SettingsPage() {
                 <table className="w-full text-left text-xs border-collapse font-mono">
                   <thead>
                     <tr className="border-b border-border bg-sidebar/50 text-muted-foreground">
-                      <th className="p-3 font-medium">
+                      <th className="p-3 font-medium min-w-[220px]">
                         Capability / Permission
                       </th>
-                      <th className="p-3 font-medium text-center">Owner</th>
-                      <th className="p-3 font-medium text-center">DBA</th>
-                      <th className="p-3 font-medium text-center">Developer</th>
-                      <th className="p-3 font-medium text-center text-primary">
-                        Data Analyst
-                      </th>
-                      <th className="p-3 font-medium text-center">
-                        DB Engineer
-                      </th>
-                      <th className="p-3 font-medium text-center">Auditor</th>
+                      {CHRONOS_ROLE_KEYS.map((roleKey) => (
+                        <th
+                          key={roleKey}
+                          className="p-3 font-medium text-center min-w-[90px]"
+                        >
+                          {CHRONOS_ROLES[roleKey]?.label || roleKey}
+                        </th>
+                      ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border text-[11px]">
-                    <tr>
-                      <td className="p-2.5 text-foreground">
-                        organization:manage
-                      </td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="p-2.5 text-foreground">
-                        database:manage / register
-                      </td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="p-2.5 text-foreground">
-                        query:read (SELECT)
-                      </td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-[#34D399] font-bold">
-                        YES
-                      </td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                    </tr>
-                    <tr>
-                      <td className="p-2.5 text-foreground">
-                        query:write (INSERT, UPDATE, DELETE)
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-destructive font-bold">
-                        STRICT NO
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-destructive font-bold">
-                        STRICT NO
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="p-2.5 text-foreground">
-                        schema:write (ALTER, CREATE TABLE)
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-destructive">NO</td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-destructive">NO</td>
-                    </tr>
-                    <tr>
-                      <td className="p-2.5 text-foreground">
-                        history:restore (Compensating tx)
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-destructive">NO</td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-destructive">NO</td>
-                    </tr>
-                    <tr>
-                      <td className="p-2.5 text-foreground">
-                        performance:inspect (EXPLAIN ANALYZE)
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-primary font-bold">
-                        YES
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                    </tr>
-                    <tr>
-                      <td className="p-2.5 text-foreground">
-                        audit:read (Append-only logs)
-                      </td>
-                      <td className="p-2.5 text-center text-[#34D399]">YES</td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-muted-foreground">
-                        —
-                      </td>
-                      <td className="p-2.5 text-center text-primary font-bold">
-                        YES
-                      </td>
-                    </tr>
+                    {matrixRows.map((row) => (
+                      <tr
+                        key={String(row.permission)}
+                        className="hover:bg-elevated/40 transition-colors"
+                      >
+                        <td className="p-2.5">
+                          <div className="font-medium text-foreground">{row.label}</div>
+                          <div className="text-[10px] text-muted-foreground font-sans">
+                            {row.description}
+                          </div>
+                        </td>
+                        {CHRONOS_ROLE_KEYS.map((roleKey) => {
+                          const cell = row.roles[roleKey];
+                          return (
+                            <td key={roleKey} className="p-2.5 text-center">
+                              {cell.state === "allowed" ? (
+                                <span className="text-[#34D399] font-semibold">
+                                  {cell.label}
+                                </span>
+                              ) : cell.state === "conditional" ? (
+                                <span
+                                  className="inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20"
+                                  title={cell.note}
+                                >
+                                  {cell.label}
+                                </span>
+                              ) : cell.label === "STRICT NO" ? (
+                                <span
+                                  className="text-destructive font-bold text-[10px]"
+                                  title={cell.note}
+                                >
+                                  STRICT NO
+                                </span>
+                              ) : (
+                                <span className="text-muted-foreground">{cell.label}</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -1522,7 +1432,7 @@ export default function SettingsPage() {
                 </Label>
                 <Select
                   value={watchTransfer("previousOwnerNewRole")}
-                  onValueChange={(val: "admin" | "member") =>
+                  onValueChange={(val: string) =>
                     setTransferValue("previousOwnerNewRole", val, {
                       shouldValidate: true,
                     })
@@ -1535,11 +1445,20 @@ export default function SettingsPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="admin" className="text-xs">
-                      Admin (Retains workspace & member management)
+                    <SelectItem value="dba" className="text-xs">
+                      DBA (Full database administration & schema governance)
                     </SelectItem>
-                    <SelectItem value="member" className="text-xs">
-                      Member (Standard query & exploration access)
+                    <SelectItem value="database_engineer" className="text-xs">
+                      Database Engineer (Performance diagnostics & diagnostics)
+                    </SelectItem>
+                    <SelectItem value="developer" className="text-xs">
+                      Developer (Application queries & data modifications)
+                    </SelectItem>
+                    <SelectItem value="data_analyst" className="text-xs">
+                      Data Analyst (Read-only analysis & export)
+                    </SelectItem>
+                    <SelectItem value="auditor" className="text-xs">
+                      Auditor (Read-only audit & compliance)
                     </SelectItem>
                   </SelectContent>
                 </Select>

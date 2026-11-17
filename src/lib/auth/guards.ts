@@ -1,6 +1,7 @@
 import { resolveUserContext, getCurrentUser, validateSessionState } from "./session";
 import { UserContext, Permission, OrganizationRole, WorkspaceRole } from "@/lib/permissions/types";
 import { hasPermission } from "@/lib/permissions/resolver";
+import { canAssignRole } from "@/lib/permissions/roles";
 import { db } from "@/db/connections/control-plane";
 import { databases, workspaces, organizations, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -265,3 +266,22 @@ export function requireRole(
     throw new ForbiddenError(`Forbidden: Role '${role}' required`, 403);
   }
 }
+
+export { canAssignRole };
+
+/**
+ * Asserts that the actor is authorized to assign or invite the target role.
+ */
+export function requireCanAssignRole(
+  context: UserContext,
+  targetRole: string
+): void {
+  const actorRole = context.organizationRole;
+  if (!canAssignRole(actorRole, targetRole)) {
+    throw new ForbiddenError(
+      `Forbidden: Your role (${actorRole || "none"}) is not authorized to assign or invite role '${targetRole}'.`,
+      403
+    );
+  }
+}
+

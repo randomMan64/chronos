@@ -13,6 +13,7 @@ import {
 import { eq, and, isNull } from "drizzle-orm";
 import crypto from "crypto";
 import { AuditService } from "@/modules/audit/audit-service";
+import { normalizeRole } from "@/lib/permissions/roles";
 import { handleApiError } from "@/lib/errors";
 
 export const runtime = "nodejs";
@@ -185,11 +186,13 @@ export async function POST(req: Request) {
           .limit(1);
 
         if (invite && new Date(invite.expiresAt) > now) {
+          const assignedRole = normalizeRole(invite.role);
+
           // Add to organization
           await tx.insert(organizationMembers).values({
             organizationId: invite.organizationId,
             userId: user.id,
-            role: invite.role,
+            role: assignedRole,
           });
 
           // Add to primary workspace if exists
@@ -203,7 +206,7 @@ export async function POST(req: Request) {
             await tx.insert(workspaceMembers).values({
               workspaceId: primaryWs.id,
               userId: user.id,
-              role: invite.role === "admin" || invite.role === "owner" ? "dba" : "developer",
+              role: assignedRole,
             });
           }
 

@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireOrganizationAccess, requirePermission } from "@/lib/auth/guards";
+import {
+  requireOrganizationAccess,
+  requirePermission,
+  requireCanAssignRole,
+} from "@/lib/auth/guards";
 import { OrganizationService } from "@/modules/organizations/organization-service";
 import { handleApiError } from "@/lib/errors";
 import { z } from "zod";
@@ -7,7 +11,16 @@ import { z } from "zod";
 export const dynamic = "force-dynamic";
 
 const updateRoleSchema = z.object({
-  role: z.enum(["owner", "admin", "member"]),
+  role: z.enum([
+    "owner",
+    "dba",
+    "developer",
+    "data_analyst",
+    "database_engineer",
+    "auditor",
+    "admin",
+    "member",
+  ]),
 });
 
 export async function PATCH(
@@ -24,6 +37,9 @@ export async function PATCH(
     if (!parsed.success) {
       return NextResponse.json({ error: "Invalid role specified" }, { status: 400 });
     }
+
+    // Role hierarchy authorization check
+    requireCanAssignRole(context, parsed.data.role);
 
     const updated = await OrganizationService.updateMemberRole({
       organizationId: params.id,

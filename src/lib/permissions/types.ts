@@ -1,13 +1,25 @@
+import type { ChronosRole, RoleDefinition } from "./roles";
+
+export type { ChronosRole, RoleDefinition };
+
 export type Permission =
+  // Organization Administration
   | "organization:read"
   | "organization:manage"
+  | "organization:delete"
+  | "organization:transfer_ownership"
+  | "members:read"
   | "members:invite"
   | "members:manage"
+  | "roles:read"
+  | "roles:assign"
   | "workspace:read"
   | "workspace:create"
   | "workspace:manage"
+  // Database Operations & Governance
   | "database:read"
   | "database:create"
+  | "database:register"
   | "database:manage"
   | "database:delete"
   | "schema:read"
@@ -28,9 +40,9 @@ export type Permission =
   | "permissions:manage"
   | "retention:manage";
 
-export type OrganizationRole = "owner" | "admin" | "member";
+export type OrganizationRole = ChronosRole | "admin" | "member";
 
-export type WorkspaceRole = "dba" | "developer" | "analyst" | "engineer" | "auditor";
+export type WorkspaceRole = ChronosRole | "analyst" | "engineer";
 
 export interface UserContext {
   userId: string;
@@ -51,4 +63,3 @@ export interface UserContext {
   };
   effectivePermissions: Set<Permission>;
 }
-

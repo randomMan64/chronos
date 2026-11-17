@@ -12,6 +12,8 @@ import {
 } from "@/db/schema";
 import { eq, and, or } from "drizzle-orm";
 import { OrganizationRole } from "@/lib/permissions/types";
+import { canAssignRole, normalizeRole } from "@/lib/permissions/roles";
+import { ForbiddenError } from "@/lib/auth/guards";
 import { AuditService } from "@/modules/audit/audit-service";
 import { EmailService } from "@/lib/email";
 import { validateEmail, isDisposableEmail } from "@/lib/auth/email-validator";
@@ -79,6 +81,28 @@ export class InvitationService {
     }
 
     const normalizedEmail = validation.normalizedEmail;
+    const normalizedRole = normalizeRole(params.role);
+
+    // If inviter is specified, verify inviter has authority to assign this role
+    if (params.invitedBy) {
+      const [inviterMember] = await db
+        .select({ role: organizationMembers.role })
+        .from(organizationMembers)
+        .where(
+          and(
+            eq(organizationMembers.organizationId, params.organizationId),
+            eq(organizationMembers.userId, params.invitedBy)
+          )
+        )
+        .limit(1);
+
+      if (inviterMember && !canAssignRole(inviterMember.role, normalizedRole)) {
+        throw new ForbiddenError(
+          `Your role (${inviterMember.role}) is not authorized to invite members with role '${params.role}'.`,
+          403
+        );
+      }
+    }
 
     // 1. Prevent duplicate active invitations
     const existing = await db
@@ -107,7 +131,7 @@ export class InvitationService {
       .values({
         organizationId: params.organizationId,
         email: normalizedEmail,
-        role: params.role,
+        role: normalizedRole,
         token: tokenHash, // Store only token hash
         status: "pending",
         invitedBy: params.invitedBy,
@@ -121,7 +145,7 @@ export class InvitationService {
       action: "members:invite",
       resourceType: "invitation",
       resourceId: invite.id,
-      metadata: { email: normalizedEmail, role: params.role },
+      metadata: { email: normalizedEmail, role: normalizedRole },
     });
 
     // 3. Fetch context details for the email dispatch
@@ -141,7 +165,7 @@ export class InvitationService {
     const emailResult = await EmailService.sendOrganizationInvitation(normalizedEmail, {
       organizationName: org?.name || "CHRONOS Organization",
       inviterName: inviter?.fullName || "Your Team",
-      role: params.role,
+      role: normalizedRole,
       invitationToken: rawToken, // Never pass the hash in the email
       expiresInDays: 7,
     });
@@ -478,11 +502,13 @@ export class InvitationService {
         .limit(1);
 
       if (!existingMember) {
-        // 7. Create organization membership with assigned role
+        const assignedRole = normalizeRole(invite.role);
+
+        // 7. Create organization membership with authoritative assigned role
         await tx.insert(organizationMembers).values({
           organizationId: invite.organizationId,
           userId: user.id,
-          role: invite.role,
+          role: assignedRole,
         });
 
         // Add to primary workspace if exists
@@ -508,7 +534,7 @@ export class InvitationService {
             await tx.insert(workspaceMembers).values({
               workspaceId: primaryWs.id,
               userId: user.id,
-              role: invite.role === "admin" || invite.role === "owner" ? "dba" : "developer",
+              role: assignedRole,
             });
           }
         }

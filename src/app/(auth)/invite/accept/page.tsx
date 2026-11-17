@@ -20,6 +20,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { CHRONOS_ROLES, normalizeRole } from "@/lib/permissions/roles";
 import {
   ArrowRight,
   CheckCircle2,
@@ -490,9 +491,9 @@ function InvitationAcceptContent() {
               <span className="text-muted-foreground">Assigned Role:</span>
               <Badge
                 variant="outline"
-                className="text-[10px] font-mono uppercase"
+                className="text-[10px] font-mono capitalize"
               >
-                {invitation.role}
+                {CHRONOS_ROLES[normalizeRole(invitation.role)]?.label || invitation.role}
               </Badge>
             </div>
           </div>
@@ -562,9 +563,9 @@ function InvitationAcceptContent() {
               </span>
               <Badge
                 variant="info"
-                className="text-[10px] font-mono uppercase px-1.5 py-0.5"
+                className="text-[10px] font-mono capitalize px-1.5 py-0.5"
               >
-                {invitation.role}
+                {CHRONOS_ROLES[normalizeRole(invitation.role)]?.label || invitation.role}
               </Badge>
             </div>
             <div className="flex items-center justify-between">
@@ -653,9 +654,9 @@ function InvitationAcceptContent() {
               </span>
               <Badge
                 variant="info"
-                className="text-[10px] font-mono uppercase px-1.5 py-0.5"
+                className="text-[10px] font-mono capitalize px-1.5 py-0.5"
               >
-                {invitation.role}
+                {CHRONOS_ROLES[normalizeRole(invitation.role)]?.label || invitation.role}
               </Badge>
             </div>
           </div>
@@ -721,9 +722,9 @@ function InvitationAcceptContent() {
             </span>
             <Badge
               variant="info"
-              className="text-[10px] font-mono uppercase px-1.5 py-0.5"
+              className="text-[10px] font-mono capitalize px-1.5 py-0.5"
             >
-              {invitation.role}
+              {CHRONOS_ROLES[normalizeRole(invitation.role)]?.label || invitation.role}
             </Badge>
           </div>
           <div className="flex items-center justify-between">

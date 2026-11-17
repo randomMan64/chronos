@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { requireOrganizationAccess, requirePermission } from "@/lib/auth/guards";
+import {
+  requireOrganizationAccess,
+  requirePermission,
+  requireCanAssignRole,
+} from "@/lib/auth/guards";
 import { InvitationService } from "@/modules/organizations/invitation-service";
 import { inviteMemberSchema } from "@/lib/validation";
 import { validateEmail } from "@/lib/auth/email-validator";
@@ -42,6 +46,9 @@ export async function POST(
         { status: 400 }
       );
     }
+
+    // Role hierarchy authorization check
+    requireCanAssignRole(context, parsed.data.role);
 
     // Centralized server-side validation: reject disposable and invalid emails BEFORE any action
     const emailValidation = validateEmail(parsed.data.email);

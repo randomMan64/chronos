@@ -15,7 +15,18 @@ export const loginSchema = z.object({
 
 export const inviteMemberSchema = z.object({
   email: z.string().email("Invalid email address"),
-  role: z.enum(["owner", "admin", "member"]).default("member"),
+  role: z
+    .enum([
+      "owner",
+      "dba",
+      "developer",
+      "data_analyst",
+      "database_engineer",
+      "auditor",
+      "admin",
+      "member",
+    ])
+    .default("developer"),
 });
 
 export const transferOwnershipSchema = z.object({
@@ -23,7 +34,17 @@ export const transferOwnershipSchema = z.object({
   confirmationPhrase: z.string().refine((val): val is string => val === "TRANSFER_OWNERSHIP", {
     message: 'Type "TRANSFER_OWNERSHIP" to confirm',
   }),
-  previousOwnerNewRole: z.enum(["admin", "member"]).default("admin"),
+  previousOwnerNewRole: z
+    .enum([
+      "dba",
+      "developer",
+      "data_analyst",
+      "database_engineer",
+      "auditor",
+      "admin",
+      "member",
+    ])
+    .default("dba"),
 });
 
 export const deleteAccountSchema = z.object({

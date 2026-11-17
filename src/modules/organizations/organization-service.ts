@@ -10,6 +10,7 @@ import {
 } from "@/db/schema";
 import { eq, and, sql, count } from "drizzle-orm";
 import { OrganizationRole } from "@/lib/permissions/types";
+import { canAssignRole, normalizeRole } from "@/lib/permissions/roles";
 import { AuditService } from "@/modules/audit/audit-service";
 import { ForbiddenError } from "@/lib/auth/guards";
 import crypto from "crypto";
@@ -154,16 +155,29 @@ export class OrganizationService {
       throw new Error("Target member not found");
     }
 
-    // Requirement 1: The currently authenticated Organization Owner must not be able to modify their own role.
-    if (targetMember.userId === params.actorId && actorMember.role === "owner") {
+    // Requirement: Prevent users from modifying their own role directly
+    if (targetMember.userId === params.actorId) {
+      if (actorMember.role === "owner") {
+        throw new ForbiddenError(
+          "Organization Owners cannot modify their own role directly. Use the Transfer Ownership workflow.",
+          403
+        );
+      }
+      throw new ForbiddenError("Users cannot modify their own role.", 403);
+    }
+
+    const normalizedNewRole = normalizeRole(params.newRole);
+
+    // Requirement: Check role assignment authority
+    if (!canAssignRole(actorMember.role, normalizedNewRole)) {
       throw new ForbiddenError(
-        "Organization Owners cannot modify their own role directly. Use the Transfer Ownership workflow.",
+        `Your role (${actorMember.role}) is not authorized to assign role '${params.newRole}'.`,
         403
       );
     }
 
     // Requirement 6 & 7: Assigning Owner role requires dedicated Transfer Ownership workflow
-    if (params.newRole === "owner") {
+    if (normalizedNewRole === "owner") {
       throw new ForbiddenError(
         "Assigning the Owner role requires the dedicated Transfer Ownership workflow.",
         403
@@ -182,7 +196,7 @@ export class OrganizationService {
         sql`SELECT id FROM organization_members WHERE organization_id = ${params.organizationId} FOR UPDATE`
       );
 
-      if (targetMember.role === "owner" && params.newRole !== "owner") {
+      if (targetMember.role === "owner") {
         const [ownerCountResult] = await tx
           .select({ count: count() })
           .from(organizationMembers)
@@ -202,7 +216,7 @@ export class OrganizationService {
       const [updated] = await tx
         .update(organizationMembers)
         .set({
-          role: params.newRole,
+          role: normalizedNewRole,
           updatedAt: new Date(),
         })
         .where(
@@ -212,6 +226,27 @@ export class OrganizationService {
           )
         )
         .returning();
+
+      // Synchronize workspace memberships for this user in the organization
+      const orgWorkspaces = await tx
+        .select({ id: workspaces.id })
+        .from(workspaces)
+        .where(eq(workspaces.organizationId, params.organizationId));
+
+      for (const ws of orgWorkspaces) {
+        await tx
+          .update(workspaceMembers)
+          .set({
+            role: normalizedNewRole,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(workspaceMembers.workspaceId, ws.id),
+              eq(workspaceMembers.userId, targetMember.userId)
+            )
+          );
+      }
 
       if (updated) {
         await AuditService.log({
@@ -335,7 +370,7 @@ export class OrganizationService {
     actorId: string;
     newOwnerMemberId: string;
     confirmationPhrase: string;
-    previousOwnerNewRole?: "admin" | "member";
+    previousOwnerNewRole?: string;
   }) {
     if (params.confirmationPhrase !== "TRANSFER_OWNERSHIP") {
       throw new Error('Confirmation phrase must be "TRANSFER_OWNERSHIP"');
@@ -390,7 +425,7 @@ export class OrganizationService {
       throw new Error("You already own this organization. Select another eligible member.");
     }
 
-    const previousRole = params.previousOwnerNewRole || "admin";
+    const previousRole = normalizeRole(params.previousOwnerNewRole || "dba");
 
     // 3. Atomic transaction with row locking
     return await db.transaction(async (tx) => {
@@ -428,6 +463,27 @@ export class OrganizationService {
           )
         )
         .returning();
+
+      // Synchronize workspace memberships for previous owner
+      const orgWorkspaces = await tx
+        .select({ id: workspaces.id })
+        .from(workspaces)
+        .where(eq(workspaces.organizationId, params.organizationId));
+
+      for (const ws of orgWorkspaces) {
+        await tx
+          .update(workspaceMembers)
+          .set({
+            role: previousRole,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(workspaceMembers.workspaceId, ws.id),
+              eq(workspaceMembers.userId, params.actorId)
+            )
+          );
+      }
 
       // Rule 4 & 10: Verify organization has at least 1 owner
       const [ownerCountResult] = await tx
