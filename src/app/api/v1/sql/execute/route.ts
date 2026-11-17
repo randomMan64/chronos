@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireDatabaseAccess } from "@/lib/auth/guards";
+import { requireDatabaseAccessById } from "@/lib/auth/guards";
 import { SqlService } from "@/modules/sql/sql-service";
 import { executeSqlSchema } from "@/lib/validation";
 import { handleApiError } from "@/lib/errors";
@@ -18,21 +18,19 @@ export async function POST(req: Request) {
       );
     }
 
-    const { databaseId, workspaceId, organizationId, sql, maxRows, timeoutMs } = parsed.data;
+    const { databaseId, sql, maxRows, timeoutMs } = parsed.data;
 
-    // Enforce database-level access and permission check
-    const context = await requireDatabaseAccess(
-      organizationId,
-      workspaceId,
+    // Enforce database-level access and permission check using authoritative database record
+    const { context, database } = await requireDatabaseAccessById(
       databaseId,
       "query:execute"
     );
 
     const result = await SqlService.executeSql({
       context,
-      databaseId,
-      workspaceId,
-      organizationId,
+      databaseId: database.id,
+      workspaceId: database.workspaceId,
+      organizationId: database.organizationId,
       sql,
       maxRows,
       timeoutMs,

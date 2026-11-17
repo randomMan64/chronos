@@ -149,10 +149,10 @@ export default function SqlEditorPage() {
   const loadHistory = React.useCallback(async () => {
     if (!selectedDbId) return;
     try {
-      const res = await fetch(`/api/v1/query/history?databaseId=${selectedDbId}`);
+      const res = await fetch(`/api/v1/sql/history?databaseId=${selectedDbId}`);
       if (res.ok) {
-        const data = await res.json();
-        setHistory(data.history || []);
+        const data = await res.json().catch(() => null);
+        setHistory(data?.history || []);
       }
     } catch {
       // ignore
@@ -172,18 +172,23 @@ export default function SqlEditorPage() {
     setExplainPlan(null);
 
     try {
-      const res = await fetch("/api/v1/query/execute", {
+      const res = await fetch("/api/v1/sql/execute", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           databaseId: selectedDbId,
+          workspaceId: activeWsId || undefined,
+          organizationId: activeOrgId || undefined,
           sql,
         }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => null);
       if (!res.ok) {
-        throw new Error(data.error || "Query execution failed");
+        throw new Error(data?.error || data?.message || `Execution failed (HTTP ${res.status})`);
+      }
+      if (!data) {
+        throw new Error("Invalid response received from server");
       }
 
       setResults({
@@ -212,20 +217,28 @@ export default function SqlEditorPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/v1/query/explain", {
+      const res = await fetch("/api/v1/sql/explain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           databaseId: selectedDbId,
+          workspaceId: activeWsId || undefined,
+          organizationId: activeOrgId || undefined,
           sql,
           analyze,
         }),
       });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Explain failed");
+      const data = await res.json().catch(() => null);
+      if (!res.ok) {
+        throw new Error(data?.error || data?.message || `Explain failed (HTTP ${res.status})`);
+      }
+      if (!data) {
+        throw new Error("Invalid response received from server");
+      }
 
-      setExplainPlan(data.plan || []);
+      const plan = data.plan ?? data.rows?.[0]?.["QUERY PLAN"] ?? data.rows ?? [];
+      setExplainPlan(Array.isArray(plan) ? plan : [plan]);
       setActiveTab("explain");
       setMobileView("results");
     } catch (err: unknown) {
@@ -263,16 +276,22 @@ export default function SqlEditorPage() {
   };
 
   // Keyboard shortcut: Ctrl+Enter / Cmd+Enter
+  const handleExecuteRef = React.useRef(handleExecute);
+  React.useEffect(() => {
+    handleExecuteRef.current = handleExecute;
+  }, [handleExecute]);
+
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
-        handleExecute();
+        e.stopPropagation();
+        handleExecuteRef.current?.();
       }
     };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  });
+    window.addEventListener("keydown", handleKeyDown, true);
+    return () => window.removeEventListener("keydown", handleKeyDown, true);
+  }, []);
 
   return (
     <div className="flex h-full w-full flex-col gap-2 overflow-hidden">
@@ -388,6 +407,11 @@ export default function SqlEditorPage() {
               theme={resolvedTheme === "dark" ? "vs-dark" : "vs"}
               value={sql}
               onChange={(val) => setSql(val || "")}
+              onMount={(editor, monaco) => {
+                editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => {
+                  handleExecuteRef.current?.();
+                });
+              }}
               options={{
                 minimap: { enabled: editorSettings.minimap },
                 fontSize: editorSettings.fontSize,
@@ -446,7 +470,7 @@ export default function SqlEditorPage() {
               </button>
             </div>
 
-            {results && results.rows.length > 0 && (
+            {activeTab === "results" && results && results.rows.length > 0 && (
               <div className="flex items-center gap-2">
                 <Button
                   variant="outline"

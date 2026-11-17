@@ -97,8 +97,8 @@ export const testDatabaseSchema = z.object({
 // SQL Execution
 export const executeSqlSchema = z.object({
   databaseId: z.string().uuid("Invalid database ID"),
-  workspaceId: z.string().uuid("Invalid workspace ID"),
-  organizationId: z.string().uuid("Invalid organization ID"),
+  workspaceId: z.string().uuid("Invalid workspace ID").optional(),
+  organizationId: z.string().uuid("Invalid organization ID").optional(),
   sql: z.string().min(1, "SQL statement is required"),
   isReadOnly: z.boolean().optional(),
   maxRows: z.number().int().min(1).max(5000).default(1000),
@@ -107,8 +107,8 @@ export const executeSqlSchema = z.object({
 
 export const explainSqlSchema = z.object({
   databaseId: z.string().uuid(),
-  workspaceId: z.string().uuid(),
-  organizationId: z.string().uuid(),
+  workspaceId: z.string().uuid().optional(),
+  organizationId: z.string().uuid().optional(),
   sql: z.string().min(1),
   analyze: z.boolean().default(false),
 });

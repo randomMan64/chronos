@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireDatabaseAccess } from "@/lib/auth/guards";
+import { requireDatabaseAccessById } from "@/lib/auth/guards";
 import { SqlService } from "@/modules/sql/sql-service";
 import { explainSqlSchema } from "@/lib/validation";
 import { handleApiError } from "@/lib/errors";
@@ -18,23 +18,27 @@ export async function POST(req: Request) {
       );
     }
 
-    const { databaseId, workspaceId, organizationId, sql, analyze } = parsed.data;
+    const { databaseId, sql, analyze } = parsed.data;
 
-    const context = await requireDatabaseAccess(
-      organizationId,
-      workspaceId,
+    const { context, database } = await requireDatabaseAccessById(
       databaseId,
       "query:read"
     );
 
     const result = await SqlService.explainSql({
       context,
-      databaseId,
+      databaseId: database.id,
       sql,
       analyze,
     });
 
-    return NextResponse.json(result);
+    const queryPlan = result.rows?.[0]?.["QUERY PLAN"] ?? result.rows;
+
+    return NextResponse.json({
+      plan: queryPlan,
+      rows: result.rows,
+      durationMs: result.durationMs,
+    });
   } catch (err) {
     const error = handleApiError(err);
     return NextResponse.json(error.body, { status: error.status });
