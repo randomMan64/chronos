@@ -200,8 +200,16 @@ export default function ExplorerPage() {
         const data = await res.json();
         setSchemas(data.schemas || ["public"]);
         setTables(data.tables || []);
-        if (data.tables?.length > 0 && !selectedTable) {
-          setSelectedTable(data.tables[0]);
+        if (data.tables?.length > 0) {
+          setSelectedTable((prev) => {
+            if (!prev) return data.tables[0];
+            const exists = data.tables.find(
+              (t: TableInfo) => t.tableName === prev.tableName,
+            );
+            return exists || data.tables[0];
+          });
+        } else {
+          setSelectedTable(null);
         }
       }
     } catch (err) {
@@ -209,7 +217,7 @@ export default function ExplorerPage() {
     } finally {
       setIsLoadingTables(false);
     }
-  }, [selectedDbId, selectedSchema, selectedTable]);
+  }, [selectedDbId, selectedSchema]);
 
   React.useEffect(() => {
     loadTables();
@@ -227,7 +235,7 @@ export default function ExplorerPage() {
         const data = await res.json();
         setRows(data.rows || []);
         setColumns(data.columns || []);
-        setTotalRows(data.totalEstimated || 0);
+        setTotalRows(data.rowCount ?? data.totalEstimated ?? 0);
       }
     } catch (err) {
       console.error("Failed to fetch rows:", err);
