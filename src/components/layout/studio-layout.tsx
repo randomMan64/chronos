@@ -341,7 +341,7 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
           role={currentOrg.role?.toUpperCase() || "OWNER"}
           onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
         />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden px-2.5 py-3 sm:px-4 md:px-5">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 sm:px-5 sm:py-4 lg:px-8 lg:py-5 xl:px-10 xl:py-6 2xl:px-12">
           {children}
         </main>
       </div>

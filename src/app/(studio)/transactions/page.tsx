@@ -111,7 +111,7 @@ export default function TransactionsPage() {
   }, [selectedTx]);
 
   return (
-    <div className="space-y-4 w-full max-w-7xl mx-auto pb-12">
+    <div className="space-y-4 w-full max-w-[1920px] mx-auto pb-12">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

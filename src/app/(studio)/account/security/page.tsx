@@ -308,7 +308,7 @@ export default function AccountSecurityPage() {
   );
 
   return (
-    <div className="space-y-5 w-full pb-10">
+    <div className="space-y-5 w-full max-w-[1920px] mx-auto pb-10">
       {/* Header */}
       <div className="space-y-1">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">

@@ -26,7 +26,7 @@ export function AppHeader({
   const title = segments[0] ? segments[0].replace("-", " ") : "Overview";
 
   return (
-    <header className="h-12 border-b border-border bg-sidebar/80 backdrop-blur px-3 sm:px-4 flex items-center justify-between shrink-0 select-none z-20">
+    <header className="h-12 border-b border-border bg-sidebar/80 backdrop-blur px-3 sm:px-5 lg:px-8 xl:px-10 2xl:px-12 flex items-center justify-between shrink-0 select-none z-20">
       {/* Mobile Menu & Breadcrumb path */}
       <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
         {/* Mobile Hamburger Drawer Trigger */}

@@ -82,7 +82,7 @@ export default function DashboardPage() {
   const userRole = currentOrg?.role?.toUpperCase() || "MEMBER";
 
   return (
-    <div className="space-y-4 w-full max-w-7xl mx-auto pb-12">
+    <div className="space-y-4 w-full max-w-[1920px] mx-auto pb-12">
       {/* Welcome Banner */}
       <div className="rounded-md border border-border bg-panel p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
