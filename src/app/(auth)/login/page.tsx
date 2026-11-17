@@ -106,13 +106,13 @@ function LoginForm() {
       <form onSubmit={handleSubmit(onSubmit)} noValidate>
         <CardContent className="space-y-3">
           {isVerifiedBanner && (
-            <div className="rounded border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-xs text-emerald-600 dark:text-emerald-400">
+            <div className="rounded border border-emerald-500/30 bg-emerald-500/10 p-2.5 text-xs dark:text-emerald-400">
               Email verified successfully! You can now sign in.
             </div>
           )}
 
           {(searchParams.get("reason") === "SESSION_REVOKED" || searchParams.get("revoked") === "true") && (
-            <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-600 dark:text-amber-400">
+            <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 text-xs text-amber-600">
               Your session has been signed out because it was revoked from another device.
             </div>
           )}
