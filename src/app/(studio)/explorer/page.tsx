@@ -8,8 +8,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
-import { Field, FieldLabel, FieldDescription, FieldError } from "@/components/ui/field";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Field,
+  FieldLabel,
+  FieldDescription,
+  FieldError,
+} from "@/components/ui/field";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 
 const registerDbSchema = z.object({
   name: z.string().min(1, "Database identifier is required"),
@@ -88,7 +99,9 @@ export default function ExplorerPage() {
   const [schemas, setSchemas] = React.useState<string[]>(["public"]);
   const [selectedSchema, setSelectedSchema] = React.useState<string>("public");
   const [tables, setTables] = React.useState<TableInfo[]>([]);
-  const [selectedTable, setSelectedTable] = React.useState<TableInfo | null>(null);
+  const [selectedTable, setSelectedTable] = React.useState<TableInfo | null>(
+    null,
+  );
   const [isLoadingTables, setIsLoadingTables] = React.useState<boolean>(true);
 
   // Search & Filter
@@ -102,16 +115,27 @@ export default function ExplorerPage() {
   const [offset, setOffset] = React.useState<number>(0);
   const [totalRows, setTotalRows] = React.useState<number>(0);
   const [isLoadingRows, setIsLoadingRows] = React.useState<boolean>(false);
-  const [selectedRow, setSelectedRow] = React.useState<Record<string, unknown> | null>(null);
+  const [selectedRow, setSelectedRow] = React.useState<Record<
+    string,
+    unknown
+  > | null>(null);
 
   // Active view tab: "data" | "structure" | "indexes"
-  const [activeView, setActiveView] = React.useState<"data" | "structure" | "indexes">("data");
+  const [activeView, setActiveView] = React.useState<
+    "data" | "structure" | "indexes"
+  >("data");
 
   // Registration Modal state
   const [showRegisterModal, setShowRegisterModal] = React.useState(false);
-  const [newDbEnv, setNewDbEnv] = React.useState<"development" | "staging" | "production">("development");
+  const [newDbEnv, setNewDbEnv] = React.useState<
+    "development" | "staging" | "production"
+  >("development");
   const [isTesting, setIsTesting] = React.useState(false);
-  const [testResult, setTestResult] = React.useState<{ ok: boolean; latencyMs?: number; error?: string } | null>(null);
+  const [testResult, setTestResult] = React.useState<{
+    ok: boolean;
+    latencyMs?: number;
+    error?: string;
+  } | null>(null);
   const [isRegistering, setIsRegistering] = React.useState(false);
   const [activeOrgId, setActiveOrgId] = React.useState<string>("");
   const [activeWsId, setActiveWsId] = React.useState<string>("");
@@ -144,7 +168,9 @@ export default function ExplorerPage() {
             setActiveOrgId(org.id);
             if (ws) setActiveWsId(ws.id);
 
-            const dbRes = await fetch(`/api/v1/databases?organizationId=${org.id}`);
+            const dbRes = await fetch(
+              `/api/v1/databases?organizationId=${org.id}`,
+            );
             if (dbRes.ok) {
               const data = await dbRes.json();
               setDatabases(data.databases || []);
@@ -166,7 +192,9 @@ export default function ExplorerPage() {
     if (!selectedDbId) return;
     setIsLoadingTables(true);
     try {
-      const res = await fetch(`/api/v1/databases/${selectedDbId}/schema?schema=${selectedSchema}`);
+      const res = await fetch(
+        `/api/v1/databases/${selectedDbId}/schema?schema=${selectedSchema}`,
+      );
       if (res.ok) {
         const data = await res.json();
         setSchemas(data.schemas || ["public"]);
@@ -192,7 +220,7 @@ export default function ExplorerPage() {
     setIsLoadingRows(true);
     try {
       const res = await fetch(
-        `/api/v1/databases/${selectedDbId}/tables/${selectedTable.tableName}/rows?schema=${selectedSchema}&limit=${limit}&offset=${offset}`
+        `/api/v1/databases/${selectedDbId}/tables/${selectedTable.tableName}/rows?schema=${selectedSchema}&limit=${limit}&offset=${offset}`,
       );
       if (res.ok) {
         const data = await res.json();
@@ -262,7 +290,9 @@ export default function ExplorerPage() {
       setTestResult(null);
 
       // Refresh databases list
-      const dbRes = await fetch(`/api/v1/databases?organizationId=${activeOrgId}`);
+      const dbRes = await fetch(
+        `/api/v1/databases?organizationId=${activeOrgId}`,
+      );
       if (dbRes.ok) {
         const dbData = await dbRes.json();
         setDatabases(dbData.databases || []);
@@ -276,7 +306,7 @@ export default function ExplorerPage() {
   };
 
   const filteredTables = tables.filter((t) =>
-    t.tableName.toLowerCase().includes(tableSearch.toLowerCase())
+    t.tableName.toLowerCase().includes(tableSearch.toLowerCase()),
   );
 
   const renderTableNav = (isDrawer: boolean = false) => (
@@ -323,7 +353,11 @@ export default function ExplorerPage() {
             </SelectTrigger>
             <SelectContent>
               {databases.map((db) => (
-                <SelectItem key={db.id} value={db.id} className="font-mono text-xs">
+                <SelectItem
+                  key={db.id}
+                  value={db.id}
+                  className="font-mono text-xs"
+                >
                   {db.name} ({db.environment})
                 </SelectItem>
               ))}
@@ -338,7 +372,9 @@ export default function ExplorerPage() {
 
         {/* Schema Selector */}
         <div className="px-2.5 py-1.5 border-b border-border flex items-center justify-between text-xs gap-2">
-          <span className="text-[10px] font-mono text-muted-foreground uppercase shrink-0">Schema:</span>
+          <span className="text-[10px] font-mono text-muted-foreground uppercase shrink-0">
+            Schema:
+          </span>
           <Select
             value={selectedSchema}
             onValueChange={(val) => {
@@ -410,7 +446,9 @@ export default function ExplorerPage() {
                 >
                   <div className="flex items-center gap-1.5 truncate">
                     <TableIcon className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span className="font-mono text-[11px] truncate">{t.tableName}</span>
+                    <span className="font-mono text-[11px] truncate">
+                      {t.tableName}
+                    </span>
                   </div>
                   <span className="text-[10px] font-mono text-muted-foreground shrink-0">
                     ~{t.estimatedRowCount}
@@ -424,8 +462,15 @@ export default function ExplorerPage() {
 
       {/* Refresh button footer */}
       <div className="p-2 border-t border-border bg-sidebar/50 flex justify-between items-center text-xs">
-        <span className="text-[10px] font-mono text-muted-foreground">PostgreSQL 14+</span>
-        <Button variant="ghost" size="sm" onClick={loadTables} className="h-6 text-[10px]">
+        <span className="text-[10px] font-mono text-muted-foreground">
+          PostgreSQL 14+
+        </span>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={loadTables}
+          className="h-6 text-[10px]"
+        >
           <RefreshCw className="h-2.5 w-2.5 mr-1" /> Refresh
         </Button>
       </div>
@@ -466,13 +511,19 @@ export default function ExplorerPage() {
                   onClick={() => setIsNavDrawerOpen(true)}
                   className="lg:hidden h-7 text-xs font-mono gap-1 px-2 cursor-pointer"
                 >
-                  <TableIcon className="h-3 w-3 text-primary" /> Tables ({filteredTables.length})
+                  <TableIcon className="h-3 w-3 text-primary" /> Tables (
+                  {filteredTables.length})
                 </Button>
                 <div className="flex items-center gap-1.5 font-mono text-xs font-semibold text-foreground truncate">
                   <TableIcon className="h-4 w-4 text-primary shrink-0 hidden sm:inline" />
-                  <span className="truncate">{selectedSchema}.{selectedTable.tableName}</span>
+                  <span className="truncate">
+                    {selectedSchema}.{selectedTable.tableName}
+                  </span>
                 </div>
-                <Badge variant="outline" className="text-[10px] font-mono shrink-0">
+                <Badge
+                  variant="outline"
+                  className="text-[10px] font-mono shrink-0"
+                >
                   ~{selectedTable.estimatedRowCount} rows
                 </Badge>
               </div>
@@ -547,7 +598,9 @@ export default function ExplorerPage() {
                             key={idx}
                             onClick={() => setSelectedRow(r)}
                             className={`hover:bg-elevated/60 cursor-pointer transition-colors ${
-                              selectedRow === r ? "bg-elevated text-foreground" : "text-muted-foreground"
+                              selectedRow === r
+                                ? "bg-elevated text-foreground"
+                                : "text-muted-foreground"
                             }`}
                           >
                             <td className="p-2 text-center border-r border-border text-[10px] text-muted-foreground">
@@ -559,7 +612,9 @@ export default function ExplorerPage() {
                                 className="p-2 border-r border-border/40 truncate max-w-[220px]"
                               >
                                 {r[c] === null ? (
-                                  <span className="text-muted-foreground italic">NULL</span>
+                                  <span className="text-muted-foreground italic">
+                                    NULL
+                                  </span>
                                 ) : typeof r[c] === "object" ? (
                                   JSON.stringify(r[c])
                                 ) : (
@@ -584,7 +639,8 @@ export default function ExplorerPage() {
                 <div className="h-10 border-t border-border px-3.5 flex items-center justify-between bg-sidebar/50 text-xs">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <span className="font-mono text-[11px]">
-                      Showing {rows.length > 0 ? offset + 1 : 0}–{offset + rows.length}
+                      Showing {rows.length > 0 ? offset + 1 : 0}–
+                      {offset + rows.length}
                     </span>
                   </div>
 
@@ -616,7 +672,9 @@ export default function ExplorerPage() {
                     <div className="flex items-center justify-between border-b border-border pb-1.5">
                       <div className="flex items-center gap-2">
                         <FileCode className="h-3.5 w-3.5 text-primary" />
-                        <span className="text-xs font-semibold text-foreground">Record Inspector</span>
+                        <span className="text-xs font-semibold text-foreground">
+                          Record Inspector
+                        </span>
                       </div>
                       <div className="flex items-center gap-2">
                         <Link
@@ -657,7 +715,9 @@ export default function ExplorerPage() {
                   <tbody className="divide-y divide-border">
                     {selectedTable.columns.map((c) => (
                       <tr key={c.columnName} className="hover:bg-elevated/40">
-                        <td className="p-2.5 font-semibold text-foreground">{c.columnName}</td>
+                        <td className="p-2.5 font-semibold text-foreground">
+                          {c.columnName}
+                        </td>
                         <td className="p-2.5 text-primary">{c.dataType}</td>
                         <td className="p-2.5">
                           {c.isNullable ? (
@@ -692,14 +752,18 @@ export default function ExplorerPage() {
                     className="p-3 rounded border border-border bg-sidebar/50 flex flex-col gap-1 text-xs font-mono"
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-semibold text-foreground">{idx.indexName}</span>
+                      <span className="font-semibold text-foreground">
+                        {idx.indexName}
+                      </span>
                       {idx.isUnique && (
                         <Badge variant="info" className="text-[9px]">
                           UNIQUE
                         </Badge>
                       )}
                     </div>
-                    <span className="text-[11px] text-muted-foreground break-all">{idx.indexDef}</span>
+                    <span className="text-[11px] text-muted-foreground break-all">
+                      {idx.indexDef}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -711,14 +775,15 @@ export default function ExplorerPage() {
               icon={<Database className="h-8 w-8 text-primary" />}
               title="Select a table"
               description="Choose a database table to inspect columns, constraints, and live records."
-              className="p-0"
+              className="p-5"
             />
             <Button
               size="sm"
               onClick={() => setIsNavDrawerOpen(true)}
               className="lg:hidden mt-4 h-8 text-xs gap-1.5 cursor-pointer font-mono"
             >
-              <TableIcon className="h-3.5 w-3.5" /> Browse Tables ({filteredTables.length})
+              <TableIcon className="h-3.5 w-3.5" /> Browse Tables (
+              {filteredTables.length})
             </Button>
           </div>
         )}
@@ -730,11 +795,16 @@ export default function ExplorerPage() {
           <DialogHeader>
             <DialogTitle>Register PostgreSQL Database</DialogTitle>
             <DialogDescription>
-              Credentials are encrypted with AES-256-GCM before storage in the control plane
+              Credentials are encrypted with AES-256-GCM before storage in the
+              control plane
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleDbSubmit(handleRegister)} noValidate className="space-y-3 pt-2">
+          <form
+            onSubmit={handleDbSubmit(handleRegister)}
+            noValidate
+            className="space-y-3 pt-2"
+          >
             <Field error={dbErrors.name?.message}>
               <FieldLabel htmlFor="dbName">Database Identifier</FieldLabel>
               <Input
@@ -746,7 +816,9 @@ export default function ExplorerPage() {
             </Field>
 
             <Field error={dbErrors.connectionString?.message}>
-              <FieldLabel htmlFor="dbConn">PostgreSQL Connection URI</FieldLabel>
+              <FieldLabel htmlFor="dbConn">
+                PostgreSQL Connection URI
+              </FieldLabel>
               <PasswordInput
                 id="dbConn"
                 placeholder="postgres://user:pass@ep-name.us-east-2.aws.neon.tech/neondb?sslmode=require"
@@ -764,7 +836,9 @@ export default function ExplorerPage() {
               <Label>Environment</Label>
               <Select
                 value={newDbEnv}
-                onValueChange={(val: "development" | "staging" | "production") => setNewDbEnv(val)}
+                onValueChange={(
+                  val: "development" | "staging" | "production",
+                ) => setNewDbEnv(val)}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -805,7 +879,9 @@ export default function ExplorerPage() {
                   )}
                   <div>
                     <div className="font-semibold">
-                      {testResult.ok ? "Connection Successful" : "Connection Failed"}
+                      {testResult.ok
+                        ? "Connection Successful"
+                        : "Connection Failed"}
                     </div>
                     {testResult.ok && (
                       <div className="text-[10px] font-mono mt-0.5">
@@ -813,7 +889,9 @@ export default function ExplorerPage() {
                       </div>
                     )}
                     {!testResult.ok && (
-                      <div className="text-[10px] font-mono mt-0.5">{testResult.error}</div>
+                      <div className="text-[10px] font-mono mt-0.5">
+                        {testResult.error}
+                      </div>
                     )}
                   </div>
                 </div>
