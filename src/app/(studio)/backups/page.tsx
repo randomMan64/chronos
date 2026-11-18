@@ -1,6 +1,7 @@
 "use client";
 
 import { DismissibleAlert } from "@/components/shared/dismissible-alert";
+import { EmptyState } from "@/components/shared/empty-state";
 import { StatusIndicator } from "@/components/shared/status-indicator";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -43,7 +44,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 
 const createSnapshotSchema = z.object({
-  name: z.string().min(1, "Snapshot identifier is required"),
+  name: z.string().trim().min(2, "Snapshot identifier must be at least 2 characters"),
 });
 type CreateSnapshotFormValues = z.infer<typeof createSnapshotSchema>;
 
@@ -123,27 +124,31 @@ export default function BackupsPage() {
     text: string;
   } | null>(null);
 
-  // 1. Initial Load: Fetch Session & Databases
+  // 1. Initial Load: Fetch Session & Databases with Workspace scoping
   React.useEffect(() => {
     async function init() {
       try {
         const meRes = await fetch("/api/v1/auth/me");
         if (meRes.ok) {
           const me = await meRes.json();
-          const org = me.organizations?.[0];
-          const ws = me.workspaces?.[0];
+          const org = me.currentOrg || me.organizations?.[0];
+          const ws = me.currentWorkspace || me.workspaces?.[0];
           if (org) {
             setActiveOrgId(org.id);
             if (ws) setActiveWsId(ws.id);
 
+            const wsQuery = ws?.id ? `&workspaceId=${ws.id}` : "";
             const dbRes = await fetch(
-              `/api/v1/databases?organizationId=${org.id}`,
+              `/api/v1/databases?organizationId=${org.id}${wsQuery}`,
             );
             if (dbRes.ok) {
               const data = await dbRes.json();
-              setDatabases(data.databases || []);
-              if (data.databases?.length > 0) {
-                setSelectedDbId(data.databases[0].id);
+              const dbs = data.databases || [];
+              setDatabases(dbs);
+              if (me.currentDatabase?.id && dbs.some((d: { id: string }) => d.id === me.currentDatabase.id)) {
+                setSelectedDbId(me.currentDatabase.id);
+              } else if (dbs.length > 0) {
+                setSelectedDbId(dbs[0].id);
               }
             }
           }
@@ -153,6 +158,49 @@ export default function BackupsPage() {
       }
     }
     init();
+
+    // Listen for workspace switch to reset & load workspace-specific database backups
+    const handleWorkspaceChanged = async (e: Event) => {
+      const customEvent = e as CustomEvent<{
+        workspace?: { id: string; name: string; environment: string };
+        database?: { id: string; name: string; status?: string } | null;
+      }>;
+      const ws = customEvent.detail?.workspace;
+      const initialDb = customEvent.detail?.database;
+
+      setSnapshots([]);
+      if (ws) {
+        setActiveWsId(ws.id);
+        const meRes = await fetch("/api/v1/auth/me");
+        if (meRes.ok) {
+          const me = await meRes.json();
+          const org = me.currentOrg || me.organizations?.[0];
+          if (org) {
+            setActiveOrgId(org.id);
+            const dbRes = await fetch(
+              `/api/v1/databases?organizationId=${org.id}&workspaceId=${ws.id}`
+            );
+            if (dbRes.ok) {
+              const data = await dbRes.json();
+              const dbs = data.databases || [];
+              setDatabases(dbs);
+              if (initialDb && dbs.some((d: { id: string }) => d.id === initialDb.id)) {
+                setSelectedDbId(initialDb.id);
+              } else if (dbs.length > 0) {
+                setSelectedDbId(dbs[0].id);
+              } else {
+                setSelectedDbId("");
+              }
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener("chronos:workspace-changed", handleWorkspaceChanged);
+    return () => {
+      window.removeEventListener("chronos:workspace-changed", handleWorkspaceChanged);
+    };
   }, []);
 
   // 2. Fetch Snapshots
@@ -244,6 +292,7 @@ export default function BackupsPage() {
       });
       setShowRestoreModal(false);
       resetRestore();
+      loadSnapshots();
     } catch (err: unknown) {
       setMessage({
         type: "error",
@@ -251,6 +300,18 @@ export default function BackupsPage() {
       });
     } finally {
       setIsRestoring(false);
+    }
+  };
+
+  const handleDatabaseSelect = (dbId: string) => {
+    setSelectedDbId(dbId);
+    const matched = databases.find((d) => d.id === dbId);
+    if (matched && typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("chronos:database-changed", {
+          detail: { database: matched },
+        })
+      );
     }
   };
 
@@ -300,7 +361,7 @@ export default function BackupsPage() {
           <span className="font-medium text-foreground">Active Database:</span>
         </div>
         <div className="w-full sm:w-64">
-          <Select value={selectedDbId} onValueChange={setSelectedDbId}>
+          <Select value={selectedDbId} onValueChange={handleDatabaseSelect}>
             <SelectTrigger className="h-7 text-xs font-mono">
               <SelectValue placeholder="Select Database" />
             </SelectTrigger>
@@ -368,7 +429,16 @@ export default function BackupsPage() {
                       </Badge>
                     </td>
                     <td className="p-3">
-                      <StatusIndicator status="active" label={s.status} />
+                      <StatusIndicator
+                        status={
+                          s.status === "completed"
+                            ? "active"
+                            : s.status === "failed"
+                            ? "failed"
+                            : "pending"
+                        }
+                        label={s.status}
+                      />
                     </td>
                     <td className="p-3 text-[11px] text-primary">
                       {formatDate(s.recoveryPoint)}
@@ -395,10 +465,14 @@ export default function BackupsPage() {
                   <tr>
                     <td
                       colSpan={6}
-                      className="p-8 text-center text-xs text-muted-foreground"
+                      className="p-8 text-center"
                     >
-                      No cluster snapshots recorded yet. Create one with
-                      &quot;Create Snapshot&quot;.
+                      <EmptyState
+                        icon={<RotateCcw className="h-6 w-6 text-muted-foreground" />}
+                        title="No Cluster Snapshots Recorded"
+                        description="Chronos preserves cryptographic PITR checkpoints to safely restore or branch production databases. Click 'Create Snapshot' to record a recovery point."
+                        className="py-4"
+                      />
                     </td>
                   </tr>
                 )}
