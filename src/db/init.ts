@@ -187,14 +187,68 @@ CREATE TABLE IF NOT EXISTS audit_logs (
   database_id UUID REFERENCES databases(id) ON DELETE SET NULL,
   actor_id UUID REFERENCES users(id) ON DELETE SET NULL,
   actor_email VARCHAR(255),
+  event_category VARCHAR(50) NOT NULL DEFAULT 'system',
   action VARCHAR(100) NOT NULL,
   resource_type VARCHAR(100) NOT NULL,
   resource_id VARCHAR(255),
   outcome VARCHAR(50) NOT NULL DEFAULT 'success',
+  severity VARCHAR(20) NOT NULL DEFAULT 'info',
   metadata JSONB DEFAULT '{}'::jsonb,
   ip_address VARCHAR(45),
+  user_agent TEXT,
+  session_id VARCHAR(255),
+  request_id VARCHAR(128),
+  duration_ms INTEGER,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Safe migrations for audit_logs
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS event_category VARCHAR(50) NOT NULL DEFAULT 'system';
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS severity VARCHAR(20) NOT NULL DEFAULT 'info';
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_agent TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS session_id VARCHAR(255);
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS request_id VARCHAR(128);
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS duration_ms INTEGER;
+
+CREATE INDEX IF NOT EXISTS audit_category_idx ON audit_logs(event_category);
+CREATE INDEX IF NOT EXISTS audit_action_idx ON audit_logs(action);
+CREATE INDEX IF NOT EXISTS audit_outcome_idx ON audit_logs(outcome);
+CREATE INDEX IF NOT EXISTS audit_severity_idx ON audit_logs(severity);
+
+-- Backfill event_category on historical logs
+UPDATE audit_logs SET event_category = 'database' WHERE event_category = 'system' AND (action LIKE 'database:%' OR action LIKE 'sql:%' OR action LIKE 'record:%' OR action LIKE 'history:%' OR resource_type IN ('database_record', 'table', 'query', 'schema', 'row_version'));
+UPDATE audit_logs SET event_category = 'authentication' WHERE event_category = 'system' AND (action LIKE 'user:%' OR action LIKE 'auth:%' OR action LIKE 'session:%' OR action LIKE 'device:%' OR action LIKE 'password:%' OR resource_type IN ('session', 'device', 'user'));
+UPDATE audit_logs SET event_category = 'workspace' WHERE event_category = 'system' AND (action LIKE 'workspace:%' OR action LIKE 'members:%' OR action LIKE 'member:%' OR action LIKE 'invitation:%' OR resource_type IN ('workspace', 'invitation', 'member'));
+UPDATE audit_logs SET event_category = 'iam' WHERE event_category = 'system' AND (action LIKE 'role%' OR action LIKE 'permission%' OR action LIKE 'access:%' OR resource_type IN ('role', 'permission'));
+UPDATE audit_logs SET event_category = 'admin' WHERE event_category = 'system' AND (action LIKE 'backup:%' OR action LIKE 'restore:%' OR action LIKE 'cluster:%' OR action LIKE 'organization:%' OR action LIKE 'account:%' OR resource_type IN ('database', 'snapshot', 'backup', 'organization'));
+
+-- 11.5 Security Alerts
+CREATE TABLE IF NOT EXISTS security_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  organization_id UUID NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+  workspace_id UUID REFERENCES workspaces(id) ON DELETE SET NULL,
+  rule_id VARCHAR(100) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  description TEXT NOT NULL,
+  severity VARCHAR(20) NOT NULL DEFAULT 'medium',
+  status VARCHAR(20) NOT NULL DEFAULT 'open',
+  related_user_email VARCHAR(255),
+  related_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  ip_address VARCHAR(45),
+  event_count INTEGER NOT NULL DEFAULT 1,
+  first_event_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_event_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  metadata JSONB DEFAULT '{}'::jsonb,
+  resolved_by VARCHAR(255),
+  resolved_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS sec_alerts_org_idx ON security_alerts(organization_id);
+CREATE INDEX IF NOT EXISTS sec_alerts_status_idx ON security_alerts(status);
+CREATE INDEX IF NOT EXISTS sec_alerts_severity_idx ON security_alerts(severity);
+CREATE INDEX IF NOT EXISTS sec_alerts_rule_idx ON security_alerts(rule_id);
+CREATE INDEX IF NOT EXISTS sec_alerts_created_idx ON security_alerts(created_at);
 
 -- 12. Notifications
 CREATE TABLE IF NOT EXISTS notifications (

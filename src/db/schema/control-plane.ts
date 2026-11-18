@@ -293,12 +293,18 @@ export const auditLogs = pgTable(
       .references(() => databases.id, { onDelete: "set null" }),
     actorId: uuid("actor_id").references(() => users.id, { onDelete: "set null" }),
     actorEmail: varchar("actor_email", { length: 255 }),
+    eventCategory: varchar("event_category", { length: 50 }).notNull().default("system"), // 'authentication' | 'workspace' | 'iam' | 'database' | 'admin' | 'system'
     action: varchar("action", { length: 100 }).notNull(),
     resourceType: varchar("resource_type", { length: 100 }).notNull(),
     resourceId: varchar("resource_id", { length: 255 }),
     outcome: varchar("outcome", { length: 50 }).notNull().default("success"), // 'success' | 'failure' | 'denied'
+    severity: varchar("severity", { length: 20 }).notNull().default("info"), // 'info' | 'warning' | 'error' | 'critical'
     metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
     ipAddress: varchar("ip_address", { length: 45 }),
+    userAgent: text("user_agent"),
+    sessionId: varchar("session_id", { length: 255 }),
+    requestId: varchar("request_id", { length: 128 }),
+    durationMs: integer("duration_ms"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
@@ -306,6 +312,46 @@ export const auditLogs = pgTable(
     index("audit_workspace_idx").on(table.workspaceId),
     index("audit_actor_idx").on(table.actorId),
     index("audit_created_idx").on(table.createdAt),
+    index("audit_category_idx").on(table.eventCategory),
+    index("audit_action_idx").on(table.action),
+    index("audit_outcome_idx").on(table.outcome),
+    index("audit_severity_idx").on(table.severity),
+  ]
+);
+
+// 11.5. Security Alerts (Real-time and threshold-based security monitoring)
+export const securityAlerts = pgTable(
+  "security_alerts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .references(() => organizations.id, { onDelete: "cascade" })
+      .notNull(),
+    workspaceId: uuid("workspace_id")
+      .references(() => workspaces.id, { onDelete: "set null" }),
+    ruleId: varchar("rule_id", { length: 100 }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    description: text("description").notNull(),
+    severity: varchar("severity", { length: 20 }).notNull().default("medium"), // 'low' | 'medium' | 'high' | 'critical'
+    status: varchar("status", { length: 20 }).notNull().default("open"), // 'open' | 'investigating' | 'resolved'
+    relatedUserEmail: varchar("related_user_email", { length: 255 }),
+    relatedUserId: uuid("related_user_id").references(() => users.id, { onDelete: "set null" }),
+    ipAddress: varchar("ip_address", { length: 45 }),
+    eventCount: integer("event_count").notNull().default(1),
+    firstEventAt: timestamp("first_event_at", { withTimezone: true }).defaultNow().notNull(),
+    lastEventAt: timestamp("last_event_at", { withTimezone: true }).defaultNow().notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+    resolvedBy: varchar("resolved_by", { length: 255 }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("sec_alerts_org_idx").on(table.organizationId),
+    index("sec_alerts_status_idx").on(table.status),
+    index("sec_alerts_severity_idx").on(table.severity),
+    index("sec_alerts_rule_idx").on(table.ruleId),
+    index("sec_alerts_created_idx").on(table.createdAt),
   ]
 );
 

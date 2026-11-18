@@ -145,11 +145,27 @@ export const auditFilterSchema = z.object({
   organizationId: z.string().uuid(),
   workspaceId: z.string().uuid().optional(),
   databaseId: z.string().uuid().optional(),
+  category: z.string().optional(),
   action: z.string().optional(),
+  outcome: z.string().optional(),
+  severity: z.string().optional(),
   actorEmail: z.string().optional(),
+  resourceType: z.string().optional(),
+  resourceId: z.string().optional(),
+  ipAddress: z.string().optional(),
+  search: z.string().optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  limit: z.number().int().min(1).max(200).default(50),
-  offset: z.number().int().min(0).default(0),
+  timeRange: z.string().optional(),
+  sortBy: z.enum(["createdAt", "action", "outcome", "severity"]).optional(),
+  sortOrder: z.enum(["asc", "desc"]).optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(200).default(50),
+  limit: z.coerce.number().int().min(1).max(200).optional(),
+  offset: z.coerce.number().int().min(0).optional(),
+});
+
+export const updateAlertStatusSchema = z.object({
+  status: z.enum(["open", "investigating", "resolved"]),
 });
 

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireOrganizationAccess, requirePermission } from "@/lib/auth/guards";
 import { AuditQueryService } from "@/modules/audit/audit-query-service";
+import { AuditAuthorization } from "@/modules/audit/audit-authorization";
+import { auditFilterSchema } from "@/lib/validation";
 import { handleApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
@@ -17,27 +19,56 @@ export async function GET(req: Request) {
     const context = await requireOrganizationAccess(orgId);
     requirePermission(context, "audit:read");
 
-    const workspaceId = searchParams.get("workspaceId") || undefined;
-    const databaseId = searchParams.get("databaseId") || undefined;
-    const action = searchParams.get("action") || undefined;
-    const actorEmail = searchParams.get("actorEmail") || undefined;
-    const limit = parseInt(searchParams.get("limit") || "50", 10);
-    const offset = parseInt(searchParams.get("offset") || "0", 10);
-
-    const logs = await AuditQueryService.getLogs({
-      organizationId: orgId,
-      workspaceId,
-      databaseId,
-      action,
-      actorEmail,
-      limit,
-      offset,
+    const rawParams: Record<string, string> = {};
+    searchParams.forEach((val, key) => {
+      rawParams[key] = val;
     });
 
-    return NextResponse.json({ auditLogs: logs });
+    const parsed = auditFilterSchema.safeParse(rawParams);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid audit query parameters", details: parsed.error.format() },
+        { status: 400 }
+      );
+    }
+
+    // Enforce role-based query scope (e.g. My Activity for Developer/Analyst, Workspace DB for DB Engineer)
+    const scope = AuditAuthorization.enforceQueryScope(context, parsed.data);
+    const data = await AuditQueryService.getEvents(scope.sanitizedParams);
+
+    return NextResponse.json({
+      events: data.events,
+      pagination: data.pagination,
+      policy: scope.policy,
+      isOwnActivityOnly: scope.isOwnActivityOnly,
+      isDatabaseScopeOnly: scope.isDatabaseScopeOnly,
+      logs: data.events,
+      auditLogs: data.events,
+    });
   } catch (err) {
     const error = handleApiError(err);
     return NextResponse.json(error.body, { status: error.status });
   }
 }
 
+// Strict enforcement: audit.modify_events and audit.delete_events are strictly No for all roles
+export async function POST() {
+  return NextResponse.json(
+    { error: "Audit records are immutable and append-only. Manual insertion is strictly forbidden." },
+    { status: 405 }
+  );
+}
+
+export async function PUT() {
+  return NextResponse.json(
+    { error: "audit.modify_events: Modifying audit records is strictly prohibited across all roles." },
+    { status: 403 }
+  );
+}
+
+export async function DELETE() {
+  return NextResponse.json(
+    { error: "audit.delete_events: Deleting audit records is strictly prohibited across all roles." },
+    { status: 403 }
+  );
+}

@@ -41,6 +41,13 @@ export const ROLE_PERMISSIONS: Record<ChronosRole, Permission[]> = {
     // Audit & compliance
     "audit:read",
     "audit:export",
+    "audit:view_own",
+    "audit:view_workspace",
+    "audit:view_organization",
+    "audit:view_authentication",
+    "audit:view_database",
+    "audit:view_permissions",
+    "audit:manage_alerts",
   ],
   dba: [
     // Organization visibility (read-only)
@@ -71,6 +78,15 @@ export const ROLE_PERMISSIONS: Record<ChronosRole, Permission[]> = {
     "backup:restore",
     "retention:manage",
     "permissions:manage",
+    "audit:read",
+    "audit:export",
+    "audit:view_own",
+    "audit:view_workspace",
+    "audit:view_organization",
+    "audit:view_authentication",
+    "audit:view_database",
+    "audit:view_permissions",
+    "audit:manage_alerts",
   ],
   developer: [
     // Organization visibility (read-only)
@@ -91,6 +107,8 @@ export const ROLE_PERMISSIONS: Record<ChronosRole, Permission[]> = {
     "history:read",
     "history:restore",
     "transaction:inspect",
+    "audit:read",
+    "audit:view_own",
   ],
   data_analyst: [
     // Organization visibility (read-only)
@@ -105,6 +123,8 @@ export const ROLE_PERMISSIONS: Record<ChronosRole, Permission[]> = {
     "query:execute",
     "query:export",
     "history:read",
+    "audit:read",
+    "audit:view_own",
   ],
   database_engineer: [
     // Organization visibility (read-only)
@@ -121,6 +141,10 @@ export const ROLE_PERMISSIONS: Record<ChronosRole, Permission[]> = {
     "transaction:inspect",
     "performance:inspect",
     "history:read",
+    "audit:read",
+    "audit:view_own",
+    "audit:view_workspace",
+    "audit:view_database",
   ],
   auditor: [
     // Organization visibility (read-only)
@@ -136,6 +160,12 @@ export const ROLE_PERMISSIONS: Record<ChronosRole, Permission[]> = {
     "transaction:inspect",
     "audit:read",
     "audit:export",
+    "audit:view_own",
+    "audit:view_workspace",
+    "audit:view_organization",
+    "audit:view_authentication",
+    "audit:view_database",
+    "audit:view_permissions",
   ],
 };
 

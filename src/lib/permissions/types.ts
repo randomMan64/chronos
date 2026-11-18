@@ -45,6 +45,15 @@ export type Permission =
   | "backup:restore"
   | "audit:read"
   | "audit:export"
+  | "audit:view_own"
+  | "audit:view_workspace"
+  | "audit:view_organization"
+  | "audit:view_authentication"
+  | "audit:view_database"
+  | "audit:view_permissions"
+  | "audit:manage_alerts"
+  | "audit:modify_events"
+  | "audit:delete_events"
   | "permissions:manage"
   | "retention:manage";
 
