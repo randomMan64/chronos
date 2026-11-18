@@ -475,7 +475,10 @@ export class OrganizationService {
     }
 
     if (targetMember.userId === params.actorId) {
-      throw new Error("You already own this organization. Select another eligible member.");
+      throw new ForbiddenError(
+        "The current Owner cannot transfer ownership to themselves. Select another eligible member.",
+        403
+      );
     }
 
     const previousRole = normalizeRole(params.previousOwnerNewRole || "dba");

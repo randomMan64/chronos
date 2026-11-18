@@ -4,6 +4,7 @@ import { eq, and, aliasedTable } from "drizzle-orm";
 import { WorkspaceRole } from "@/lib/permissions/types";
 import { normalizeRole } from "@/lib/permissions/roles";
 import { AuditService } from "@/modules/audit/audit-service";
+import { ForbiddenError } from "@/lib/auth/guards";
 import crypto from "crypto";
 
 function getRoleDatabaseDefaults(role: string): {
@@ -180,6 +181,11 @@ export class WorkspaceService {
       throw new Error("Workspace not found in this organization.");
     }
 
+    // Self-permission protection: prevent self-assigning workspace membership
+    if (params.userId === params.actorId) {
+      throw new ForbiddenError("Users cannot assign or modify their own workspace membership.", 403);
+    }
+
     // 2. Verify target user belongs to organization
     const [orgMember] = await db
       .select()
@@ -298,6 +304,11 @@ export class WorkspaceService {
       throw new Error("Workspace member not found.");
     }
 
+    // Self-permission protection: prevent self-revocation of workspace membership
+    if (member.userId === params.actorId) {
+      throw new ForbiddenError("Users cannot revoke their own workspace membership.", 403);
+    }
+
     // 2. Remove database permissions for this user on databases in this workspace
     const wsDatabases = await db
       .select({ id: databases.id })
@@ -392,6 +403,28 @@ export class WorkspaceService {
     newRole: WorkspaceRole;
     actorId: string;
   }) {
+    // 1. Fetch target member from database
+    const [targetMember] = await db
+      .select()
+      .from(workspaceMembers)
+      .where(
+        and(
+          eq(workspaceMembers.workspaceId, params.workspaceId),
+          eq(workspaceMembers.id, params.memberId),
+          eq(workspaceMembers.organizationId, params.organizationId)
+        )
+      )
+      .limit(1);
+
+    if (!targetMember) {
+      return null;
+    }
+
+    // 2. Self-permission protection: prevent self-role modification
+    if (targetMember.userId === params.actorId) {
+      throw new ForbiddenError("Users cannot modify their own workspace role.", 403);
+    }
+
     const canonicalRole = normalizeRole(params.newRole);
     const [updated] = await db
       .update(workspaceMembers)

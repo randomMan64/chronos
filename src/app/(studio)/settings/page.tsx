@@ -678,7 +678,13 @@ export default function SettingsPage() {
     const currentMemberUserIds = new Set(
       (workspaceMembersMap[selectedWorkspaceId] || []).map((m) => m.userId)
     );
-    const filtered = members.filter((m) => !currentMemberUserIds.has(m.userId));
+    const filtered = members.filter(
+      (m) =>
+        !currentMemberUserIds.has(m.userId) &&
+        m.userId !== currentUser?.id &&
+        (!currentUser?.email ||
+          m.email.toLowerCase() !== currentUser.email.toLowerCase())
+    );
     return sortMembersByCurrentUserAndRole(
       filtered,
       currentUser?.id,
@@ -1037,10 +1043,10 @@ export default function SettingsPage() {
                                     {CHRONOS_ROLES[normalizeRole(m.role)]?.label || m.role}
                                   </Badge>
                                   <span
-                                    className="text-[10px] text-muted-foreground flex items-center gap-0.5"
-                                    title="You cannot modify your own role directly"
+                                    className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono"
+                                    title="You cannot modify your own role"
                                   >
-                                    <Lock className="h-3 w-3" /> You
+                                    <Lock className="h-3 w-3 text-muted-foreground" /> Your account
                                   </span>
                                 </div>
                               ) : isOwner ? (
@@ -1702,7 +1708,19 @@ export default function SettingsPage() {
                                     </div>
                                   </td>
                                   <td className="p-3">
-                                    {canAssignWorkspaceMembers ? (
+                                    {isCurrentUser ? (
+                                      <div className="flex items-center gap-1.5 py-0.5">
+                                        <Badge variant="outline" className="capitalize text-[10px] font-mono">
+                                          {CHRONOS_ROLES[normalizeRole(mem.role)]?.label || mem.role}
+                                        </Badge>
+                                        <span
+                                          className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono"
+                                          title="You cannot modify your own workspace role"
+                                        >
+                                          <Lock className="h-3 w-3 text-muted-foreground" /> Your account
+                                        </span>
+                                      </div>
+                                    ) : canAssignWorkspaceMembers ? (
                                       <Select
                                         value={normalizeRole(mem.role)}
                                         onValueChange={(newRole) =>
@@ -1755,31 +1773,28 @@ export default function SettingsPage() {
                                   </td>
                                   {canRevokeWorkspaceMembers && (
                                     <td className="p-3 text-right">
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="ghost"
-                                        disabled={isCurrentUser && isOwner}
-                                        onClick={() =>
-                                          setWsMemberToRemove({
-                                            id: mem.id,
-                                            workspaceId: selectedWorkspaceId,
-                                            workspaceName: activeWs?.name || "Workspace",
-                                            fullName: mem.fullName || mem.email,
-                                            email: mem.email,
-                                            role: mem.role,
-                                          })
-                                        }
-                                        className="h-7 px-2 text-destructive hover:bg-destructive/10 text-xs cursor-pointer"
-                                        title={
-                                          isCurrentUser && isOwner
-                                            ? "Cannot revoke workspace access from organization owner"
-                                            : "Revoke workspace access"
-                                        }
-                                      >
-                                        <Trash2 className="h-3.5 w-3.5 mr-1" />
-                                        <span>Revoke</span>
-                                      </Button>
+                                      {!isCurrentUser ? (
+                                        <Button
+                                          type="button"
+                                          size="sm"
+                                          variant="ghost"
+                                          onClick={() =>
+                                            setWsMemberToRemove({
+                                              id: mem.id,
+                                              workspaceId: selectedWorkspaceId,
+                                              workspaceName: activeWs?.name || "Workspace",
+                                              fullName: mem.fullName || mem.email,
+                                              email: mem.email,
+                                              role: mem.role,
+                                            })
+                                          }
+                                          className="h-7 px-2 text-destructive hover:bg-destructive/10 text-xs cursor-pointer"
+                                          title={`Revoke access for ${mem.fullName || mem.email}`}
+                                        >
+                                          <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                          <span>Revoke</span>
+                                        </Button>
+                                      ) : null}
                                     </td>
                                   )}
                                 </tr>

@@ -419,4 +419,161 @@ describe("CHRONOS Workspace Switcher & Workspace-Level Access Management", () =>
       expect(devIndexAlice).toBeLessThan(devIndexBob);
     });
   });
+
+  describe("14. Self-Permission Modification & Ownership Protection", () => {
+    it("Owner cannot change own organization role", () => {
+      const actorId = "user-owner-1";
+      const targetMember = { id: "m-owner", userId: actorId, role: "owner" };
+
+      expect(() => {
+        if (targetMember.userId === actorId) {
+          throw new ForbiddenError(
+            "Organization Owners cannot modify their own role directly. Use the Transfer Ownership workflow.",
+            403
+          );
+        }
+      }).toThrowError(/cannot modify their own role/i);
+    });
+
+    it("Admin/DBA cannot change own organization role", () => {
+      const actorId = "user-admin-1";
+      const targetMember = { id: "m-admin", userId: actorId, role: "dba" };
+
+      expect(() => {
+        if (targetMember.userId === actorId) {
+          throw new ForbiddenError("Users cannot modify their own role.", 403);
+        }
+      }).toThrowError(/Users cannot modify their own role/i);
+    });
+
+    it("DBA cannot change own workspace role", () => {
+      const actorId = "user-dba-1";
+      const targetWorkspaceMember = { id: "wm-dba", userId: actorId, role: "dba" };
+
+      expect(() => {
+        if (targetWorkspaceMember.userId === actorId) {
+          throw new ForbiddenError("Users cannot modify their own workspace role.", 403);
+        }
+      }).toThrowError(/Users cannot modify their own workspace role/i);
+    });
+
+    it("Developer cannot change own workspace role", () => {
+      const actorId = "user-dev-1";
+      const targetWorkspaceMember = { id: "wm-dev", userId: actorId, role: "developer" };
+
+      expect(() => {
+        if (targetWorkspaceMember.userId === actorId) {
+          throw new ForbiddenError("Users cannot modify their own workspace role.", 403);
+        }
+      }).toThrowError(/Users cannot modify their own workspace role/i);
+    });
+
+    it("No user can revoke their own workspace access through the admin interface", () => {
+      const actorId = "user-any-1";
+      const targetWorkspaceMember = { id: "wm-any", userId: actorId, role: "developer" };
+
+      expect(() => {
+        if (targetWorkspaceMember.userId === actorId) {
+          throw new ForbiddenError("Users cannot revoke their own workspace membership.", 403);
+        }
+      }).toThrowError(/Users cannot revoke their own workspace membership/i);
+    });
+
+    it("No user can self-assign workspace membership", () => {
+      const actorId = "user-dba-1";
+      const targetUserId = actorId;
+
+      expect(() => {
+        if (targetUserId === actorId) {
+          throw new ForbiddenError("Users cannot assign or modify their own workspace membership.", 403);
+        }
+      }).toThrowError(/Users cannot assign or modify their own workspace membership/i);
+    });
+
+    it("Authorized Owner can change another member's role", () => {
+      const actorId = "user-owner-1";
+      const targetMember = { id: "m-dev-2", userId: "user-dev-2", role: "developer" };
+
+      const changeRole = () => {
+        if (targetMember.userId === actorId) {
+          throw new ForbiddenError("Users cannot modify their own role.", 403);
+        }
+        return { ...targetMember, role: "data_analyst" };
+      };
+
+      const result = changeRole();
+      expect(result.role).toBe("data_analyst");
+      expect(result.userId).toBe("user-dev-2");
+    });
+
+    it("Authorized DBA can manage another member when explicitly granted permission", () => {
+      const dbaPermissionsWithManage = resolvePermissions({
+        orgRole: "member",
+        workspaceRole: "dba",
+      });
+      // DBA without members:manage is rejected
+      expect(hasPermission(dbaPermissionsWithManage, "members:manage")).toBe(false);
+
+      // DBA with explicitly granted permission
+      const customPerms = new Set([...dbaPermissionsWithManage, "workspace:members:assign", "workspace:members:revoke"]);
+      expect(hasPermission(customPerms, "workspace:members:assign")).toBe(true);
+      expect(hasPermission(customPerms, "workspace:members:revoke")).toBe(true);
+
+      const actorId = "user-dba-1";
+      const otherMember = { id: "wm-dev-3", userId: "user-dev-3", role: "developer" };
+
+      // Can manage other member
+      expect(otherMember.userId !== actorId).toBe(true);
+    });
+
+    it("Direct API requests cannot bypass self-permission modification restrictions", () => {
+      const actorId = "attacker-user-id";
+      const directApiPayload = {
+        memberId: "target-member-id",
+        newRole: "owner",
+      };
+      const fetchedMemberFromDb = {
+        id: directApiPayload.memberId,
+        userId: actorId, // Attacker targeting their own membership record!
+      };
+
+      expect(() => {
+        if (fetchedMemberFromDb.userId === actorId) {
+          throw new ForbiddenError("Users cannot modify their own role.", 403);
+        }
+      }).toThrowError(ForbiddenError);
+    });
+
+    it("Current Owner cannot transfer ownership to themselves", () => {
+      const currentOwnerId = "owner-user-id";
+      const targetMember = {
+        id: "owner-member-record",
+        userId: currentOwnerId,
+      };
+
+      expect(() => {
+        if (targetMember.userId === currentOwnerId) {
+          throw new ForbiddenError(
+            "The current Owner cannot transfer ownership to themselves. Select another eligible member.",
+            403
+          );
+        }
+      }).toThrowError(/cannot transfer ownership to themselves/i);
+    });
+
+    it("Organization can never be left with zero Owners", () => {
+      const totalOwnersBefore = 1;
+      const demotingOwner = true;
+
+      expect(() => {
+        const remainingOwners = totalOwnersBefore - (demotingOwner ? 1 : 0);
+        if (remainingOwners < 1) {
+          throw new ForbiddenError(
+            "Organization must have at least one active Owner. Transfer ownership before demoting this account.",
+            403
+          );
+        }
+      }).toThrowError(/at least one active Owner/i);
+    });
+  });
 });

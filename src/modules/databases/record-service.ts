@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { userDbManager, TableColumnMetadata } from "@/db/connections/user-database";
 import { TemporalService } from "@/modules/temporal/temporal-service";
 import { AuditService } from "@/modules/audit/audit-service";
-import { NotFoundError } from "@/lib/auth/guards";
+import { NotFoundError, ForbiddenError } from "@/lib/auth/guards";
 
 export class ConcurrencyConflictError extends Error {
   public statusCode = 409;
@@ -209,6 +209,26 @@ export class RecordService {
     }
 
     const currentRecord = selectRes.rows[0];
+
+    // Self-permission modification protection: users cannot modify their own permission or membership records
+    const lowerTable = table.toLowerCase();
+    if (
+      lowerTable === "database_permissions" ||
+      lowerTable === "workspace_members" ||
+      lowerTable === "organization_members"
+    ) {
+      const targetUserId =
+        currentRecord.user_id ??
+        currentRecord.userId ??
+        params.primaryKey.user_id ??
+        params.primaryKey.userId;
+      if (targetUserId && String(targetUserId) === String(params.actor.id)) {
+        throw new ForbiddenError(
+          "Self-permission modification is prohibited: Users cannot modify their own permission or membership assignments.",
+          403
+        );
+      }
+    }
 
     // 3. Optimistic Concurrency Check
     if (params.originalRow) {
@@ -497,6 +517,26 @@ export class RecordService {
     }
 
     const currentRecord = selectRes.rows[0];
+
+    // Self-permission modification protection: users cannot modify their own permission or membership records
+    const lowerTable = table.toLowerCase();
+    if (
+      lowerTable === "database_permissions" ||
+      lowerTable === "workspace_members" ||
+      lowerTable === "organization_members"
+    ) {
+      const targetUserId =
+        currentRecord.user_id ??
+        currentRecord.userId ??
+        params.primaryKey.user_id ??
+        params.primaryKey.userId;
+      if (targetUserId && String(targetUserId) === String(params.actor.id)) {
+        throw new ForbiddenError(
+          "Self-permission modification is prohibited: Users cannot modify their own permission or membership assignments.",
+          403
+        );
+      }
+    }
 
     // Optimistic Concurrency Check
     if (params.originalRow) {
