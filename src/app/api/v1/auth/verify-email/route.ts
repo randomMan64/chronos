@@ -164,9 +164,11 @@ export async function POST(req: Request) {
         createdWsId = newWs.id;
 
         await tx.insert(workspaceMembers).values({
+          organizationId: newOrg.id,
           workspaceId: newWs.id,
           userId: user.id,
           role: "dba",
+          assignedBy: user.id,
         });
 
         // Clear pending organization name
@@ -204,9 +206,11 @@ export async function POST(req: Request) {
 
           if (primaryWs) {
             await tx.insert(workspaceMembers).values({
+              organizationId: invite.organizationId,
               workspaceId: primaryWs.id,
               userId: user.id,
               role: assignedRole,
+              assignedBy: invite.invitedBy,
             });
           }
 
@@ -282,9 +286,11 @@ export async function POST(req: Request) {
 
             if (primaryWs) {
               await tx.insert(workspaceMembers).values({
+                organizationId: invite.organizationId,
                 workspaceId: primaryWs.id,
                 userId: user.id,
                 role: invite.role === "admin" || invite.role === "owner" ? "dba" : "developer",
+                assignedBy: invite.invitedBy,
               });
             }
 

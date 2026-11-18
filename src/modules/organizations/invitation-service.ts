@@ -532,9 +532,11 @@ export class InvitationService {
 
           if (!existingWsMem) {
             await tx.insert(workspaceMembers).values({
+              organizationId: invite.organizationId,
               workspaceId: primaryWs.id,
               userId: user.id,
               role: assignedRole,
+              assignedBy: invite.invitedBy,
             });
           }
         }

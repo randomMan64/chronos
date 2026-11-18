@@ -61,11 +61,55 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
     environment: initialSession?.currentWorkspace?.environment || "development",
   }));
 
+  const [workspacesList, setWorkspacesList] = React.useState<Array<{
+    id: string;
+    name: string;
+    slug?: string;
+    environment: string;
+    role?: string;
+  }>>(() => initialSession?.workspaces || []);
+
   const [currentDatabase, setCurrentDatabase] = React.useState(() => ({
     id: initialSession?.currentDatabase?.id || "",
     name: initialSession?.currentDatabase?.name || "No database selected",
     status: initialSession?.currentDatabase?.status || "active",
   }));
+
+  const handleWorkspaceChange = React.useCallback(
+    (
+      newWs: { id: string; name: string; environment?: string },
+      newDb?: { id: string; name: string; status?: string } | null
+    ) => {
+      setCurrentWorkspace({
+        id: newWs.id,
+        name: newWs.name,
+        environment: newWs.environment || "development",
+      });
+      if (newDb) {
+        setCurrentDatabase({
+          id: newDb.id,
+          name: newDb.name,
+          status: newDb.status || "active",
+        });
+      } else {
+        setCurrentDatabase({
+          id: "",
+          name: "No database selected",
+          status: "none",
+        });
+      }
+
+      // Broadcast workspace changed event for all client modules to clear stale data
+      window.dispatchEvent(
+        new CustomEvent("chronos:workspace-changed", {
+          detail: { workspace: newWs, database: newDb },
+        })
+      );
+
+      router.refresh();
+    },
+    [router]
+  );
 
   // Sync state if initialSession updates
   React.useEffect(() => {
@@ -82,6 +126,9 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
         name: initialSession.currentOrg.name,
         role: initialSession.currentOrg.role || "member",
       });
+    }
+    if (initialSession?.workspaces) {
+      setWorkspacesList(initialSession.workspaces);
     }
     if (initialSession?.currentWorkspace) {
       setCurrentWorkspace({
@@ -159,6 +206,9 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
               name: data.organizations[0].name,
               role: data.organizations[0].role || "member",
             });
+          }
+          if (data.workspaces) {
+            setWorkspacesList(data.workspaces);
           }
           if (data.currentWorkspace) {
             setCurrentWorkspace({
@@ -273,9 +323,25 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
     };
     window.addEventListener("chronos:settings-updated", handleSettingsChange);
 
+    const handleWorkspacesUpdated = (e: Event) => {
+      const customEvent = e as CustomEvent<Array<{ id: string; name: string; slug?: string; environment: string }>>;
+      if (customEvent.detail && Array.isArray(customEvent.detail)) {
+        setWorkspacesList(customEvent.detail);
+      } else if (currentOrg.id) {
+        fetch(`/api/v1/workspaces?organizationId=${currentOrg.id}`)
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.workspaces) setWorkspacesList(d.workspaces);
+          })
+          .catch(() => {});
+      }
+    };
+    window.addEventListener("chronos:workspaces-updated", handleWorkspacesUpdated);
+
     return () => {
       window.removeEventListener("chronos:sidebar-pref", handlePrefChange);
       window.removeEventListener("chronos:settings-updated", handleSettingsChange);
+      window.removeEventListener("chronos:workspaces-updated", handleWorkspacesUpdated);
     };
   }, []);
 
@@ -303,8 +369,10 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
         currentOrg={currentOrg}
         currentWorkspace={currentWorkspace}
         currentDatabase={currentDatabase}
+        workspaces={workspacesList}
         user={currentUser}
         onLogout={handleTriggerLogout}
+        onWorkspaceChange={handleWorkspaceChange}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={handleToggleSidebar}
       />
@@ -325,8 +393,10 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
               currentOrg={currentOrg}
               currentWorkspace={currentWorkspace}
               currentDatabase={currentDatabase}
+              workspaces={workspacesList}
               user={currentUser}
               onLogout={handleTriggerLogout}
+              onWorkspaceChange={handleWorkspaceChange}
               isMobile={true}
               onClose={() => setIsMobileMenuOpen(false)}
             />

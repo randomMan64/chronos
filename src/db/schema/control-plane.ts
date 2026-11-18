@@ -119,6 +119,9 @@ export const workspaceMembers = pgTable(
   "workspace_members",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .references(() => organizations.id, { onDelete: "cascade" })
+      .notNull(),
     workspaceId: uuid("workspace_id")
       .references(() => workspaces.id, { onDelete: "cascade" })
       .notNull(),
@@ -126,12 +129,15 @@ export const workspaceMembers = pgTable(
       .references(() => users.id, { onDelete: "cascade" })
       .notNull(),
     role: varchar("role", { length: 50 }).notNull().default("developer"), // 'dba' | 'developer' | 'analyst' | 'engineer' | 'auditor'
+    assignedBy: uuid("assigned_by")
+      .references(() => users.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("workspace_user_idx").on(table.workspaceId, table.userId),
     index("workspace_member_user_idx").on(table.userId),
+    index("workspace_member_org_idx").on(table.organizationId),
   ]
 );
 
@@ -448,5 +454,24 @@ export const databasesRelations = relations(databases, ({ one, many }) => ({
   }),
   permissions: many(databasePermissions),
   savedQueries: many(savedQueries),
+}));
+
+export const workspaceMembersRelations = relations(workspaceMembers, ({ one }) => ({
+  workspace: one(workspaces, {
+    fields: [workspaceMembers.workspaceId],
+    references: [workspaces.id],
+  }),
+  user: one(users, {
+    fields: [workspaceMembers.userId],
+    references: [users.id],
+  }),
+  organization: one(organizations, {
+    fields: [workspaceMembers.organizationId],
+    references: [organizations.id],
+  }),
+  assignedByUser: one(users, {
+    fields: [workspaceMembers.assignedBy],
+    references: [users.id],
+  }),
 }));
 

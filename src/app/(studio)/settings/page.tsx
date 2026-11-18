@@ -62,12 +62,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { formatDate, getInitials } from "@/lib/utils";
+import { formatDate, getInitials, cn } from "@/lib/utils";
 import { DismissibleAlert } from "@/components/shared/dismissible-alert";
 import {
   CHRONOS_ROLES,
   CHRONOS_ROLE_KEYS,
   ChronosRole,
+  ROLE_HIERARCHY,
   canAssignRole,
   getAssignableRoles,
   normalizeRole,
@@ -87,7 +88,53 @@ import {
   Lock,
   ArrowRightLeft,
   ShieldAlert,
+  UserPlus,
 } from "lucide-react";
+
+/**
+ * Sorts members so that the active user's account appears first ("(You)"),
+ * followed by descending role hierarchy (Owner -> DBA -> Database Engineer -> Developer -> Data Analyst -> Auditor),
+ * and alphabetically by full name or email as a tie-breaker.
+ */
+function sortMembersByCurrentUserAndRole<
+  T extends {
+    userId: string;
+    role: string;
+    fullName?: string | null;
+    email?: string | null;
+  },
+>(
+  list: T[],
+  currentUserId?: string | null,
+  currentUserEmail?: string | null,
+): T[] {
+  return [...list].sort((a, b) => {
+    const aIsSelf =
+      (!!currentUserId && a.userId === currentUserId) ||
+      (!!currentUserEmail &&
+        !!a.email &&
+        currentUserEmail.toLowerCase() === a.email.toLowerCase());
+    const bIsSelf =
+      (!!currentUserId && b.userId === currentUserId) ||
+      (!!currentUserEmail &&
+        !!b.email &&
+        currentUserEmail.toLowerCase() === b.email.toLowerCase());
+
+    if (aIsSelf && !bIsSelf) return -1;
+    if (!aIsSelf && bIsSelf) return 1;
+
+    const aRank = ROLE_HIERARCHY[normalizeRole(a.role)] ?? 0;
+    const bRank = ROLE_HIERARCHY[normalizeRole(b.role)] ?? 0;
+
+    if (bRank !== aRank) {
+      return bRank - aRank; // Highest role hierarchy first
+    }
+
+    const nameA = (a.fullName || a.email || "").toLowerCase();
+    const nameB = (b.fullName || b.email || "").toLowerCase();
+    return nameA.localeCompare(nameB);
+  });
+}
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = React.useState<string>("members");
@@ -111,6 +158,19 @@ export default function SettingsPage() {
   const canInviteMembers = hasPermission(permissions, "members:invite");
   const canManageMembers = hasPermission(permissions, "members:manage");
   const canCreateWorkspace = hasPermission(permissions, "workspace:create");
+  const canManageWorkspaces = isOwner || hasPermission(permissions, "workspace:manage");
+  const canAssignWorkspaceMembers =
+    isOwner ||
+    hasPermission(permissions, "workspace:members:assign") ||
+    hasPermission(permissions, "workspace:manage");
+  const canRevokeWorkspaceMembers =
+    isOwner ||
+    hasPermission(permissions, "workspace:members:revoke") ||
+    hasPermission(permissions, "workspace:manage");
+  const canDeleteWorkspace =
+    isOwner ||
+    hasPermission(permissions, "workspace:delete") ||
+    hasPermission(permissions, "workspace:manage");
   const canTransferOwnership =
     org?.role === "owner" &&
     (hasPermission(permissions, "permissions:manage") ||
@@ -145,6 +205,52 @@ export default function SettingsPage() {
       createdAt: string;
     }>
   >([]);
+
+  // Workspace Access Management state
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = React.useState<string | null>(null);
+  const [workspaceMembersMap, setWorkspaceMembersMap] = React.useState<
+    Record<
+      string,
+      Array<{
+        id: string;
+        userId: string;
+        email: string;
+        fullName: string;
+        role: string;
+        assignedBy?: string | null;
+        assignedByName?: string | null;
+        assignedByEmail?: string | null;
+        createdAt: string;
+      }>
+    >
+  >({});
+  const [isLoadingWsMembers, setIsLoadingWsMembers] = React.useState(false);
+
+  // Add workspace member modal
+  const [showAddWsMemberModal, setShowAddWsMemberModal] = React.useState(false);
+  const [addWsMemberUserId, setAddWsMemberUserId] = React.useState("");
+  const [addWsMemberRole, setAddWsMemberRole] = React.useState("developer");
+  const [isAddingWsMember, setIsAddingWsMember] = React.useState(false);
+
+  // Remove workspace member modal
+  const [wsMemberToRemove, setWsMemberToRemove] = React.useState<{
+    id: string;
+    workspaceId: string;
+    workspaceName: string;
+    fullName: string;
+    email: string;
+    role: string;
+  } | null>(null);
+  const [isRemovingWsMember, setIsRemovingWsMember] = React.useState(false);
+
+  // Delete workspace modal
+  const [wsToDelete, setWsToDelete] = React.useState<{
+    id: string;
+    name: string;
+    environment: string;
+  } | null>(null);
+  const [isDeletingWs, setIsDeletingWs] = React.useState(false);
+  const [wsDeleteConfirmName, setWsDeleteConfirmName] = React.useState("");
 
   // Form states
   const [inviteRole, setInviteRole] = React.useState("developer");
@@ -240,6 +346,24 @@ export default function SettingsPage() {
 
   const matrixRows = React.useMemo(() => getPermissionsMatrix(), []);
 
+  const sortedMembers = React.useMemo(() => {
+    return sortMembersByCurrentUserAndRole(
+      members,
+      currentUser?.id,
+      currentUser?.email
+    );
+  }, [members, currentUser?.id, currentUser?.email]);
+
+  const sortedWorkspaceMembers = React.useMemo(() => {
+    if (!selectedWorkspaceId) return [];
+    const list = workspaceMembersMap[selectedWorkspaceId] || [];
+    return sortMembersByCurrentUserAndRole(
+      list,
+      currentUser?.id,
+      currentUser?.email
+    );
+  }, [workspaceMembersMap, selectedWorkspaceId, currentUser?.id, currentUser?.email]);
+
   const [isLoading, setIsLoading] = React.useState(true);
   const [pendingRoles, setPendingRoles] = React.useState<
     Record<string, string>
@@ -251,6 +375,24 @@ export default function SettingsPage() {
     type: "success" | "error";
     text: string;
   } | null>(null);
+
+  const fetchWorkspaceMembers = React.useCallback(async (wsId: string) => {
+    setIsLoadingWsMembers(true);
+    try {
+      const res = await fetch(`/api/v1/workspaces/${wsId}/members`);
+      if (res.ok) {
+        const data = await res.json();
+        setWorkspaceMembersMap((prev) => ({
+          ...prev,
+          [wsId]: data.members || [],
+        }));
+      }
+    } catch {
+      // ignore
+    } finally {
+      setIsLoadingWsMembers(false);
+    }
+  }, []);
 
   // Load active organization data
   const loadData = React.useCallback(async () => {
@@ -297,7 +439,17 @@ export default function SettingsPage() {
           }
           if (wsRes.ok) {
             const wData = await wsRes.json();
-            setWorkspaces(wData.workspaces || []);
+            const wsList = wData.workspaces || [];
+            setWorkspaces(wsList);
+            setSelectedWorkspaceId((prev) => {
+              if (prev && wsList.some((w: { id: string }) => w.id === prev)) {
+                fetchWorkspaceMembers(prev);
+                return prev;
+              }
+              const nextId = wsList[0]?.id || null;
+              if (nextId) fetchWorkspaceMembers(nextId);
+              return nextId;
+            });
           }
         }
       }
@@ -521,6 +673,162 @@ export default function SettingsPage() {
     }
   };
 
+  const eligibleOrgMembers = React.useMemo(() => {
+    if (!selectedWorkspaceId) return [];
+    const currentMemberUserIds = new Set(
+      (workspaceMembersMap[selectedWorkspaceId] || []).map((m) => m.userId)
+    );
+    const filtered = members.filter((m) => !currentMemberUserIds.has(m.userId));
+    return sortMembersByCurrentUserAndRole(
+      filtered,
+      currentUser?.id,
+      currentUser?.email
+    );
+  }, [members, workspaceMembersMap, selectedWorkspaceId, currentUser?.id, currentUser?.email]);
+
+  const handleSelectWorkspaceTab = (wsId: string) => {
+    setSelectedWorkspaceId(wsId);
+    if (!workspaceMembersMap[wsId]) {
+      fetchWorkspaceMembers(wsId);
+    }
+  };
+
+  const handleAddWorkspaceMember = async () => {
+    if (!selectedWorkspaceId || !addWsMemberUserId) return;
+    setIsAddingWsMember(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/v1/workspaces/${selectedWorkspaceId}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: addWsMemberUserId,
+          role: addWsMemberRole,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to add member to workspace");
+      }
+      setShowAddWsMemberModal(false);
+      setAddWsMemberUserId("");
+      setAddWsMemberRole("developer");
+      await fetchWorkspaceMembers(selectedWorkspaceId);
+      setMessage({
+        type: "success",
+        text: "Member successfully granted access to workspace.",
+      });
+    } catch (err: unknown) {
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to add member to workspace",
+      });
+    } finally {
+      setIsAddingWsMember(false);
+    }
+  };
+
+  const handleUpdateWsMemberRole = async (
+    wsId: string,
+    memberId: string,
+    newRole: string
+  ) => {
+    setUpdatingRoleId(memberId);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/v1/workspaces/${wsId}/members/${memberId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: newRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to update member role");
+      }
+      await fetchWorkspaceMembers(wsId);
+      setMessage({
+        type: "success",
+        text: "Workspace member role updated successfully.",
+      });
+    } catch (err: unknown) {
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to update workspace role",
+      });
+    } finally {
+      setUpdatingRoleId(null);
+    }
+  };
+
+  const handleConfirmRemoveWsMember = async () => {
+    if (!wsMemberToRemove) return;
+    setIsRemovingWsMember(true);
+    setMessage(null);
+    try {
+      const res = await fetch(
+        `/api/v1/workspaces/${wsMemberToRemove.workspaceId}/members/${wsMemberToRemove.id}`,
+        { method: "DELETE" }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to remove workspace access");
+      }
+      await fetchWorkspaceMembers(wsMemberToRemove.workspaceId);
+      setWsMemberToRemove(null);
+      setMessage({
+        type: "success",
+        text: "Workspace access revoked successfully.",
+      });
+    } catch (err: unknown) {
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to revoke access",
+      });
+    } finally {
+      setIsRemovingWsMember(false);
+    }
+  };
+
+  const handleConfirmDeleteWorkspace = async () => {
+    if (!wsToDelete || !org) return;
+    if (wsDeleteConfirmName !== wsToDelete.name) return;
+    setIsDeletingWs(true);
+    setMessage(null);
+    try {
+      const res = await fetch(`/api/v1/workspaces/${wsToDelete.id}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to delete workspace");
+      }
+      const remaining = workspaces.filter((w) => w.id !== wsToDelete.id);
+      setWorkspaces(remaining);
+      window.dispatchEvent(
+        new CustomEvent("chronos:workspaces-updated", { detail: remaining })
+      );
+      if (selectedWorkspaceId === wsToDelete.id) {
+        const nextWs = remaining[0] || null;
+        setSelectedWorkspaceId(nextWs ? nextWs.id : null);
+        if (nextWs) fetchWorkspaceMembers(nextWs.id);
+      }
+      const deletedName = wsToDelete.name;
+      setWsToDelete(null);
+      setWsDeleteConfirmName("");
+      setMessage({
+        type: "success",
+        text: `Workspace '${deletedName}' deleted. Workspace metadata and database registrations removed; external PostgreSQL databases unaffected.`,
+      });
+    } catch (err: unknown) {
+      setMessage({
+        type: "error",
+        text: err instanceof Error ? err.message : "Failed to delete workspace",
+      });
+    } finally {
+      setIsDeletingWs(false);
+    }
+  };
+
   const handleCreateWorkspace = async (values: WorkspaceFormValues) => {
     if (!org || !canCreateWorkspace) return;
     setIsCreatingWs(true);
@@ -539,12 +847,18 @@ export default function SettingsPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to create workspace");
 
+      resetWs();
+      const updatedList = [...workspaces, data.workspace];
+      setWorkspaces(updatedList);
+      setSelectedWorkspaceId(data.workspace.id);
+      fetchWorkspaceMembers(data.workspace.id);
+      window.dispatchEvent(
+        new CustomEvent("chronos:workspaces-updated", { detail: updatedList })
+      );
       setMessage({
         type: "success",
         text: `Workspace '${values.name}' created`,
       });
-      resetWs();
-      loadData();
     } catch (err: unknown) {
       setMessage({
         type: "error",
@@ -679,8 +993,13 @@ export default function SettingsPage() {
                         </td>
                       </tr>
                     ) : (
-                      members.map((m) => {
-                        const isSelf = currentUser?.id === m.userId;
+                      sortedMembers.map((m) => {
+                        const isSelf =
+                          currentUser?.id === m.userId ||
+                          (!!currentUser?.email &&
+                            !!m.email &&
+                            currentUser.email.toLowerCase() ===
+                              m.email.toLowerCase());
                         const isOwner = m.role === "owner";
                         const isCurrentOwner = org?.role === "owner";
 
@@ -804,9 +1123,12 @@ export default function SettingsPage() {
                                   size="sm"
                                   variant="outline"
                                   onClick={() => {
-                                    const otherMembers = members.filter(
+                                    const otherMembers = sortedMembers.filter(
                                       (other) =>
-                                        other.userId !== currentUser?.id,
+                                        other.userId !== currentUser?.id &&
+                                        (!currentUser?.email ||
+                                          other.email.toLowerCase() !==
+                                            currentUser.email.toLowerCase()),
                                     );
                                     if (otherMembers.length > 0) {
                                       setTransferValue(
@@ -1034,8 +1356,8 @@ export default function SettingsPage() {
           )}
         </TabsContent>
 
-        {/* Tab 3: Workspaces */}
-        <TabsContent value="workspaces" className="mt-4 space-y-4">
+        {/* Tab 3: Workspaces & Access Governance */}
+        <TabsContent value="workspaces" className="mt-4 space-y-5">
           {canCreateWorkspace && (
             <Card>
               <CardHeader>
@@ -1111,22 +1433,27 @@ export default function SettingsPage() {
             </Card>
           )}
 
+          {/* Workspaces List */}
           <Card>
-            <CardHeader>
-              <CardTitle>Existing Workspaces</CardTitle>
-              <CardDescription>
-                Registered workspaces under this organization
-              </CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
+              <div>
+                <CardTitle>Existing Workspaces</CardTitle>
+                <CardDescription>
+                  Select a workspace to manage its granular access control and member permissions
+                </CardDescription>
+              </div>
             </CardHeader>
             <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="border-b border-border bg-sidebar/50 text-muted-foreground">
-                      <th className="p-3 font-medium">Name</th>
+                      <th className="p-3 font-medium">Workspace Name</th>
                       <th className="p-3 font-medium">Slug</th>
                       <th className="p-3 font-medium">Environment</th>
+                      <th className="p-3 font-medium">Members</th>
                       <th className="p-3 font-medium">Created</th>
+                      <th className="p-3 font-medium text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -1143,53 +1470,330 @@ export default function SettingsPage() {
                             <div className="h-5 w-16 bg-muted rounded" />
                           </td>
                           <td className="p-3">
+                            <div className="h-4 w-12 bg-muted rounded" />
+                          </td>
+                          <td className="p-3">
                             <div className="h-4 w-24 bg-muted rounded" />
+                          </td>
+                          <td className="p-3 text-right">
+                            <div className="h-6 w-20 bg-muted rounded ml-auto" />
                           </td>
                         </tr>
                       ))
                     ) : workspaces.length === 0 ? (
                       <tr>
                         <td
-                          colSpan={4}
+                          colSpan={6}
                           className="p-6 text-center text-muted-foreground font-mono text-xs"
                         >
                           No registered workspaces found
                         </td>
                       </tr>
                     ) : (
-                      workspaces.map((ws) => (
-                        <tr key={ws.id} className="hover:bg-elevated/40">
-                          <td className="p-3 font-medium text-foreground">
-                            {ws.name}
-                          </td>
-                          <td className="p-3 font-mono text-muted-foreground">
-                            {ws.slug}
-                          </td>
-                          <td className="p-3">
-                            <Badge
-                              variant={
-                                ws.environment === "production"
-                                  ? "destructive"
-                                  : ws.environment === "staging"
-                                    ? "warning"
-                                    : "info"
-                              }
-                              className="capitalize"
-                            >
-                              {ws.environment}
-                            </Badge>
-                          </td>
-                          <td className="p-3 font-mono text-[11px] text-muted-foreground">
-                            {formatDate(ws.createdAt)}
-                          </td>
-                        </tr>
-                      ))
+                      workspaces.map((ws) => {
+                        const isSelected = ws.id === selectedWorkspaceId;
+                        const wsMembersCount = workspaceMembersMap[ws.id]?.length;
+                        return (
+                          <tr
+                            key={ws.id}
+                            className={cn(
+                              "transition-colors",
+                              isSelected
+                                ? "bg-panel/70 border-l-2 border-l-primary"
+                                : "hover:bg-elevated/40"
+                            )}
+                          >
+                            <td className="p-3 font-medium text-foreground">
+                              <div className="flex items-center gap-2">
+                                <Layers className="h-3.5 w-3.5 text-primary shrink-0" />
+                                <span>{ws.name}</span>
+                              </div>
+                            </td>
+                            <td className="p-3 font-mono text-muted-foreground">
+                              {ws.slug}
+                            </td>
+                            <td className="p-3">
+                              <Badge
+                                variant={
+                                  ws.environment === "production"
+                                    ? "destructive"
+                                    : ws.environment === "staging"
+                                      ? "warning"
+                                      : "info"
+                                }
+                                className="capitalize text-[10px]"
+                              >
+                                {ws.environment}
+                              </Badge>
+                            </td>
+                            <td className="p-3 font-mono text-muted-foreground">
+                              {wsMembersCount !== undefined ? wsMembersCount : "-"}
+                            </td>
+                            <td className="p-3 font-mono text-[11px] text-muted-foreground">
+                              {formatDate(ws.createdAt)}
+                            </td>
+                            <td className="p-3 text-right">
+                              <div className="inline-flex items-center gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant={isSelected ? "default" : "outline"}
+                                  onClick={() => handleSelectWorkspaceTab(ws.id)}
+                                  className="h-7 px-2.5 text-[11px] cursor-pointer"
+                                >
+                                  {isSelected ? "Managing Access" : "Manage Access"}
+                                </Button>
+                                {canDeleteWorkspace && workspaces.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => {
+                                      setWsToDelete(ws);
+                                      setWsDeleteConfirmName("");
+                                    }}
+                                    className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive cursor-pointer"
+                                    title="Delete workspace"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
               </div>
             </CardContent>
           </Card>
+
+          {/* Granular Workspace Access & Membership Section */}
+          {selectedWorkspaceId && (
+            (() => {
+              const activeWs = workspaces.find((w) => w.id === selectedWorkspaceId) || workspaces[0];
+              const membersList = sortedWorkspaceMembers;
+              return (
+                <Card className="border-border/80">
+                  <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <Shield className="h-4 w-4 text-primary" />
+                        <CardTitle className="text-sm font-semibold">
+                          Access Control: {activeWs?.name || "Workspace"}
+                        </CardTitle>
+                        {activeWs?.environment && (
+                          <Badge
+                            variant={
+                              activeWs.environment === "production"
+                                ? "destructive"
+                                : activeWs.environment === "staging"
+                                  ? "warning"
+                                  : "info"
+                            }
+                            className="capitalize text-[10px]"
+                          >
+                            {activeWs.environment}
+                          </Badge>
+                        )}
+                      </div>
+                      <CardDescription className="text-xs">
+                        Assign organization members and configure workspace-specific roles. Workspace membership operates independently of organization-level roles.
+                      </CardDescription>
+                    </div>
+                    {canAssignWorkspaceMembers && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          setShowAddWsMemberModal(true);
+                          setAddWsMemberRole("developer");
+                          setAddWsMemberUserId(eligibleOrgMembers[0]?.userId || "");
+                        }}
+                        className="h-8 px-3 text-xs gap-1.5 cursor-pointer shrink-0"
+                      >
+                        <UserPlus className="h-3.5 w-3.5" />
+                        <span>Add Member</span>
+                      </Button>
+                    )}
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-border bg-sidebar/50 text-muted-foreground">
+                            <th className="p-3 font-medium">Member</th>
+                            <th className="p-3 font-medium">Workspace Role</th>
+                            <th className="p-3 font-medium">Assigned By</th>
+                            <th className="p-3 font-medium">Access Status</th>
+                            <th className="p-3 font-medium">Joined Date</th>
+                            {canRevokeWorkspaceMembers && (
+                              <th className="p-3 font-medium text-right">Actions</th>
+                            )}
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border">
+                          {isLoadingWsMembers ? (
+                            Array.from({ length: 2 }).map((_, i) => (
+                              <tr key={i} className="animate-pulse">
+                                <td className="p-3">
+                                  <div className="h-4 w-36 bg-muted rounded" />
+                                </td>
+                                <td className="p-3">
+                                  <div className="h-6 w-28 bg-muted rounded" />
+                                </td>
+                                <td className="p-3">
+                                  <div className="h-4 w-28 bg-muted rounded" />
+                                </td>
+                                <td className="p-3">
+                                  <div className="h-4 w-16 bg-muted rounded" />
+                                </td>
+                                <td className="p-3">
+                                  <div className="h-4 w-24 bg-muted rounded" />
+                                </td>
+                                {canRevokeWorkspaceMembers && (
+                                  <td className="p-3 text-right">
+                                    <div className="h-4 w-12 bg-muted rounded ml-auto" />
+                                  </td>
+                                )}
+                              </tr>
+                            ))
+                          ) : membersList.length === 0 ? (
+                            <tr>
+                              <td
+                                colSpan={canRevokeWorkspaceMembers ? 6 : 5}
+                                className="p-8 text-center text-muted-foreground font-mono text-xs"
+                              >
+                                No members assigned to this workspace yet.
+                              </td>
+                            </tr>
+                          ) : (
+                            membersList.map((mem) => {
+                              const isCurrentUser =
+                                mem.userId === currentUser?.id ||
+                                (!!currentUser?.email &&
+                                  !!mem.email &&
+                                  currentUser.email.toLowerCase() ===
+                                    mem.email.toLowerCase());
+                              return (
+                                <tr key={mem.id} className="hover:bg-elevated/40">
+                                  <td className="p-3">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className="h-7 w-7 rounded-full bg-elevated border border-border flex items-center justify-center text-[10px] font-medium text-foreground shrink-0">
+                                        {getInitials(mem.fullName || mem.email)}
+                                      </div>
+                                      <div className="flex flex-col min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="font-medium text-foreground truncate">
+                                            {mem.fullName || mem.email}
+                                          </span>
+                                          {isCurrentUser && (
+                                            <span className="text-[10px] text-muted-foreground font-mono">
+                                              (You)
+                                            </span>
+                                          )}
+                                        </div>
+                                        <span className="text-[11px] text-muted-foreground truncate font-mono">
+                                          {mem.email}
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="p-3">
+                                    {canAssignWorkspaceMembers ? (
+                                      <Select
+                                        value={normalizeRole(mem.role)}
+                                        onValueChange={(newRole) =>
+                                          handleUpdateWsMemberRole(
+                                            selectedWorkspaceId,
+                                            mem.id,
+                                            newRole
+                                          )
+                                        }
+                                        disabled={updatingRoleId === mem.id}
+                                      >
+                                        <SelectTrigger className="h-7 w-44 text-xs font-sans">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="dba" className="text-xs">
+                                            DBA (Full Access)
+                                          </SelectItem>
+                                          <SelectItem value="developer" className="text-xs">
+                                            Developer (Write / DML)
+                                          </SelectItem>
+                                          <SelectItem value="database_engineer" className="text-xs">
+                                            Database Engineer (Inspect / Explain)
+                                          </SelectItem>
+                                          <SelectItem value="data_analyst" className="text-xs">
+                                            Data Analyst (Read-only SELECT)
+                                          </SelectItem>
+                                          <SelectItem value="auditor" className="text-xs">
+                                            Auditor (Audit Logs)
+                                          </SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    ) : (
+                                      <Badge variant="outline" className="capitalize text-[10px] font-mono">
+                                        {CHRONOS_ROLES[normalizeRole(mem.role)]?.label || mem.role}
+                                      </Badge>
+                                    )}
+                                  </td>
+                                  <td className="p-3 font-mono text-[11px] text-muted-foreground">
+                                    {mem.assignedByName || mem.assignedByEmail || "Direct Assignment"}
+                                  </td>
+                                  <td className="p-3">
+                                    <div className="inline-flex items-center gap-1.5 text-xs text-foreground font-medium">
+                                      <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                                      <span>Active</span>
+                                    </div>
+                                  </td>
+                                  <td className="p-3 font-mono text-[11px] text-muted-foreground">
+                                    {formatDate(mem.createdAt)}
+                                  </td>
+                                  {canRevokeWorkspaceMembers && (
+                                    <td className="p-3 text-right">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="ghost"
+                                        disabled={isCurrentUser && isOwner}
+                                        onClick={() =>
+                                          setWsMemberToRemove({
+                                            id: mem.id,
+                                            workspaceId: selectedWorkspaceId,
+                                            workspaceName: activeWs?.name || "Workspace",
+                                            fullName: mem.fullName || mem.email,
+                                            email: mem.email,
+                                            role: mem.role,
+                                          })
+                                        }
+                                        className="h-7 px-2 text-destructive hover:bg-destructive/10 text-xs cursor-pointer"
+                                        title={
+                                          isCurrentUser && isOwner
+                                            ? "Cannot revoke workspace access from organization owner"
+                                            : "Revoke workspace access"
+                                        }
+                                      >
+                                        <Trash2 className="h-3.5 w-3.5 mr-1" />
+                                        <span>Revoke</span>
+                                      </Button>
+                                    </td>
+                                  )}
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()
+          )}
         </TabsContent>
 
         {/* Tab 4: RBAC Permissions Matrix */}
@@ -1207,13 +1811,13 @@ export default function SettingsPage() {
                 <table className="w-full text-left text-xs border-collapse font-mono">
                   <thead>
                     <tr className="border-b border-border bg-sidebar/50 text-muted-foreground">
-                      <th className="p-3 font-medium min-w-[220px]">
+                      <th className="p-3 font-medium min-w-55">
                         Capability / Permission
                       </th>
                       {CHRONOS_ROLE_KEYS.map((roleKey) => (
                         <th
                           key={roleKey}
-                          className="p-3 font-medium text-center min-w-[90px]"
+                          className="p-3 font-medium text-center min-w-22.5"
                         >
                           {CHRONOS_ROLES[roleKey]?.label || roleKey}
                         </th>
@@ -1403,8 +2007,14 @@ export default function SettingsPage() {
                     <SelectValue placeholder="Choose an active member..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {members
-                      .filter((m) => m.userId !== currentUser?.id)
+                    {sortedMembers
+                      .filter(
+                        (m) =>
+                          m.userId !== currentUser?.id &&
+                          (!currentUser?.email ||
+                            m.email.toLowerCase() !==
+                              currentUser.email.toLowerCase()),
+                      )
                       .map((m) => (
                         <SelectItem key={m.id} value={m.id} className="text-xs">
                           <span className="font-medium text-foreground">
@@ -1699,6 +2309,257 @@ export default function SettingsPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* SHADCN DIALOG: Add Workspace Member */}
+      <Dialog open={showAddWsMemberModal} onOpenChange={setShowAddWsMemberModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                <UserPlus className="h-4 w-4" />
+              </div>
+              <DialogTitle className="text-base font-semibold text-foreground">
+                Grant Workspace Access
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground pt-1 leading-normal">
+              Select an existing member of &quot;{org?.name}&quot; to grant access to the{" "}
+              <span className="font-semibold text-foreground">
+                {workspaces.find((w) => w.id === selectedWorkspaceId)?.name}
+              </span>{" "}
+              workspace. No email invitation or verification is required.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">
+                Organization Member
+              </label>
+              {eligibleOrgMembers.length === 0 ? (
+                <div className="p-3 rounded-md bg-muted/30 border border-border text-xs text-muted-foreground font-mono">
+                  All organization members already belong to this workspace.
+                </div>
+              ) : (
+                <Select
+                  value={addWsMemberUserId}
+                  onValueChange={setAddWsMemberUserId}
+                >
+                  <SelectTrigger className="h-9 text-xs font-sans">
+                    <SelectValue placeholder="Select member..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {eligibleOrgMembers.map((m) => (
+                      <SelectItem key={m.userId} value={m.userId} className="text-xs">
+                        {m.fullName || m.email} ({m.email})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">
+                Workspace Role
+              </label>
+              <Select
+                value={addWsMemberRole}
+                onValueChange={setAddWsMemberRole}
+              >
+                <SelectTrigger className="h-9 text-xs font-sans">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="developer" className="text-xs">
+                    Developer (Write / DML query permissions)
+                  </SelectItem>
+                  <SelectItem value="database_engineer" className="text-xs">
+                    Database Engineer (Performance diagnostics & explain plans)
+                  </SelectItem>
+                  <SelectItem value="data_analyst" className="text-xs">
+                    Data Analyst (Strictly read-only SELECT queries)
+                  </SelectItem>
+                  <SelectItem value="dba" className="text-xs">
+                    DBA (Full workspace database administrator)
+                  </SelectItem>
+                  <SelectItem value="auditor" className="text-xs">
+                    Auditor (Append-only audit telemetry access)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border/50">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAddWsMemberModal(false)}
+              disabled={isAddingWsMember}
+              className="text-xs h-8 cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleAddWorkspaceMember}
+              isLoading={isAddingWsMember}
+              disabled={isAddingWsMember || !addWsMemberUserId || eligibleOrgMembers.length === 0}
+              className="text-xs h-8 cursor-pointer gap-1.5"
+            >
+              <UserPlus className="h-3.5 w-3.5" />
+              <span>Grant Access</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* SHADCN DIALOG: Revoke Workspace Access */}
+      <Dialog
+        open={!!wsMemberToRemove}
+        onOpenChange={(open) => !open && setWsMemberToRemove(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                <AlertTriangle className="h-4 w-4" />
+              </div>
+              <DialogTitle className="text-base font-semibold text-foreground">
+                Revoke Workspace Access
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground pt-1 leading-normal">
+              Are you sure you want to revoke access for{" "}
+              <span className="font-semibold text-foreground">
+                {wsMemberToRemove?.fullName}
+              </span>{" "}
+              from the{" "}
+              <span className="font-semibold text-foreground">
+                {wsMemberToRemove?.workspaceName}
+              </span>{" "}
+              workspace?
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 p-3 space-y-2 text-xs">
+            <div className="font-medium text-destructive flex items-center gap-1.5">
+              <ShieldAlert className="h-4 w-4 shrink-0" />
+              <span>Access Revocation Notice</span>
+            </div>
+            <p className="text-muted-foreground leading-relaxed">
+              The user will immediately lose access to all databases, saved queries, and telemetry within this workspace. Their account and organization membership will remain active.
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border/50">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setWsMemberToRemove(null)}
+              disabled={isRemovingWsMember}
+              className="text-xs h-8 cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              isLoading={isRemovingWsMember}
+              disabled={isRemovingWsMember}
+              onClick={handleConfirmRemoveWsMember}
+              className="text-xs h-8 cursor-pointer gap-1.5"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Revoke Access</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* SHADCN DIALOG: Delete Workspace */}
+      <Dialog
+        open={!!wsToDelete}
+        onOpenChange={(open) => !open && setWsToDelete(null)}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
+                <Trash2 className="h-4 w-4" />
+              </div>
+              <DialogTitle className="text-base font-semibold text-foreground">
+                Delete Workspace
+              </DialogTitle>
+            </div>
+            <DialogDescription className="text-xs text-muted-foreground pt-1 leading-normal">
+              Permanently delete workspace{" "}
+              <span className="font-semibold text-foreground">
+                &quot;{wsToDelete?.name}&quot;
+              </span>{" "}
+              ({wsToDelete?.environment}).
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-2 text-xs">
+            <div className="rounded-lg border border-amber-500/20 bg-amber-500/5 p-3 space-y-1.5">
+              <div className="font-medium text-amber-500 flex items-center gap-1.5">
+                <Shield className="h-4 w-4 shrink-0" />
+                <span>External Database Safety Guarantee</span>
+              </div>
+              <p className="text-muted-foreground leading-relaxed">
+                Deleting this workspace will remove registered connection credentials and workspace metadata from Chronos. External PostgreSQL database clusters will NOT be dropped or modified.
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground">
+                To confirm, type <span className="font-semibold text-foreground">&quot;{wsToDelete?.name}&quot;</span> below:
+              </label>
+              <Input
+                type="text"
+                value={wsDeleteConfirmName}
+                onChange={(e) => setWsDeleteConfirmName(e.target.value)}
+                placeholder={wsToDelete?.name || "Workspace Name"}
+                className="h-8 text-xs font-mono bg-elevated/40"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0 pt-2 border-t border-border/50">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setWsToDelete(null)}
+              disabled={isDeletingWs}
+              className="text-xs h-8 cursor-pointer"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              isLoading={isDeletingWs}
+              disabled={
+                isDeletingWs ||
+                wsDeleteConfirmName.trim() !== (wsToDelete?.name || "").trim()
+              }
+              onClick={handleConfirmDeleteWorkspace}
+              className="text-xs h-8 cursor-pointer gap-1.5"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              <span>Delete Workspace</span>
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

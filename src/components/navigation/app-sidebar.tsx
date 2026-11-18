@@ -24,20 +24,36 @@ import {
   User,
   Shield,
   Monitor,
+  ChevronsUpDown,
+  Check,
+  Loader2,
 } from "lucide-react";
 import { cn, getInitials } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { StatusIndicator } from "@/components/shared/status-indicator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import { useTranslation } from "@/lib/i18n";
 
 interface AppSidebarProps {
   currentOrg?: { id: string; name: string; role?: string };
   currentWorkspace?: { id: string; name: string; environment?: string };
   currentDatabase?: { id: string; name: string; status?: string };
+  workspaces?: Array<{ id: string; name: string; slug?: string; environment: string; role?: string }>;
   user?: { email: string; fullName: string; avatarUrl?: string | null };
   permissions?: string[];
   onLogout?: () => void;
+  onWorkspaceChange?: (
+    workspace: { id: string; name: string; environment: string },
+    database?: { id: string; name: string; status?: string } | null
+  ) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   onClose?: () => void;
@@ -48,8 +64,10 @@ export function AppSidebar({
   currentOrg,
   currentWorkspace,
   currentDatabase,
+  workspaces = [],
   user,
   onLogout,
+  onWorkspaceChange,
   isCollapsed = false,
   onToggleCollapse,
   onClose,
@@ -57,12 +75,47 @@ export function AppSidebar({
 }: AppSidebarProps) {
   const pathname = usePathname();
   const [userMenuOpen, setUserMenuOpen] = React.useState(false);
+  const [wsMenuOpen, setWsMenuOpen] = React.useState(false);
+  const [isSwitchingWs, setIsSwitchingWs] = React.useState(false);
+  const [wsSwitchError, setWsSwitchError] = React.useState<string | null>(null);
   const { t } = useTranslation();
 
   const safeOrg = currentOrg || { id: "", name: "", role: "" };
   const safeWorkspace = currentWorkspace || { id: "", name: "", environment: "" };
   const safeDatabase = currentDatabase || { id: "", name: "", status: "" };
   const safeUser = user || { email: "", fullName: "", avatarUrl: null };
+
+  const handleSelectWorkspace = async (ws: { id: string; name: string; environment?: string }) => {
+    if (ws.id === safeWorkspace.id) {
+      setWsMenuOpen(false);
+      return;
+    }
+    setIsSwitchingWs(true);
+    setWsSwitchError(null);
+    try {
+      const res = await fetch("/api/v1/workspaces/active", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId: ws.id }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Failed to switch workspace");
+      }
+
+      const data = await res.json();
+      setWsMenuOpen(false);
+      if (onWorkspaceChange) {
+        onWorkspaceChange(data.workspace, data.database);
+      }
+    } catch (err: any) {
+      console.error("Workspace switch failed:", err);
+      setWsSwitchError(err.message || "Failed to switch workspace");
+    } finally {
+      setIsSwitchingWs(false);
+    }
+  };
 
   const navigationItems = [
     {
@@ -200,35 +253,99 @@ export function AppSidebar({
               )}
             </div>
 
-            {/* Workspace & Environment */}
-            <div className="flex items-center justify-between px-2 py-1.5 rounded hover:bg-panel cursor-pointer transition-colors text-xs">
-              <div className="flex flex-col min-w-0">
-                <span className="text-[10px] uppercase font-mono text-muted-foreground tracking-wider">
-                  {t("nav.workspace")}
-                </span>
-                {safeWorkspace.name ? (
-                  <span className="font-medium text-foreground truncate text-[11px]">
-                    {safeWorkspace.name}
-                  </span>
-                ) : (
-                  <div className="h-3 w-16 bg-muted/40 rounded animate-pulse my-0.5" />
-                )}
-              </div>
-              {safeWorkspace.environment && (
-                <Badge
-                  variant={
-                    safeWorkspace.environment === "production"
-                      ? "destructive"
-                      : safeWorkspace.environment === "staging"
-                      ? "warning"
-                      : "info"
-                  }
-                  className="text-[9px] shrink-0 ml-1"
+            {/* Workspace & Environment Switcher */}
+            <DropdownMenu open={wsMenuOpen} onOpenChange={setWsMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  disabled={isSwitchingWs}
+                  className="w-full flex items-center justify-between px-2 py-1.5 rounded hover:bg-panel focus:outline-none focus:ring-1 focus:ring-primary/40 cursor-pointer transition-colors text-xs text-left group"
                 >
-                  {safeWorkspace.environment}
-                </Badge>
-              )}
-            </div>
+                  <div className="flex flex-col min-w-0 pr-1">
+                    <span className="text-[10px] uppercase font-mono text-muted-foreground tracking-wider flex items-center gap-1">
+                      {t("nav.workspace")}
+                      {isSwitchingWs && <Loader2 className="h-2.5 w-2.5 animate-spin text-primary" />}
+                    </span>
+                    {safeWorkspace.name ? (
+                      <span className="font-medium text-foreground truncate text-[11px] group-hover:text-primary transition-colors">
+                        {safeWorkspace.name}
+                      </span>
+                    ) : (
+                      <div className="h-3 w-16 bg-muted/40 rounded animate-pulse my-0.5" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    {safeWorkspace.environment && (
+                      <Badge
+                        variant={
+                          safeWorkspace.environment === "production"
+                            ? "destructive"
+                            : safeWorkspace.environment === "staging"
+                            ? "warning"
+                            : "info"
+                        }
+                        className="text-[9px] capitalize shrink-0"
+                      >
+                        {safeWorkspace.environment}
+                      </Badge>
+                    )}
+                    <ChevronsUpDown className="h-3 w-3 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56 p-1 z-50">
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono px-2 py-1">
+                  Accessible Workspaces
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {wsSwitchError && (
+                  <div className="p-2 text-[10px] text-destructive bg-destructive/10 rounded mb-1">
+                    {wsSwitchError}
+                  </div>
+                )}
+                {workspaces.length === 0 ? (
+                  <div className="p-3 text-center text-xs text-muted-foreground font-mono">
+                    No accessible workspaces
+                  </div>
+                ) : (
+                  workspaces.map((ws) => {
+                    const isActive = ws.id === safeWorkspace.id;
+                    return (
+                      <DropdownMenuItem
+                        key={ws.id}
+                        onClick={() => handleSelectWorkspace(ws)}
+                        className={cn(
+                          "flex items-center justify-between px-2 py-1.5 cursor-pointer text-xs rounded",
+                          isActive && "bg-elevated font-medium text-primary"
+                        )}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 mr-1">
+                          <Check
+                            className={cn(
+                              "h-3.5 w-3.5 shrink-0",
+                              isActive ? "opacity-100 text-primary" : "opacity-0"
+                            )}
+                          />
+                          <span className="truncate">{ws.name}</span>
+                        </div>
+                        <Badge
+                          variant={
+                            ws.environment === "production"
+                              ? "destructive"
+                              : ws.environment === "staging"
+                              ? "warning"
+                              : "info"
+                          }
+                          className="text-[8px] uppercase px-1 py-0 h-4 shrink-0"
+                        >
+                          {ws.environment}
+                        </Badge>
+                      </DropdownMenuItem>
+                    );
+                  })
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Connected Database */}
             <div className="flex items-center justify-between px-2 py-1.5 rounded bg-panel/60 border border-border/60 text-xs">
@@ -243,6 +360,64 @@ export function AppSidebar({
           </div>
         ) : (
           <div className="p-2 border-b border-border flex flex-col items-center gap-2">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="h-8 w-8 rounded-md bg-panel/70 hover:bg-panel flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  title={`Workspace: ${safeWorkspace.name || "None"} (${safeWorkspace.environment || ""})`}
+                >
+                  <Layers className="h-4 w-4 text-primary" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent side="right" align="start" className="w-56 p-1 z-50">
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground font-mono px-2 py-1">
+                  Accessible Workspaces
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {workspaces.length === 0 ? (
+                  <div className="p-3 text-center text-xs text-muted-foreground font-mono">
+                    No accessible workspaces
+                  </div>
+                ) : (
+                  workspaces.map((ws) => {
+                    const isActive = ws.id === safeWorkspace.id;
+                    return (
+                      <DropdownMenuItem
+                        key={ws.id}
+                        onClick={() => handleSelectWorkspace(ws)}
+                        className={cn(
+                          "flex items-center justify-between px-2 py-1.5 cursor-pointer text-xs rounded",
+                          isActive && "bg-elevated font-medium text-primary"
+                        )}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 mr-1">
+                          <Check
+                            className={cn(
+                              "h-3.5 w-3.5 shrink-0",
+                              isActive ? "opacity-100 text-primary" : "opacity-0"
+                            )}
+                          />
+                          <span className="truncate">{ws.name}</span>
+                        </div>
+                        <Badge
+                          variant={
+                            ws.environment === "production"
+                              ? "destructive"
+                              : ws.environment === "staging"
+                              ? "warning"
+                              : "info"
+                          }
+                          className="text-[8px] uppercase px-1 py-0 h-4 shrink-0"
+                        >
+                          {ws.environment}
+                        </Badge>
+                      </DropdownMenuItem>
+                    );
+                  })
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <div
               className="h-8 w-8 rounded-md bg-panel flex items-center justify-center text-primary"
               title={safeDatabase.name ? `Connected: ${safeDatabase.name}` : undefined}

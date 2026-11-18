@@ -18,7 +18,13 @@ export async function GET(req: Request) {
     const context = await requireOrganizationAccess(orgId);
     requirePermission(context, "workspace:read");
 
-    const wss = await WorkspaceService.getWorkspaces(orgId);
+    const isOwnerOrAdmin =
+      context.organizationRole === "owner" || context.organizationRole === "admin";
+    const wss = await WorkspaceService.getAccessibleWorkspaces({
+      organizationId: orgId,
+      userId: context.userId,
+      isOwnerOrAdmin,
+    });
     return NextResponse.json({ workspaces: wss });
   } catch (err) {
     const error = handleApiError(err);

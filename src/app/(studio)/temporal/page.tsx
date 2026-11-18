@@ -112,12 +112,13 @@ export default function TemporalPage() {
         if (meRes.ok) {
           const me = await meRes.json();
           const org = me.organizations?.[0];
-          const ws = me.workspaces?.[0];
+          const ws = me.currentWorkspace || me.workspaces?.[0];
           if (org) {
             setActiveOrgId(org.id);
             if (ws) setActiveWsId(ws.id);
 
-            const dbRes = await fetch(`/api/v1/databases?organizationId=${org.id}`);
+            const wsQuery = ws ? `&workspaceId=${ws.id}` : "";
+            const dbRes = await fetch(`/api/v1/databases?organizationId=${org.id}${wsQuery}`);
             if (dbRes.ok) {
               const data = await dbRes.json();
               setDatabases(data.databases || []);
@@ -130,6 +131,54 @@ export default function TemporalPage() {
       }
     }
     init();
+
+    // Listen for workspace switch to reset timeline & diffs to prevent cross-workspace data leakage
+    const handleWorkspaceChanged = async (e: Event) => {
+      const customEvent = e as CustomEvent<{
+        workspace?: { id: string; name: string; environment: string };
+        database?: { id: string; name: string; status?: string } | null;
+      }>;
+      const ws = customEvent.detail?.workspace;
+      const initialDb = customEvent.detail?.database;
+
+      // Invalidate current state to prevent cross-workspace leakage
+      setVersions([]);
+      setSelectedVersion(null);
+      setCompareVersionB(null);
+      setDiffResult(null);
+      setTimeTravelResult(null);
+
+      if (ws) {
+        setActiveWsId(ws.id);
+        const meRes = await fetch("/api/v1/auth/me");
+        if (meRes.ok) {
+          const me = await meRes.json();
+          const orgId = me.currentOrg?.id || me.organizations?.[0]?.id;
+          if (orgId) {
+            const dbRes = await fetch(
+              `/api/v1/databases?organizationId=${orgId}&workspaceId=${ws.id}`
+            );
+            if (dbRes.ok) {
+              const data = await dbRes.json();
+              const dbs = data.databases || [];
+              setDatabases(dbs);
+              if (initialDb && dbs.some((d: { id: string }) => d.id === initialDb.id)) {
+                setSelectedDbId(initialDb.id);
+              } else if (dbs.length > 0) {
+                setSelectedDbId(dbs[0].id);
+              } else {
+                setSelectedDbId("");
+              }
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener("chronos:workspace-changed", handleWorkspaceChanged);
+    return () => {
+      window.removeEventListener("chronos:workspace-changed", handleWorkspaceChanged);
+    };
   }, []);
 
   // 2. Fetch record timeline

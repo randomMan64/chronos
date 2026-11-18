@@ -61,9 +61,11 @@ export class OrganizationService {
 
     // 4. Add creator as DBA in workspace
     await db.insert(workspaceMembers).values({
+      organizationId: org.id,
       workspaceId: ws.id,
       userId: params.userId,
       role: "dba",
+      assignedBy: params.userId,
     });
 
     // 5. Audit

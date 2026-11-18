@@ -16,6 +16,11 @@ export type Permission =
   | "workspace:read"
   | "workspace:create"
   | "workspace:manage"
+  | "workspace:delete"
+  | "workspace:members:read"
+  | "workspace:members:assign"
+  | "workspace:members:revoke"
+  | "workspace:permissions:manage"
   // Database Operations & Governance
   | "database:read"
   | "database:create"
