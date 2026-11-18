@@ -18,7 +18,7 @@ export async function POST(req: Request) {
       );
     }
 
-    const { organizationId, workspaceId, databaseId, schemaName, tableName, asOfTimestamp, recordId } =
+    const { organizationId, workspaceId, databaseId, schemaName, tableName, asOfTimestamp, recordId, page, pageSize } =
       parsed.data;
 
     // Time travel is read-only: requires history:read
@@ -30,6 +30,8 @@ export async function POST(req: Request) {
       tableName,
       recordId,
       asOfTimestamp: new Date(asOfTimestamp),
+      page,
+      pageSize,
     });
 
     return NextResponse.json(result);

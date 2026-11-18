@@ -223,6 +223,14 @@ describe("Database Explorer Record-Level Editing & Permissions", () => {
       expect(result.record).toEqual({ id: "rec-1", status: "active", score: 10 });
       expect(result.changedColumns).toEqual(["status"]);
 
+      // Verify parameterized SQL does not skip $1 and indices match allParams 1:1 (avoids Postgres 42P18)
+      expect(mockQuery).toHaveBeenNthCalledWith(
+        2,
+        expect.anything(),
+        `UPDATE "public"."accounts" SET "status" = $1 WHERE "id" = $2 RETURNING *;`,
+        { params: ["active", "rec-1"] }
+      );
+
       // Verify Temporal Snapshot
       expect(temporalSpy).toHaveBeenCalledTimes(1);
       expect(temporalSpy).toHaveBeenCalledWith(

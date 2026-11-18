@@ -256,6 +256,7 @@ export class RecordService {
     const setClauses: string[] = [];
     const updateValues: unknown[] = [];
     const changedColumns: string[] = [];
+    let updateParamIndex = 1;
 
     const pkColNames = new Set(pkCols.map((c) => c.columnName));
     const validColMap = new Map(tableMeta.columns.map((c) => [c.columnName, c]));
@@ -280,7 +281,7 @@ export class RecordService {
       }
 
       const sanitizedVal = sanitizeColumnValue(rawVal, colMeta);
-      setClauses.push(`${quoteIdent(colName)} = $${paramIndex++}`);
+      setClauses.push(`${quoteIdent(colName)} = $${updateParamIndex++}`);
       updateValues.push(sanitizedVal);
       changedColumns.push(colName);
     }

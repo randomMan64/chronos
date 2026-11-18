@@ -14,6 +14,11 @@ export async function GET(
     const { searchParams } = new URL(req.url);
     const databaseId = searchParams.get("databaseId");
     const schema = searchParams.get("schema") || "public";
+    const operation = searchParams.get("operation") || undefined;
+    const startDateStr = searchParams.get("startDate");
+    const endDateStr = searchParams.get("endDate");
+    const limit = searchParams.get("limit") ? parseInt(searchParams.get("limit")!, 10) : undefined;
+    const offset = searchParams.get("offset") ? parseInt(searchParams.get("offset")!, 10) : undefined;
 
     if (!databaseId) {
       return NextResponse.json({ error: "databaseId is required" }, { status: 400 });
@@ -26,6 +31,11 @@ export async function GET(
       schemaName: schema,
       tableName: params.table,
       recordId: params.recordId,
+      operation,
+      startDate: startDateStr ? new Date(startDateStr) : undefined,
+      endDate: endDateStr ? new Date(endDateStr) : undefined,
+      limit,
+      offset,
     });
 
     return NextResponse.json({ versions });

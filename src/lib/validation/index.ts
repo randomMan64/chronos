@@ -122,6 +122,8 @@ export const timeTravelQuerySchema = z.object({
   tableName: z.string().min(1),
   asOfTimestamp: z.string().datetime(),
   recordId: z.string().optional(),
+  page: z.number().int().min(1).default(1).optional(),
+  pageSize: z.number().int().min(1).max(100).default(25).optional(),
 });
 
 export const compareVersionsSchema = z.object({

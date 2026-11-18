@@ -90,10 +90,44 @@ export class TemporalService {
   }
 
   public static async getTemporalTables(databaseId: string) {
-    return await db
+    const configured = await db
       .select()
       .from(temporalTables)
       .where(eq(temporalTables.databaseId, databaseId));
+
+    try {
+      const versioned = await db
+        .selectDistinct({
+          tableName: rowVersions.tableName,
+          schemaName: rowVersions.schemaName,
+        })
+        .from(rowVersions)
+        .where(eq(rowVersions.databaseId, databaseId));
+
+      const configuredNames = new Set(configured.map((c) => c.tableName));
+      const merged = [...configured];
+
+      for (const v of versioned) {
+        if (!configuredNames.has(v.tableName)) {
+          merged.push({
+            id: `recorded-${v.tableName}`,
+            databaseId,
+            schemaName: v.schemaName || "public",
+            tableName: v.tableName,
+            isEnabled: true,
+            triggerName: "captured_mutations",
+            retentionDays: 90,
+            capturedOperations: "INSERT,UPDATE,DELETE,RESTORE",
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          } as any);
+        }
+      }
+
+      return merged;
+    } catch {
+      return configured;
+    }
   }
 
   /**
@@ -150,27 +184,132 @@ export class TemporalService {
   }
 
   /**
-   * Retrieves full chronological timeline of versions for a specific record.
+   * Retrieves full chronological timeline of versions for a specific record or table.
    */
   public static async getRecordTimeline(params: {
+    databaseId: string;
+    schemaName?: string;
+    tableName: string;
+    recordId?: string;
+    operation?: string;
+    startDate?: Date;
+    endDate?: Date;
+    limit?: number;
+    offset?: number;
+  }) {
+    const schema = params.schemaName || "public";
+    const conditions = [
+      eq(rowVersions.databaseId, params.databaseId),
+      eq(rowVersions.schemaName, schema),
+      eq(rowVersions.tableName, params.tableName),
+    ];
+
+    if (params.recordId) {
+      conditions.push(eq(rowVersions.recordId, params.recordId));
+    }
+    if (params.operation && params.operation !== "ALL") {
+      conditions.push(eq(rowVersions.operation, params.operation.toUpperCase()));
+    }
+    if (params.startDate) {
+      conditions.push(gte(rowVersions.changedAt, params.startDate));
+    }
+    if (params.endDate) {
+      conditions.push(lte(rowVersions.changedAt, params.endDate));
+    }
+
+    const limit = Math.max(1, Math.min(100, params.limit || 50));
+    const offset = Math.max(0, params.offset || 0);
+
+    const rows = await db
+      .select()
+      .from(rowVersions)
+      .where(and(...conditions))
+      .orderBy(desc(rowVersions.changedAt), desc(rowVersions.versionNumber))
+      .limit(limit)
+      .offset(offset);
+
+    return rows.map((v) => {
+      const diff = v.diff || computeDiff(v.oldData, v.newData);
+      const modifiedCount = Object.keys(diff?.modified || {}).length;
+      const addedCount = Object.keys(diff?.added || {}).length;
+      const removedCount = Object.keys(diff?.removed || {}).length;
+
+      let changeSummary = "";
+      if (v.operation === "INSERT") {
+        const fields = Object.keys(v.newData || {}).length;
+        changeSummary = `Inserted record with ${fields} field${fields === 1 ? "" : "s"}`;
+      } else if (v.operation === "DELETE") {
+        changeSummary = "Permanently deleted row snapshot";
+      } else if (v.operation === "RESTORE") {
+        changeSummary = `Compensating restore to state at v${v.versionNumber}`;
+      } else if (v.operation === "UPDATE") {
+        if (modifiedCount > 0) {
+          const modFields = Object.keys(diff?.modified || {});
+          changeSummary = `Modified ${modifiedCount} field${modifiedCount > 1 ? "s" : ""}: ${modFields.slice(0, 3).join(", ")}${modFields.length > 3 ? "..." : ""}`;
+        } else {
+          changeSummary = "Updated row attributes";
+        }
+      }
+
+      return {
+        id: v.id,
+        tableName: v.tableName,
+        recordId: v.recordId,
+        operation: v.operation as "INSERT" | "UPDATE" | "DELETE" | "RESTORE",
+        versionNumber: v.versionNumber,
+        oldData: v.oldData,
+        newData: v.newData,
+        diff,
+        changeSummary,
+        modifiedCount,
+        addedCount,
+        removedCount,
+        validFrom: v.changedAt ? v.changedAt.toISOString() : new Date().toISOString(),
+        validTo: null,
+        transactionXmin: v.transactionId || undefined,
+        performedBy: v.changedBy || undefined,
+      };
+    });
+  }
+
+  /**
+   * Retrieves the current live state of a record directly from the target database.
+   */
+  public static async getCurrentRecord(params: {
     databaseId: string;
     schemaName?: string;
     tableName: string;
     recordId: string;
   }) {
     const schema = params.schemaName || "public";
-    return await db
+    const [database] = await db
       .select()
-      .from(rowVersions)
-      .where(
-        and(
-          eq(rowVersions.databaseId, params.databaseId),
-          eq(rowVersions.schemaName, schema),
-          eq(rowVersions.tableName, params.tableName),
-          eq(rowVersions.recordId, params.recordId)
-        )
-      )
-      .orderBy(desc(rowVersions.versionNumber));
+      .from(databases)
+      .where(eq(databases.id, params.databaseId))
+      .limit(1);
+
+    if (!database) throw new Error("Database not found");
+
+    try {
+      const tables = await userDbManager.introspectTables(
+        { id: database.id, connectionStringEncrypted: database.connectionStringEncrypted },
+        schema
+      );
+
+      const targetTable = tables.find((t) => t.tableName === params.tableName);
+      const pkCol = targetTable?.columns.find((c) => c.isPrimaryKey)?.columnName || "id";
+
+      const sql = `SELECT * FROM "${schema.replace(/"/g, '""')}"."${params.tableName.replace(/"/g, '""')}" WHERE "${pkCol.replace(/"/g, '""')}" = $1 LIMIT 1;`;
+
+      const res = await userDbManager.executeQuery(
+        { id: database.id, connectionStringEncrypted: database.connectionStringEncrypted },
+        sql,
+        { params: [params.recordId], isReadOnly: true }
+      );
+      return res.rows.length > 0 ? res.rows[0] : null;
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -182,6 +321,8 @@ export class TemporalService {
     tableName: string;
     recordId?: string;
     asOfTimestamp: Date;
+    page?: number;
+    pageSize?: number;
   }) {
     const schema = params.schemaName || "public";
 
@@ -199,14 +340,66 @@ export class TemporalService {
             lte(rowVersions.changedAt, params.asOfTimestamp)
           )
         )
-        .orderBy(desc(rowVersions.versionNumber))
+        .orderBy(desc(rowVersions.changedAt), desc(rowVersions.versionNumber))
         .limit(1);
+
+      if (version) {
+        const isDeleted = version.operation === "DELETE";
+        return {
+          asOf: params.asOfTimestamp.toISOString(),
+          recordId: params.recordId,
+          tableName: params.tableName,
+          status: isDeleted ? "DELETED" : "ACTIVE",
+          versionId: version.id,
+          versionNumber: version.versionNumber,
+          operation: version.operation,
+          changedAt: version.changedAt ? version.changedAt.toISOString() : null,
+          changedBy: version.changedBy,
+          historicalData: isDeleted ? null : (version.newData || version.oldData),
+          lastKnownState: version.oldData || version.newData,
+          message: isDeleted
+            ? `Record was deleted at this point in time (v${version.versionNumber} on ${version.changedAt?.toISOString()}).`
+            : `Reconstructed from Version v${version.versionNumber} (effective ${version.changedAt?.toISOString()}).`,
+        };
+      }
+
+      // Check if any version existed AFTER the timestamp to give precise diagnostic
+      const [laterVersion] = await db
+        .select()
+        .from(rowVersions)
+        .where(
+          and(
+            eq(rowVersions.databaseId, params.databaseId),
+            eq(rowVersions.schemaName, schema),
+            eq(rowVersions.tableName, params.tableName),
+            eq(rowVersions.recordId, params.recordId)
+          )
+        )
+        .orderBy(rowVersions.changedAt)
+        .limit(1);
+
+      if (laterVersion) {
+        return {
+          asOf: params.asOfTimestamp.toISOString(),
+          recordId: params.recordId,
+          tableName: params.tableName,
+          status: "NOT_YET_CREATED",
+          versionId: null,
+          versionNumber: null,
+          historicalData: null,
+          message: `Record was not yet created at requested timestamp. Earliest version (v${laterVersion.versionNumber}) occurred on ${laterVersion.changedAt?.toISOString()}.`,
+        };
+      }
 
       return {
         asOf: params.asOfTimestamp.toISOString(),
         recordId: params.recordId,
-        version: version || null,
-        historicalData: version ? version.newData || version.oldData : null,
+        tableName: params.tableName,
+        status: "NOT_FOUND",
+        versionId: null,
+        versionNumber: null,
+        historicalData: null,
+        message: `No historical mutations found for record "${params.recordId}" in table "${params.tableName}".`,
       };
     }
 
@@ -222,7 +415,7 @@ export class TemporalService {
           lte(rowVersions.changedAt, params.asOfTimestamp)
         )
       )
-      .orderBy(desc(rowVersions.changedAt));
+      .orderBy(desc(rowVersions.changedAt), desc(rowVersions.versionNumber));
 
     // Deduplicate by recordId to get state as of timestamp
     const recordMap = new Map<string, typeof versions[0]>();
@@ -232,14 +425,30 @@ export class TemporalService {
       }
     }
 
-    const activeRows = Array.from(recordMap.values())
+    const activeRowsWithMeta = Array.from(recordMap.values())
       .filter((v) => v.operation !== "DELETE")
-      .map((v) => v.newData || v.oldData);
+      .map((v) => ({
+        _recordId: v.recordId,
+        _versionNumber: v.versionNumber,
+        _operation: v.operation,
+        _validFrom: v.changedAt ? v.changedAt.toISOString() : null,
+        ...(v.newData || v.oldData || {}),
+      }));
+
+    const page = Math.max(1, params.page || 1);
+    const pageSize = Math.max(1, Math.min(100, params.pageSize || 25));
+    const totalCount = activeRowsWithMeta.length;
+    const startIndex = (page - 1) * pageSize;
+    const paginatedRows = activeRowsWithMeta.slice(startIndex, startIndex + pageSize);
 
     return {
       asOf: params.asOfTimestamp.toISOString(),
-      rowCount: activeRows.length,
-      rows: activeRows,
+      tableName: params.tableName,
+      rowCount: totalCount,
+      page,
+      pageSize,
+      totalPages: Math.ceil(totalCount / pageSize) || 1,
+      rows: paginatedRows,
     };
   }
 
@@ -319,16 +528,54 @@ export class TemporalService {
       WHERE "id" = '${recordId.replace(/'/g, "''")}';
     `;
 
+    let previousState: Record<string, unknown> | null = null;
     try {
-      await userDbManager.executeQuery(
+      previousState = await this.getCurrentRecord({
+        databaseId: database.id,
+        schemaName: schema,
+        tableName: table,
+        recordId,
+      });
+
+      const updateRes = await userDbManager.executeQuery(
         {
           id: database.id,
           connectionStringEncrypted: database.connectionStringEncrypted,
         },
-        updateSql
+        updateSql,
+        { params: values }
       );
-    } catch {
-      // If table row doesn't exist (was deleted), execute compensating INSERT
+
+      // If no row was updated (e.g. record was previously deleted), execute compensating INSERT
+      if (updateRes.rows.length === 0) {
+        const insertCols: string[] = [];
+        const insertParams: string[] = [];
+        const insertValues: unknown[] = [];
+        let insertIdx = 1;
+
+        for (const [col, val] of Object.entries(stateToRestore)) {
+          insertCols.push(`"${col.replace(/[^a-zA-Z0-9_]/g, "")}"`);
+          insertParams.push(`$${insertIdx++}`);
+          insertValues.push(val);
+        }
+
+        const insertSql = `
+          INSERT INTO "${schema}"."${table}" (${insertCols.join(", ")})
+          VALUES (${insertParams.join(", ")})
+          ON CONFLICT DO NOTHING;
+        `;
+
+        await userDbManager.executeQuery(
+          {
+            id: database.id,
+            connectionStringEncrypted: database.connectionStringEncrypted,
+          },
+          insertSql,
+          { params: insertValues }
+        );
+      }
+    } catch (dbErr) {
+      console.warn("[TemporalService] Warning during compensating query execution:", dbErr);
     }
 
     // 4. Record new version with operation RESTORE
@@ -338,7 +585,7 @@ export class TemporalService {
       tableName: table,
       recordId,
       operation: "RESTORE",
-      oldData: null,
+      oldData: previousState,
       newData: stateToRestore,
       changedBy: params.context.email,
     });

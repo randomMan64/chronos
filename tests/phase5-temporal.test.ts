@@ -92,5 +92,50 @@ describe("Phase 5 — Time Travel & Restore Schemas", () => {
     });
     expect(missingReason.success).toBe(false);
   });
+
+  it("supports table-level queries when recordId is omitted in timeTravelQuerySchema", () => {
+    const valid = timeTravelQuerySchema.safeParse({
+      databaseId: validUuid,
+      workspaceId: validUuid,
+      organizationId: validUuid,
+      schemaName: "public",
+      tableName: "audit_logs",
+      asOfTimestamp: "2026-11-18T10:00:00.000Z",
+      page: 2,
+      pageSize: 10,
+    });
+    expect(valid.success).toBe(true);
+    if (valid.success) {
+      expect(valid.data.recordId).toBeUndefined();
+      expect(valid.data.tableName).toBe("audit_logs");
+      expect(valid.data.page).toBe(2);
+      expect(valid.data.pageSize).toBe(10);
+    }
+  });
+
+  it("handles complex nested attribute diffs accurately", () => {
+    const v1 = {
+      id: "ord_101",
+      customer: { name: "Alice", email: "alice@acme.com" },
+      tags: ["vip", "priority"],
+      total: 500,
+    };
+    const v2 = {
+      id: "ord_101",
+      customer: { name: "Alice", email: "alice.work@acme.com" },
+      tags: ["vip", "priority", "express"],
+      total: 750,
+      currency: "USD",
+    };
+
+    const diff = computeDiff(v1, v2);
+    expect(diff.added).toEqual({ currency: "USD" });
+    expect(diff.removed).toEqual({});
+    expect(diff.modified).toHaveProperty("customer");
+    expect(diff.modified).toHaveProperty("tags");
+    expect(diff.modified).toHaveProperty("total");
+    expect(diff.modified.total).toEqual({ old: 500, new: 750 });
+  });
 });
+
 
