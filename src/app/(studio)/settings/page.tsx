@@ -137,7 +137,7 @@ function sortMembersByCurrentUserAndRole<
 }
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = React.useState<string>("members");
+  const [activeTab, setActiveTab] = React.useState<string>("workspaces");
 
   // Organization & Session state
   const [currentUser, setCurrentUser] = React.useState<{
@@ -906,11 +906,11 @@ export default function SettingsPage() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="bg-panel border border-border p-1 h-auto flex flex-wrap gap-1">
           <TabsTrigger
-            value="members"
+            value="workspaces"
             className="text-xs py-1.5 px-3 flex items-center gap-1.5"
           >
-            <Users className="h-3.5 w-3.5" />
-            <span>Members ({isLoading ? "..." : members.length})</span>
+            <Layers className="h-3.5 w-3.5" />
+            <span>Workspaces ({isLoading ? "..." : workspaces.length})</span>
           </TabsTrigger>
           <TabsTrigger
             value="invites"
@@ -928,13 +928,6 @@ export default function SettingsPage() {
             </span>
           </TabsTrigger>
           <TabsTrigger
-            value="workspaces"
-            className="text-xs py-1.5 px-3 flex items-center gap-1.5"
-          >
-            <Layers className="h-3.5 w-3.5" />
-            <span>Workspaces ({isLoading ? "..." : workspaces.length})</span>
-          </TabsTrigger>
-          <TabsTrigger
             value="rbac"
             className="text-xs py-1.5 px-3 flex items-center gap-1.5"
           >
@@ -943,235 +936,6 @@ export default function SettingsPage() {
           </TabsTrigger>
         </TabsList>
 
-        {/* Tab 1: Members */}
-        <TabsContent value="members" className="mt-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Organization Members</CardTitle>
-              <CardDescription>
-                Assign organization-level roles. Changes take effect on
-                subsequent authorization checks.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead>
-                    <tr className="border-b border-border bg-sidebar/50 text-muted-foreground">
-                      <th className="p-3 font-medium">User</th>
-                      <th className="p-3 font-medium">Email</th>
-                      <th className="p-3 font-medium">Role</th>
-                      <th className="p-3 font-medium">Joined</th>
-                      <th className="p-3 font-medium text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {isLoading ? (
-                      Array.from({ length: 3 }).map((_, i) => (
-                        <tr key={i} className="animate-pulse">
-                          <td className="p-3">
-                            <div className="flex items-center gap-2">
-                              <div className="h-6 w-6 rounded-full bg-muted" />
-                              <div className="h-4 w-28 bg-muted rounded" />
-                            </div>
-                          </td>
-                          <td className="p-3">
-                            <div className="h-4 w-36 bg-muted rounded" />
-                          </td>
-                          <td className="p-3">
-                            <div className="h-6 w-24 bg-muted rounded" />
-                          </td>
-                          <td className="p-3">
-                            <div className="h-4 w-20 bg-muted rounded" />
-                          </td>
-                          <td className="p-3 text-right">
-                            <div className="h-6 w-8 bg-muted rounded ml-auto" />
-                          </td>
-                        </tr>
-                      ))
-                    ) : members.length === 0 ? (
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="p-6 text-center text-xs text-muted-foreground font-mono"
-                        >
-                          No organization members found
-                        </td>
-                      </tr>
-                    ) : (
-                      sortedMembers.map((m) => {
-                        const isSelf =
-                          currentUser?.id === m.userId ||
-                          (!!currentUser?.email &&
-                            !!m.email &&
-                            currentUser.email.toLowerCase() ===
-                              m.email.toLowerCase());
-                        const isOwner = m.role === "owner";
-                        const isCurrentOwner = org?.role === "owner";
-
-                        return (
-                          <tr
-                            key={m.id}
-                            className="hover:bg-elevated/40 transition-colors"
-                          >
-                            <td className="p-3 font-medium text-foreground">
-                              <div className="flex items-center gap-2">
-                                <div className="h-6 w-6 rounded-full bg-elevated border border-border flex items-center justify-center font-mono text-[9px] font-semibold tracking-tighter">
-                                  {getInitials(m.fullName)}
-                                </div>
-                                <div className="flex items-center gap-1.5">
-                                  <span>{m.fullName}</span>
-                                  {isSelf && (
-                                    <span className="text-[10px] text-muted-foreground font-mono">
-                                      (You)
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-3 font-mono text-muted-foreground">
-                              {m.email}
-                            </td>
-                            <td className="p-3">
-                              {isSelf ? (
-                                <div className="flex items-center gap-1.5 py-0.5">
-                                  <Badge
-                                    variant={isOwner ? "warning" : "outline"}
-                                    className="font-mono text-[10px] capitalize flex items-center gap-1"
-                                  >
-                                    {isOwner && <Crown className="h-3 w-3 text-warning" />}
-                                    {CHRONOS_ROLES[normalizeRole(m.role)]?.label || m.role}
-                                  </Badge>
-                                  <span
-                                    className="text-[10px] text-muted-foreground flex items-center gap-1 font-mono"
-                                    title="You cannot modify your own role"
-                                  >
-                                    <Lock className="h-3 w-3 text-muted-foreground" /> Your account
-                                  </span>
-                                </div>
-                              ) : isOwner ? (
-                                <div className="flex items-center gap-1.5 py-0.5">
-                                  <Badge
-                                    variant="warning"
-                                    className="font-mono text-[10px] capitalize flex items-center gap-1"
-                                  >
-                                    <Crown className="h-3 w-3 text-warning" /> Owner
-                                  </Badge>
-                                  <span
-                                    className="text-[10px] text-muted-foreground flex items-center gap-0.5"
-                                    title="Owner role cannot be modified directly"
-                                  >
-                                    <Lock className="h-3 w-3" /> Locked
-                                  </span>
-                                </div>
-                              ) : canManageMembers ? (
-                                <div className="flex items-center gap-2">
-                                  <Select
-                                    value={pendingRoles[m.id] ?? normalizeRole(m.role)}
-                                    onValueChange={(val) =>
-                                      setPendingRoles((prev) => ({
-                                        ...prev,
-                                        [m.id]: val,
-                                      }))
-                                    }
-                                  >
-                                    <SelectTrigger className="h-7 w-40 text-xs font-mono">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      {assignableMemberRoles.map((roleKey) => (
-                                        <SelectItem
-                                          key={roleKey}
-                                          value={roleKey}
-                                          className="text-xs font-mono"
-                                        >
-                                          {CHRONOS_ROLES[roleKey]?.label || roleKey}
-                                        </SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
-                                  <Button
-                                    size="sm"
-                                    variant={
-                                      pendingRoles[m.id] &&
-                                      pendingRoles[m.id] !== m.role
-                                        ? "default"
-                                        : "outline"
-                                    }
-                                    disabled={
-                                      !pendingRoles[m.id] ||
-                                      pendingRoles[m.id] === m.role ||
-                                      updatingRoleId === m.id
-                                    }
-                                    isLoading={updatingRoleId === m.id}
-                                    onClick={() => handleUpdateMemberRole(m.id)}
-                                    className="h-7 px-2.5 text-[11px] font-mono cursor-pointer"
-                                  >
-                                    Apply
-                                  </Button>
-                                </div>
-                              ) : (
-                                <Badge
-                                  variant="outline"
-                                  className="font-mono text-[10px] capitalize"
-                                >
-                                  {CHRONOS_ROLES[normalizeRole(m.role)]?.label || m.role}
-                                </Badge>
-                              )}
-                            </td>
-                            <td className="p-3 text-muted-foreground font-mono text-[11px]">
-                              {formatDate(m.joinedAt)}
-                            </td>
-                            <td className="p-3 text-right">
-                              {/* Requirement 6 & 7: Transfer Ownership workflow trigger for Owner */}
-                              {isSelf && isOwner && canTransferOwnership ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => {
-                                    const otherMembers = sortedMembers.filter(
-                                      (other) =>
-                                        other.userId !== currentUser?.id &&
-                                        (!currentUser?.email ||
-                                          other.email.toLowerCase() !==
-                                            currentUser.email.toLowerCase()),
-                                    );
-                                    if (otherMembers.length > 0) {
-                                      setTransferValue(
-                                        "newOwnerMemberId",
-                                        otherMembers[0].id,
-                                      );
-                                    }
-                                    setShowTransferModal(true);
-                                  }}
-                                  className="h-7 px-2.5 text-xs font-medium gap-1.5 text-amber-800 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30 hover:border-amber-500/50 rounded-md transition-all shadow-2xs cursor-pointer font-sans"
-                                >
-                                  <ArrowRightLeft className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" />
-                                  <span>Transfer Ownership</span>
-                                </Button>
-                              ) : !isSelf && canManageMembers && !isOwner ? (
-                                /* Requirement 3: Hide self-removal; only users with members:manage can remove non-owners */
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  onClick={() => setMemberToRemove(m)}
-                                  className="text-destructive hover:text-destructive/80 h-7 w-7 cursor-pointer"
-                                  title={`Remove ${m.fullName}`}
-                                >
-                                  <Trash2 className="h-3.5 w-3.5" />
-                                </Button>
-                              ) : null}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         {/* Tab 2: Invitations */}
         <TabsContent value="invites" className="mt-4 space-y-4">
@@ -1902,6 +1666,42 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            {/* Transfer Ownership Workflow */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-destructive/20">
+              <div className="space-y-0.5">
+                <p className="text-xs font-medium text-foreground">
+                  Transfer organization ownership
+                </p>
+                <p className="text-[11px] text-muted-foreground max-w-xl leading-relaxed">
+                  Transfer primary ownership and administrative root privileges of <strong className="text-foreground font-semibold">{org?.name}</strong> to another active member.
+                </p>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  const otherMembers = sortedMembers.filter(
+                    (other) =>
+                      other.userId !== currentUser?.id &&
+                      (!currentUser?.email ||
+                        other.email.toLowerCase() !==
+                          currentUser.email.toLowerCase()),
+                  );
+                  if (otherMembers.length > 0) {
+                    setTransferValue("newOwnerMemberId", otherMembers[0].id);
+                  }
+                  setShowTransferModal(true);
+                }}
+                disabled={sortedMembers.filter((m) => m.userId !== currentUser?.id).length === 0}
+                className="h-8 px-3 text-xs font-medium gap-1.5 text-amber-800 dark:text-amber-400 bg-amber-500/10 hover:bg-amber-500/15 border-amber-500/30 hover:border-amber-500/50 rounded-md transition-all shadow-2xs cursor-pointer font-sans shrink-0"
+              >
+                <ArrowRightLeft className="h-3.5 w-3.5 text-amber-700 dark:text-amber-400" />
+                <span>Transfer Ownership</span>
+              </Button>
+            </div>
+
+            {/* Delete Organization Workflow */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-1">
               <div className="space-y-0.5">
                 <p className="text-xs font-medium text-foreground">
