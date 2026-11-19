@@ -10,6 +10,7 @@ import {
   workspaceMembers,
   databases,
   databasePermissions,
+  userPreferences,
 } from "@/db/schema";
 import { eq, and, gt, isNull, desc } from "drizzle-orm";
 import { UserContext, OrganizationRole, WorkspaceRole } from "@/lib/permissions/types";
@@ -287,6 +288,10 @@ export interface AuthenticatedSession {
     status: string;
   } | null;
   permissions: string[];
+  preferences?: {
+    theme?: string;
+    sidebarPreference?: string;
+  };
 }
 
 /**
@@ -463,6 +468,22 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedSession | 
       workspaceRole: (currentWsCandidate?.role as WorkspaceRole) || undefined,
     });
 
+    // 5. Fetch user preferences (for theme and display settings)
+    let userPref = null;
+    try {
+      const [pref] = await db
+        .select({
+          theme: userPreferences.theme,
+          sidebarPreference: userPreferences.sidebarPreference,
+        })
+        .from(userPreferences)
+        .where(eq(userPreferences.userId, user.id))
+        .limit(1);
+      userPref = pref || null;
+    } catch {
+      // ignore
+    }
+
     return {
       user: {
         id: user.id,
@@ -477,6 +498,7 @@ export async function getAuthenticatedSession(): Promise<AuthenticatedSession | 
       databases: wsDatabases,
       currentDatabase,
       permissions: Array.from(effectivePermissions),
+      preferences: userPref || { theme: "system", sidebarPreference: "expanded" },
     };
   } catch (err) {
     console.error("Failed to load authenticated session:", err);

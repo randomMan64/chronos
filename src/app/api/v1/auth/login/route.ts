@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { db } from "@/db/connections/control-plane";
-import { users, userSessions, organizationMembers, organizations, workspaces } from "@/db/schema";
+import { users, userSessions, organizationMembers, organizations, workspaces, userPreferences } from "@/db/schema";
 import { loginSchema } from "@/lib/validation";
 import {
   createSessionToken,
@@ -161,9 +161,25 @@ export async function POST(req: Request) {
       });
     }
 
+    // Resolve user's saved appearance preference
+    let userTheme = "dark";
+    try {
+      const [pref] = await db
+        .select({ theme: userPreferences.theme })
+        .from(userPreferences)
+        .where(eq(userPreferences.userId, user.id))
+        .limit(1);
+      if (pref?.theme) {
+        userTheme = pref.theme;
+      }
+    } catch {
+      // ignore
+    }
+
     const response = NextResponse.json(
       {
         success: true,
+        theme: userTheme,
         user: {
           id: user.id,
           email: user.email,

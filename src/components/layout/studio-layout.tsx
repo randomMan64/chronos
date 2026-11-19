@@ -5,6 +5,7 @@ import { AppSidebar } from "@/components/navigation/app-sidebar";
 import { AppHeader } from "@/components/navigation/app-header";
 import { useRouter, usePathname } from "next/navigation";
 import { useTranslation } from "@/lib/i18n";
+import { useTheme } from "@/components/shared/theme-provider";
 import type { AuthenticatedSession } from "@/lib/auth/session";
 import {
   installGlobalAuthInterceptor,
@@ -22,6 +23,18 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const { t } = useTranslation();
+  const { setTheme } = useTheme();
+
+  // Synchronize server-side user theme preference on initial mount
+  const serverTheme = initialSession?.preferences?.theme;
+  React.useEffect(() => {
+    if (serverTheme && (serverTheme === "light" || serverTheme === "dark" || serverTheme === "system")) {
+      const currentStored = typeof window !== "undefined" ? localStorage.getItem("chronos_theme") : null;
+      if (currentStored !== serverTheme) {
+        setTheme(serverTheme as "light" | "dark" | "system");
+      }
+    }
+  }, [serverTheme, setTheme]);
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState<boolean>(
@@ -239,6 +252,12 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
             if (prefRes.ok) {
               const prefJson = await prefRes.json();
               const pref = prefJson.preferences || prefJson;
+              if (pref?.theme && (pref.theme === "light" || pref.theme === "dark" || pref.theme === "system")) {
+                const currentStored = typeof window !== "undefined" ? localStorage.getItem("chronos_theme") : null;
+                if (currentStored !== pref.theme) {
+                  setTheme(pref.theme);
+                }
+              }
               if (pref?.sidebarPreference) {
                 const shouldCollapse = pref.sidebarPreference === "collapsed";
                 setIsSidebarCollapsed(shouldCollapse);

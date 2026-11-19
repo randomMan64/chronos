@@ -121,6 +121,17 @@ export async function performLogout() {
 
   clearClientAuthState();
 
+  // Switch to default dark theme on public logout entry pages
+  try {
+    localStorage.removeItem("chronos_theme");
+    const root = document.documentElement;
+    root.classList.remove("light");
+    root.classList.add("dark");
+    root.setAttribute("data-theme", "dark");
+  } catch {
+    // ignore
+  }
+
   try {
     const channel = getBroadcastChannel();
     if (channel) {

@@ -80,6 +80,21 @@ function LoginForm() {
         throw new Error(data.error || "Failed to sign in");
       }
 
+      // Synchronize and apply user's saved account theme preference
+      if (data.theme) {
+        try {
+          localStorage.setItem("chronos_theme", data.theme);
+          const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+          const resolved = data.theme === "system" ? (prefersDark ? "dark" : "light") : data.theme;
+          const root = document.documentElement;
+          root.classList.remove("light", "dark");
+          root.classList.add(resolved);
+          root.setAttribute("data-theme", resolved);
+        } catch {
+          // ignore localStorage errors
+        }
+      }
+
       // Safe returnUrl redirection
       const destination =
         returnUrl && returnUrl.startsWith("/") && !returnUrl.startsWith("//")
