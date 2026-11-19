@@ -116,11 +116,13 @@ export const explainSqlSchema = z.object({
 // Temporal & History
 export const timeTravelQuerySchema = z.object({
   databaseId: z.string().uuid(),
-  workspaceId: z.string().uuid(),
-  organizationId: z.string().uuid(),
+  workspaceId: z.string().uuid().optional(),
+  organizationId: z.string().uuid().optional(),
   schemaName: z.string().default("public"),
   tableName: z.string().min(1),
-  asOfTimestamp: z.string().datetime(),
+  asOfTimestamp: z.string().refine((val) => !isNaN(Date.parse(val)), {
+    message: "Invalid datetime",
+  }),
   recordId: z.string().optional(),
   page: z.number().int().min(1).default(1).optional(),
   pageSize: z.number().int().min(1).max(100).default(25).optional(),

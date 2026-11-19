@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireDatabaseAccess } from "@/lib/auth/guards";
+import { requireDatabaseAccessById } from "@/lib/auth/guards";
 import { TemporalService } from "@/modules/temporal/temporal-service";
 import { timeTravelQuerySchema } from "@/lib/validation";
 import { handleApiError } from "@/lib/errors";
@@ -18,18 +18,23 @@ export async function POST(req: Request) {
       );
     }
 
-    const { organizationId, workspaceId, databaseId, schemaName, tableName, asOfTimestamp, recordId, page, pageSize } =
+    const { databaseId, schemaName, tableName, asOfTimestamp, recordId, page, pageSize } =
       parsed.data;
 
     // Time travel is read-only: requires history:read
-    await requireDatabaseAccess(organizationId, workspaceId, databaseId, "history:read");
+    const { database } = await requireDatabaseAccessById(databaseId, "history:read");
+
+    const parsedDate = new Date(asOfTimestamp);
+    if (isNaN(parsedDate.getTime())) {
+      return NextResponse.json({ error: "Invalid AS OF timestamp provided." }, { status: 400 });
+    }
 
     const result = await TemporalService.queryAsOfTimestamp({
-      databaseId,
+      databaseId: database.id,
       schemaName,
       tableName,
       recordId,
-      asOfTimestamp: new Date(asOfTimestamp),
+      asOfTimestamp: parsedDate,
       page,
       pageSize,
     });

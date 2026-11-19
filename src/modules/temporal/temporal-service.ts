@@ -201,8 +201,11 @@ export class TemporalService {
     const conditions = [
       eq(rowVersions.databaseId, params.databaseId),
       eq(rowVersions.schemaName, schema),
-      eq(rowVersions.tableName, params.tableName),
     ];
+
+    if (params.tableName && params.tableName.toLowerCase() !== "all") {
+      conditions.push(eq(rowVersions.tableName, params.tableName));
+    }
 
     if (params.recordId) {
       conditions.push(eq(rowVersions.recordId, params.recordId));
@@ -404,30 +407,35 @@ export class TemporalService {
     }
 
     // Table-level: return all records active at timestamp
+    const conditions = [
+      eq(rowVersions.databaseId, params.databaseId),
+      eq(rowVersions.schemaName, schema),
+      lte(rowVersions.changedAt, params.asOfTimestamp),
+    ];
+
+    if (params.tableName && params.tableName.toLowerCase() !== "all") {
+      conditions.push(eq(rowVersions.tableName, params.tableName));
+    }
+
     const versions = await db
       .select()
       .from(rowVersions)
-      .where(
-        and(
-          eq(rowVersions.databaseId, params.databaseId),
-          eq(rowVersions.schemaName, schema),
-          eq(rowVersions.tableName, params.tableName),
-          lte(rowVersions.changedAt, params.asOfTimestamp)
-        )
-      )
+      .where(and(...conditions))
       .orderBy(desc(rowVersions.changedAt), desc(rowVersions.versionNumber));
 
-    // Deduplicate by recordId to get state as of timestamp
+    // Deduplicate by tableName:recordId to get state as of timestamp
     const recordMap = new Map<string, typeof versions[0]>();
     for (const v of versions) {
-      if (!recordMap.has(v.recordId)) {
-        recordMap.set(v.recordId, v);
+      const key = `${v.tableName}:${v.recordId}`;
+      if (!recordMap.has(key)) {
+        recordMap.set(key, v);
       }
     }
 
     const activeRowsWithMeta = Array.from(recordMap.values())
       .filter((v) => v.operation !== "DELETE")
       .map((v) => ({
+        _tableName: v.tableName,
         _recordId: v.recordId,
         _versionNumber: v.versionNumber,
         _operation: v.operation,

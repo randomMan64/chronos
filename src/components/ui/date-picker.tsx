@@ -47,7 +47,7 @@ function formatDisplay(date: Date | null, showTime: boolean, placeholder: string
   return `${m} ${d}, ${y}, ${hStr}:${minutes} ${ampm}`;
 }
 
-function toLocalDatetimeString(date: Date, showTime: boolean): string {
+export function toLocalDatetimeString(date: Date, showTime: boolean): string {
   const y = date.getFullYear();
   const m = (date.getMonth() + 1).toString().padStart(2, "0");
   const d = date.getDate().toString().padStart(2, "0");
@@ -172,153 +172,156 @@ export function DatePicker({
   };
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <button
-          id={id}
-          type="button"
-          disabled={disabled}
-          className={cn(
-            "flex h-8 w-full items-center justify-between rounded-md border border-border bg-input px-3 text-xs font-sans text-foreground shadow-2xs transition-colors hover:bg-secondary/40 focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer text-left",
-            !selectedDate && "text-muted-foreground",
-            className
-          )}
-        >
-          <div className="flex items-center gap-2 truncate">
-            <CalendarIcon className="h-3.5 w-3.5 text-primary/80 shrink-0" />
-            <span className="truncate font-medium">
-              {formatDisplay(selectedDate, showTime, placeholder)}
-            </span>
-          </div>
-          {value && (
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange?.("");
-              }}
-              className="ml-1.5 text-muted-foreground/60 hover:text-foreground transition-colors cursor-pointer rounded-xs p-0.5"
-              title="Clear timestamp"
-            >
-              <X className="h-3.5 w-3.5" />
-            </span>
-          )}
-        </button>
-      </PopoverTrigger>
-
-      <PopoverContent className="w-auto p-0" align="start">
-        <div className="flex flex-col">
-          <Calendar
-            selected={selectedDate}
-            onSelect={handleSelectDay}
-            minDate={minDate}
-            maxDate={maxDate}
-          />
-
-          {showTime && (
-            <div className="border-t border-border px-3 py-2.5 bg-secondary/15 flex flex-col gap-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                  <Clock className="h-3.5 w-3.5 text-primary" /> Time
-                </span>
-
-                {/* Digital inputs and AM/PM segmented pills */}
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center rounded-md border border-border bg-background px-2 py-0.5 shadow-2xs">
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={2}
-                      value={hoursInput}
-                      onChange={(e) => handleHoursChange(e.target.value)}
-                      onBlur={handleHoursBlur}
-                      aria-label="Hours"
-                      className="w-5 text-center text-xs font-semibold bg-transparent text-foreground focus:outline-none focus:text-primary"
-                    />
-                    <span className="text-xs font-bold text-muted-foreground/60 select-none px-0.5">
-                      :
-                    </span>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      maxLength={2}
-                      value={minsInput}
-                      onChange={(e) => handleMinsChange(e.target.value)}
-                      onBlur={handleMinsBlur}
-                      aria-label="Minutes"
-                      className="w-5 text-center text-xs font-semibold bg-transparent text-foreground focus:outline-none focus:text-primary"
-                    />
-                  </div>
-
-                  <div className="flex rounded-md border border-border bg-background p-0.5 shadow-2xs">
-                    <button
-                      type="button"
-                      onClick={() => handleAmPmToggle(false)}
-                      className={cn(
-                        "px-2 py-0.5 text-[11px] font-semibold rounded transition-all cursor-pointer",
-                        !isPM
-                          ? "bg-primary text-primary-foreground shadow-2xs"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      AM
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAmPmToggle(true)}
-                      className={cn(
-                        "px-2 py-0.5 text-[11px] font-semibold rounded transition-all cursor-pointer",
-                        isPM
-                          ? "bg-primary text-primary-foreground shadow-2xs"
-                          : "text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      PM
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Quick Presets & Done */}
-              <div className="flex items-center justify-between pt-1 border-t border-border/50">
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setPreset(0)}
-                    className="text-[10px] font-medium px-2 py-0.5 rounded border border-border/70 bg-background text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer shadow-2xs"
-                  >
-                    Now
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreset(60)}
-                    className="text-[10px] font-medium px-2 py-0.5 rounded border border-border/70 bg-background text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer shadow-2xs"
-                  >
-                    -1 hr
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPreset(1440)}
-                    className="text-[10px] font-medium px-2 py-0.5 rounded border border-border/70 bg-background text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer shadow-2xs"
-                  >
-                    -1 day
-                  </button>
-                </div>
-
-                <Button
-                  size="sm"
-                  onClick={() => setOpen(false)}
-                  className="h-6 px-2.5 text-[11px] font-medium"
-                >
-                  Done
-                </Button>
-              </div>
+    <div className="relative flex items-center w-full">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <button
+            id={id}
+            type="button"
+            disabled={disabled}
+            className={cn(
+              "flex h-8 w-full items-center justify-between rounded-md border border-border bg-input px-3 text-xs font-sans text-foreground shadow-2xs transition-colors hover:bg-secondary/40 focus:outline-none focus:ring-1 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer text-left",
+              value && "pr-8",
+              !selectedDate && "text-muted-foreground",
+              className
+            )}
+          >
+            <div className="flex items-center gap-2 truncate">
+              <CalendarIcon className="h-3.5 w-3.5 text-primary/80 shrink-0" />
+              <span className="truncate font-medium">
+                {formatDisplay(selectedDate, showTime, placeholder)}
+              </span>
             </div>
-          )}
-        </div>
-      </PopoverContent>
-    </Popover>
+          </button>
+        </PopoverTrigger>
+
+        <PopoverContent className="w-auto p-0 z-50" align="start">
+          <div className="flex flex-col">
+            <Calendar
+              selected={selectedDate}
+              onSelect={handleSelectDay}
+              minDate={minDate}
+              maxDate={maxDate}
+            />
+
+            {showTime && (
+              <div className="border-t border-border px-3 py-2.5 bg-secondary/15 flex flex-col gap-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-medium text-foreground flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5 text-primary" /> Time
+                  </span>
+
+                  {/* Digital inputs and AM/PM segmented pills */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center rounded-md border border-border bg-background px-2 py-0.5 shadow-2xs">
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={2}
+                        value={hoursInput}
+                        onChange={(e) => handleHoursChange(e.target.value)}
+                        onBlur={handleHoursBlur}
+                        aria-label="Hours"
+                        className="w-5 text-center text-xs font-semibold bg-transparent text-foreground focus:outline-none focus:text-primary"
+                      />
+                      <span className="text-xs font-bold text-muted-foreground/60 select-none px-0.5">
+                        :
+                      </span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={2}
+                        value={minsInput}
+                        onChange={(e) => handleMinsChange(e.target.value)}
+                        onBlur={handleMinsBlur}
+                        aria-label="Minutes"
+                        className="w-5 text-center text-xs font-semibold bg-transparent text-foreground focus:outline-none focus:text-primary"
+                      />
+                    </div>
+
+                    <div className="flex rounded-md border border-border bg-background p-0.5 shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => handleAmPmToggle(false)}
+                        className={cn(
+                          "px-2 py-0.5 text-[11px] font-semibold rounded transition-all cursor-pointer",
+                          !isPM
+                            ? "bg-primary text-primary-foreground shadow-2xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        AM
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleAmPmToggle(true)}
+                        className={cn(
+                          "px-2 py-0.5 text-[11px] font-semibold rounded transition-all cursor-pointer",
+                          isPM
+                            ? "bg-primary text-primary-foreground shadow-2xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        PM
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Quick Presets & Done */}
+                <div className="flex items-center justify-between pt-1 border-t border-border/50">
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setPreset(0)}
+                      className="text-[10px] font-medium px-2 py-0.5 rounded border border-border/70 bg-background text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer shadow-2xs"
+                    >
+                      Now
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreset(60)}
+                      className="text-[10px] font-medium px-2 py-0.5 rounded border border-border/70 bg-background text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer shadow-2xs"
+                    >
+                      -1 hr
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreset(1440)}
+                      className="text-[10px] font-medium px-2 py-0.5 rounded border border-border/70 bg-background text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer shadow-2xs"
+                    >
+                      -1 day
+                    </button>
+                  </div>
+
+                  <Button
+                    size="sm"
+                    onClick={() => setOpen(false)}
+                    className="h-6 px-2.5 text-[11px] font-medium cursor-pointer"
+                  >
+                    Done
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      {value && !disabled && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onChange?.("");
+          }}
+          className="absolute right-2 text-muted-foreground/60 hover:text-foreground transition-colors cursor-pointer rounded-xs p-0.5 z-10"
+          title="Clear timestamp"
+        >
+          <X className="h-3.5 w-3.5" />
+        </button>
+      )}
+    </div>
   );
 }
 

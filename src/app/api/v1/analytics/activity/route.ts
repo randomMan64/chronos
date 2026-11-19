@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireDatabaseAccessById } from "@/lib/auth/guards";
-import { TransactionService } from "@/modules/transactions/transaction-service";
+import { AnalyticsService } from "@/modules/analytics/analytics-service";
 import { handleApiError } from "@/lib/errors";
 
 export const dynamic = "force-dynamic";
@@ -14,10 +14,10 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "databaseId is required" }, { status: 400 });
     }
 
-    const { database } = await requireDatabaseAccessById(databaseId, "performance:inspect");
+    const { database, context } = await requireDatabaseAccessById(databaseId, "performance:live_sessions");
 
-    const activity = await TransactionService.getLiveActivity(database.id);
-    return NextResponse.json({ activity });
+    const result = await AnalyticsService.getLiveActivityAndLocks(database.id, context);
+    return NextResponse.json(result);
   } catch (err) {
     const error = handleApiError(err);
     return NextResponse.json(error.body, { status: error.status });

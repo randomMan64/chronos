@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Field, FieldLabel, FieldError } from "@/components/ui/field";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+  CardContent,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -26,7 +32,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { DateTimePicker } from "@/components/ui/date-picker";
+import {
+  DateTimePicker,
+  toLocalDatetimeString,
+} from "@/components/ui/date-picker";
 import { EmptyState } from "@/components/shared/empty-state";
 import { DismissibleAlert } from "@/components/shared/dismissible-alert";
 import {
@@ -103,7 +112,7 @@ interface PointInTimeResult {
 // Client-side diff computation utility
 function calculateDiff(
   oldData: Record<string, unknown> | null,
-  newData: Record<string, unknown> | null
+  newData: Record<string, unknown> | null,
 ) {
   const added: Record<string, unknown> = {};
   const removed: Record<string, unknown> = {};
@@ -133,7 +142,7 @@ function JsonSyntaxHighlighter({ data }: { data: unknown }) {
   const formatted = JSON.stringify(data, null, 2);
 
   return (
-    <pre className="p-3 rounded-md bg-sidebar/80 border border-border/80 text-[11px] font-mono overflow-auto max-h-[460px] leading-relaxed select-text text-foreground">
+    <pre className="p-3 rounded-md bg-sidebar/80 border border-border/80 text-[11px] font-mono overflow-auto max-h-115 leading-relaxed select-text text-foreground">
       {formatted}
     </pre>
   );
@@ -141,33 +150,43 @@ function JsonSyntaxHighlighter({ data }: { data: unknown }) {
 
 function TemporalInvestigationView() {
   const searchParams = useSearchParams();
-  const urlTable = searchParams.get("table") || searchParams.get("tableName") || "";
+  const urlTable =
+    searchParams.get("table") || searchParams.get("tableName") || "";
   const urlRecordId = searchParams.get("recordId") || "";
-  const urlDbId = searchParams.get("db") || searchParams.get("databaseId") || "";
+  const urlDbId =
+    searchParams.get("db") || searchParams.get("databaseId") || "";
 
   // Query parameters
-  const [databases, setDatabases] = React.useState<Array<{ id: string; name: string }>>([]);
+  const [databases, setDatabases] = React.useState<
+    Array<{ id: string; name: string }>
+  >([]);
   const [selectedDbId, setSelectedDbId] = React.useState<string>(urlDbId || "");
   const [tableName, setTableName] = React.useState<string>(urlTable || "");
   const [recordId, setRecordId] = React.useState<string>(urlRecordId || "");
 
   // Table options in active database
   const [availableTables, setAvailableTables] = React.useState<string[]>([]);
-  const [temporalTablesSet, setTemporalTablesSet] = React.useState<Set<string>>(new Set());
+  const [temporalTablesSet, setTemporalTablesSet] = React.useState<Set<string>>(
+    new Set(),
+  );
 
   const [activeOrgId, setActiveOrgId] = React.useState<string>("");
   const [activeWsId, setActiveWsId] = React.useState<string>("");
 
   // Point-In-Time states
-  const [asOfTimestamp, setAsOfTimestamp] = React.useState<string>(
-    new Date(Date.now() - 3600 * 1000).toISOString().slice(0, 16)
+  const [asOfTimestamp, setAsOfTimestamp] = React.useState<string>(() =>
+    toLocalDatetimeString(new Date(Date.now() - 3600 * 1000), true),
   );
-  const [timeTravelResult, setTimeTravelResult] = React.useState<PointInTimeResult | null>(null);
+  const [appliedAsOfTimestamp, setAppliedAsOfTimestamp] =
+    React.useState<string>("");
+  const [timeTravelResult, setTimeTravelResult] =
+    React.useState<PointInTimeResult | null>(null);
   const [isQueryingTimeTravel, setIsQueryingTimeTravel] = React.useState(false);
 
   // Timeline & Versions
   const [versions, setVersions] = React.useState<RowVersionItem[]>([]);
-  const [selectedVersion, setSelectedVersion] = React.useState<RowVersionItem | null>(null);
+  const [selectedVersion, setSelectedVersion] =
+    React.useState<RowVersionItem | null>(null);
   const [isLoadingTimeline, setIsLoadingTimeline] = React.useState(false);
 
   // Timeline Filters
@@ -176,11 +195,19 @@ function TemporalInvestigationView() {
   const [timelineSearch, setTimelineSearch] = React.useState<string>("");
 
   // Inspector Mode: "diff" | "json"
-  const [inspectorMode, setInspectorMode] = React.useState<"diff" | "json">("diff");
+  const [inspectorMode, setInspectorMode] = React.useState<"diff" | "json">(
+    "diff",
+  );
   // Comparison modes: "mutation" (exact change in this version) | "current" (vs Live DB state) | "custom" (vs custom base)
-  const [compareTarget, setCompareTarget] = React.useState<"mutation" | "current" | "custom">("mutation");
-  const [customBaseVersion, setCustomBaseVersion] = React.useState<RowVersionItem | null>(null);
-  const [liveCurrentRecord, setLiveCurrentRecord] = React.useState<Record<string, unknown> | null>(null);
+  const [compareTarget, setCompareTarget] = React.useState<
+    "mutation" | "current" | "custom"
+  >("mutation");
+  const [customBaseVersion, setCustomBaseVersion] =
+    React.useState<RowVersionItem | null>(null);
+  const [liveCurrentRecord, setLiveCurrentRecord] = React.useState<Record<
+    string,
+    unknown
+  > | null>(null);
   const [isLoadingLiveRecord, setIsLoadingLiveRecord] = React.useState(false);
   const [copiedJson, setCopiedJson] = React.useState(false);
 
@@ -188,7 +215,10 @@ function TemporalInvestigationView() {
   const [showRestoreModal, setShowRestoreModal] = React.useState(false);
   const [isRestoring, setIsRestoring] = React.useState(false);
   const [userPermissions, setUserPermissions] = React.useState<string[]>([]);
-  const [notification, setNotification] = React.useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [notification, setNotification] = React.useState<{
+    type: "success" | "error";
+    text: string;
+  } | null>(null);
 
   const canRestore = React.useMemo(() => {
     return (
@@ -230,7 +260,9 @@ function TemporalInvestigationView() {
             let dbs: Array<{ id: string; name: string }> = me.databases || [];
             if (dbs.length === 0) {
               const wsQuery = ws ? `&workspaceId=${ws.id}` : "";
-              const dbRes = await fetch(`/api/v1/databases?organizationId=${org.id}${wsQuery}`);
+              const dbRes = await fetch(
+                `/api/v1/databases?organizationId=${org.id}${wsQuery}`,
+              );
               if (dbRes.ok) {
                 const data = await dbRes.json();
                 dbs = data.databases || [];
@@ -242,7 +274,10 @@ function TemporalInvestigationView() {
             // Default database selection
             if (urlDbId && dbs.some((d) => d.id === urlDbId)) {
               setSelectedDbId(urlDbId);
-            } else if (me.currentDatabase?.id && dbs.some((d) => d.id === me.currentDatabase.id)) {
+            } else if (
+              me.currentDatabase?.id &&
+              dbs.some((d) => d.id === me.currentDatabase.id)
+            ) {
               setSelectedDbId(me.currentDatabase.id);
             } else if (dbs.length > 0) {
               setSelectedDbId(dbs[0].id);
@@ -284,7 +319,10 @@ function TemporalInvestigationView() {
 
           if (initialDb && dbs.some((d) => d.id === initialDb.id)) {
             setSelectedDbId(initialDb.id);
-          } else if (me.currentDatabase?.id && dbs.some((d) => d.id === me.currentDatabase.id)) {
+          } else if (
+            me.currentDatabase?.id &&
+            dbs.some((d) => d.id === me.currentDatabase.id)
+          ) {
             setSelectedDbId(me.currentDatabase.id);
           } else if (dbs.length > 0) {
             setSelectedDbId(dbs[0].id);
@@ -295,9 +333,15 @@ function TemporalInvestigationView() {
       }
     };
 
-    window.addEventListener("chronos:workspace-changed", handleWorkspaceChanged);
+    window.addEventListener(
+      "chronos:workspace-changed",
+      handleWorkspaceChanged,
+    );
     return () => {
-      window.removeEventListener("chronos:workspace-changed", handleWorkspaceChanged);
+      window.removeEventListener(
+        "chronos:workspace-changed",
+        handleWorkspaceChanged,
+      );
     };
   }, [urlDbId]);
 
@@ -312,7 +356,9 @@ function TemporalInvestigationView() {
     async function loadDatabaseTables() {
       try {
         // Fetch temporal tables
-        const temporalRes = await fetch(`/api/v1/history/tables?databaseId=${selectedDbId}`);
+        const temporalRes = await fetch(
+          `/api/v1/history/tables?databaseId=${selectedDbId}`,
+        );
         const temporalNames = new Set<string>();
         if (temporalRes.ok) {
           const data = await temporalRes.json();
@@ -323,24 +369,30 @@ function TemporalInvestigationView() {
         setTemporalTablesSet(temporalNames);
 
         // Fetch database schema tables
-        const schemaRes = await fetch(`/api/v1/databases/${selectedDbId}/schema?schema=public`);
+        const schemaRes = await fetch(
+          `/api/v1/databases/${selectedDbId}/schema?schema=public`,
+        );
         let schemaTableNames: string[] = [];
         if (schemaRes.ok) {
           const schemaData = await schemaRes.json();
-          schemaTableNames = (schemaData.tables || []).map((t: { tableName: string }) => t.tableName);
+          schemaTableNames = (schemaData.tables || []).map(
+            (t: { tableName: string }) => t.tableName,
+          );
         }
 
         // Combine unique tables
-        const combined = Array.from(new Set([...Array.from(temporalNames), ...schemaTableNames]));
+        const combined = Array.from(
+          new Set([...Array.from(temporalNames), ...schemaTableNames]),
+        );
         setAvailableTables(combined);
 
         // Set initial table name prioritizing captured tables
         setTableName((prev) => {
           if (urlTable) return urlTable;
-          if (prev && combined.includes(prev)) return prev;
+          if (prev === "all" || (prev && combined.includes(prev))) return prev;
           if (temporalNames.size > 0) return Array.from(temporalNames)[0];
           if (combined.length > 0) return combined[0];
-          return "snapshots";
+          return "all";
         });
       } catch (err) {
         console.warn("Failed to load tables for temporal selector:", err);
@@ -354,13 +406,16 @@ function TemporalInvestigationView() {
   const fetchSeqRef = React.useRef(0);
 
   const fetchTimeline = React.useCallback(
-    async (override?: {
-      table?: string;
-      record?: string;
-    }) => {
+    async (override?: { table?: string; record?: string; asOf?: string }) => {
       const activeDb = selectedDbId;
-      const activeTable = (override?.table !== undefined ? override.table : tableName).trim();
-      const activeRecord = (override?.record !== undefined ? override.record : recordId).trim();
+      const activeTable = (
+        override?.table !== undefined ? override.table : tableName
+      ).trim();
+      const activeRecord = (
+        override?.record !== undefined ? override.record : recordId
+      ).trim();
+      const activeAsOf =
+        override?.asOf !== undefined ? override.asOf : appliedAsOfTimestamp;
 
       if (!activeDb || !activeTable) return;
       const seq = ++fetchSeqRef.current;
@@ -370,6 +425,12 @@ function TemporalInvestigationView() {
         const params = new URLSearchParams();
         params.set("databaseId", activeDb);
         if (activeRecord) params.set("recordId", activeRecord);
+        if (activeAsOf) {
+          const parsed = new Date(activeAsOf);
+          if (!isNaN(parsed.getTime())) {
+            params.set("endDate", parsed.toISOString());
+          }
+        }
         params.set("limit", "100");
 
         const endpoint = activeRecord
@@ -385,7 +446,9 @@ function TemporalInvestigationView() {
           setVersions(list);
 
           if (list.length > 0) {
-            setSelectedVersion((prev) => (prev && list.some((v) => v.id === prev.id) ? prev : list[0]));
+            setSelectedVersion((prev) =>
+              prev && list.some((v) => v.id === prev.id) ? prev : list[0],
+            );
             setCompareTarget("mutation");
             setCustomBaseVersion(null);
           } else {
@@ -400,7 +463,8 @@ function TemporalInvestigationView() {
           if (res.status !== 404) {
             setNotification({
               type: "error",
-              text: errData?.error || `Failed to fetch versions for ${activeTable}`,
+              text:
+                errData?.error || `Failed to fetch versions for ${activeTable}`,
             });
           }
         }
@@ -416,7 +480,7 @@ function TemporalInvestigationView() {
         }
       }
     },
-    [selectedDbId, tableName, recordId]
+    [selectedDbId, tableName, recordId, appliedAsOfTimestamp],
   );
 
   // Auto-fetch when cluster or target table changes
@@ -438,7 +502,8 @@ function TemporalInvestigationView() {
   const handleTableChange = (newTable: string) => {
     setTableName(newTable);
     setRecordId("");
-    fetchTimeline({ table: newTable, record: "" });
+    setAppliedAsOfTimestamp("");
+    fetchTimeline({ table: newTable, record: "", asOf: "" });
   };
 
   // 4. Fetch Live Record when selectedVersion changes
@@ -449,15 +514,17 @@ function TemporalInvestigationView() {
     }
 
     const recId = selectedVersion.recordId || recordId;
-    if (!recId) return;
+    const targetTableForLive =
+      selectedVersion.tableName || (tableName !== "all" ? tableName : "");
+    if (!recId || !targetTableForLive) return;
 
     let isMounted = true;
     setIsLoadingLiveRecord(true);
 
     fetch(
       `/api/v1/history/current?databaseId=${selectedDbId}&tableName=${encodeURIComponent(
-        tableName
-      )}&recordId=${encodeURIComponent(recId)}`
+        targetTableForLive,
+      )}&recordId=${encodeURIComponent(recId)}`,
     )
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -483,16 +550,21 @@ function TemporalInvestigationView() {
     setIsQueryingTimeTravel(true);
     setNotification(null);
     try {
+      const asOfDate = asOfTimestamp ? new Date(asOfTimestamp) : new Date();
+      if (isNaN(asOfDate.getTime())) {
+        throw new Error("Invalid AS OF timestamp provided.");
+      }
+
       const res = await fetch("/api/v1/history/query", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          organizationId: activeOrgId,
-          workspaceId: activeWsId,
           databaseId: selectedDbId,
+          organizationId: activeOrgId || undefined,
+          workspaceId: activeWsId || undefined,
           schemaName: "public",
           tableName: tableName.trim(),
-          asOfTimestamp: new Date(asOfTimestamp).toISOString(),
+          asOfTimestamp: asOfDate.toISOString(),
           recordId: recordId.trim() || undefined,
         }),
       });
@@ -513,7 +585,8 @@ function TemporalInvestigationView() {
 
   // 6. Execute Compensating Restore
   const handleRestore = async (values: RestoreVersionFormValues) => {
-    if (!selectedVersion || !selectedDbId || !activeOrgId || !activeWsId) return;
+    if (!selectedVersion || !selectedDbId || !activeOrgId || !activeWsId)
+      return;
     setIsRestoring(true);
     try {
       const res = await fetch("/api/v1/history/restore", {
@@ -548,13 +621,23 @@ function TemporalInvestigationView() {
     }
   };
 
-  // Filter versions by operation, date range, and in-memory search
+  // Filter versions by operation, date range, applied AS OF timestamp, and in-memory search
   const filteredVersions = React.useMemo(() => {
     let list = versions;
 
+    // Filter by applied AS OF timestamp (mutations on or before point-in-time when user clicked View Timeline)
+    if (appliedAsOfTimestamp) {
+      const asOfMs = new Date(appliedAsOfTimestamp).getTime();
+      if (!isNaN(asOfMs)) {
+        list = list.filter((v) => new Date(v.validFrom).getTime() <= asOfMs);
+      }
+    }
+
     // Filter by operation
     if (operationFilter !== "ALL") {
-      list = list.filter((v) => v.operation.toUpperCase() === operationFilter.toUpperCase());
+      list = list.filter(
+        (v) => v.operation.toUpperCase() === operationFilter.toUpperCase(),
+      );
     }
 
     // Filter by date range
@@ -564,10 +647,10 @@ function TemporalInvestigationView() {
         dateRangeFilter === "24h"
           ? now - 24 * 3600 * 1000
           : dateRangeFilter === "7d"
-          ? now - 7 * 24 * 3600 * 1000
-          : dateRangeFilter === "30d"
-          ? now - 30 * 24 * 3600 * 1000
-          : 0;
+            ? now - 7 * 24 * 3600 * 1000
+            : dateRangeFilter === "30d"
+              ? now - 30 * 24 * 3600 * 1000
+              : 0;
 
       list = list.filter((v) => new Date(v.validFrom).getTime() >= cutoff);
     }
@@ -580,17 +663,26 @@ function TemporalInvestigationView() {
           v.recordId.toLowerCase().includes(term) ||
           (v.performedBy && v.performedBy.toLowerCase().includes(term)) ||
           (v.changeSummary && v.changeSummary.toLowerCase().includes(term)) ||
-          v.operation.toLowerCase().includes(term)
+          v.operation.toLowerCase().includes(term),
       );
     }
 
     return list;
-  }, [versions, operationFilter, dateRangeFilter, timelineSearch]);
+  }, [
+    versions,
+    appliedAsOfTimestamp,
+    operationFilter,
+    dateRangeFilter,
+    timelineSearch,
+  ]);
 
   // Synchronize selectedVersion when filtered list changes
   React.useEffect(() => {
     if (filteredVersions.length > 0) {
-      if (!selectedVersion || !filteredVersions.some((v) => v.id === selectedVersion.id)) {
+      if (
+        !selectedVersion ||
+        !filteredVersions.some((v) => v.id === selectedVersion.id)
+      ) {
         setSelectedVersion(filteredVersions[0]);
       }
     } else {
@@ -603,13 +695,16 @@ function TemporalInvestigationView() {
     if (!selectedVersion) return null;
 
     if (compareTarget === "current") {
-      const targetState = selectedVersion.newData || selectedVersion.oldData || {};
+      const targetState =
+        selectedVersion.newData || selectedVersion.oldData || {};
       return calculateDiff(liveCurrentRecord, targetState);
     }
 
     if (compareTarget === "custom" && customBaseVersion) {
-      const baseState = customBaseVersion.newData || customBaseVersion.oldData || {};
-      const targetState = selectedVersion.newData || selectedVersion.oldData || {};
+      const baseState =
+        customBaseVersion.newData || customBaseVersion.oldData || {};
+      const targetState =
+        selectedVersion.newData || selectedVersion.oldData || {};
       return calculateDiff(baseState, targetState);
     }
 
@@ -624,7 +719,8 @@ function TemporalInvestigationView() {
     return calculateDiff(selectedVersion.oldData, selectedVersion.newData);
   }, [selectedVersion, compareTarget, customBaseVersion, liveCurrentRecord]);
 
-  const activeClusterName = databases.find((d) => d.id === selectedDbId)?.name || "Cluster";
+  const activeClusterName =
+    databases.find((d) => d.id === selectedDbId)?.name || "Cluster";
 
   const handleCopyJson = () => {
     if (!selectedVersion) return;
@@ -649,7 +745,9 @@ function TemporalInvestigationView() {
       },
       snapshot: selectedVersion.newData || selectedVersion.oldData,
     };
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
@@ -664,13 +762,16 @@ function TemporalInvestigationView() {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-base font-semibold text-foreground">Temporal Investigation & Time Travel</h1>
+            <h1 className="text-base font-semibold text-foreground">
+              Temporal Investigation & Time Travel
+            </h1>
             <Badge variant="info" className="font-mono text-[10px]">
               POINT-IN-TIME
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground">
-            Inspect historical record mutations, audit diffs, reconstruct point-in-time states, and execute audited compensating restorations
+            Inspect historical record mutations, audit diffs, reconstruct
+            point-in-time states, and execute audited compensating restorations
           </p>
         </div>
       </div>
@@ -684,7 +785,7 @@ function TemporalInvestigationView() {
       {/* Control Strip: Database, Table, Record Identifier & Timestamp */}
       <Card>
         <CardContent className="p-3.5 flex flex-wrap items-end gap-3">
-          <div className="w-full sm:w-[180px] space-y-1.5">
+          <div className="w-full sm:w-45 space-y-1.5">
             <Label>Cluster</Label>
             <Select value={selectedDbId} onValueChange={setSelectedDbId}>
               <SelectTrigger className="h-8 font-mono text-xs w-full">
@@ -694,7 +795,11 @@ function TemporalInvestigationView() {
               </SelectTrigger>
               <SelectContent>
                 {databases.map((db) => (
-                  <SelectItem key={db.id} value={db.id} className="font-mono text-xs">
+                  <SelectItem
+                    key={db.id}
+                    value={db.id}
+                    className="font-mono text-xs"
+                  >
                     {db.name}
                   </SelectItem>
                 ))}
@@ -702,32 +807,46 @@ function TemporalInvestigationView() {
             </Select>
           </div>
 
-          <div className="w-full sm:w-[190px] space-y-1.5">
+          <div className="w-full sm:w-47.5 space-y-1.5">
             <Label htmlFor="targetTable">Target Table</Label>
-            <Select
-              value={tableName}
-              onValueChange={handleTableChange}
-            >
-              <SelectTrigger id="targetTable" className="h-8 font-mono text-xs w-full">
+            <Select value={tableName} onValueChange={handleTableChange}>
+              <SelectTrigger
+                id="targetTable"
+                className="h-8 font-mono text-xs w-full"
+              >
                 <SelectValue placeholder="Select Table">
-                  {tableName || "Select Table"}
+                  {tableName === "all"
+                    ? "All Tables"
+                    : tableName || "Select Table"}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
+                <SelectItem
+                  value="all"
+                  className="font-mono text-xs font-semibold text-primary"
+                >
+                  All Tables
+                </SelectItem>
+                <div className="my-1 border-t border-border" />
                 {temporalTablesSet.size > 0 && (
                   <>
                     <div className="px-2 py-1 text-[10px] font-semibold text-primary uppercase font-mono tracking-wider flex items-center gap-1">
                       <Sparkles className="h-2.5 w-2.5" /> Captured History
                     </div>
                     {Array.from(temporalTablesSet).map((tbl) => (
-                      <SelectItem key={tbl} value={tbl} className="font-mono text-xs font-medium">
+                      <SelectItem
+                        key={tbl}
+                        value={tbl}
+                        className="font-mono text-xs font-medium"
+                      >
                         {tbl}
                       </SelectItem>
                     ))}
                     <div className="my-1 border-t border-border" />
                   </>
                 )}
-                {availableTables.filter((t) => !temporalTablesSet.has(t)).length > 0 && (
+                {availableTables.filter((t) => !temporalTablesSet.has(t))
+                  .length > 0 && (
                   <>
                     <div className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase font-mono tracking-wider">
                       Other Tables
@@ -735,7 +854,11 @@ function TemporalInvestigationView() {
                     {availableTables
                       .filter((t) => !temporalTablesSet.has(t))
                       .map((tbl) => (
-                        <SelectItem key={tbl} value={tbl} className="font-mono text-xs text-muted-foreground">
+                        <SelectItem
+                          key={tbl}
+                          value={tbl}
+                          className="font-mono text-xs text-muted-foreground"
+                        >
                           {tbl}
                         </SelectItem>
                       ))}
@@ -745,7 +868,7 @@ function TemporalInvestigationView() {
             </Select>
           </div>
 
-          <div className="w-full sm:w-[210px] space-y-1.5">
+          <div className="w-full sm:w-52.5 space-y-1.5">
             <Label htmlFor="recordId">Record ID (Optional)</Label>
             <Input
               id="recordId"
@@ -761,7 +884,7 @@ function TemporalInvestigationView() {
             />
           </div>
 
-          <div className="w-full sm:w-[220px] space-y-1.5">
+          <div className="w-full sm:w-55 space-y-1.5">
             <Label htmlFor="asOfTimestamp">AS OF Timestamp</Label>
             <DateTimePicker
               id="asOfTimestamp"
@@ -773,7 +896,10 @@ function TemporalInvestigationView() {
           <div className="flex items-center gap-2 flex-wrap pt-1 sm:pt-0">
             <Button
               size="sm"
-              onClick={() => fetchTimeline()}
+              onClick={() => {
+                setAppliedAsOfTimestamp(asOfTimestamp);
+                fetchTimeline({ asOf: asOfTimestamp });
+              }}
               disabled={!selectedDbId || !tableName.trim()}
               isLoading={isLoadingTimeline}
               className="h-8 text-xs cursor-pointer"
@@ -795,42 +921,14 @@ function TemporalInvestigationView() {
         </CardContent>
       </Card>
 
-      {/* Tables With Captured Mutations Banner (Placed Above) */}
-      {temporalTablesSet.size > 0 && (
-        <div className="flex items-center gap-2.5 px-3.5 py-2 rounded-lg border border-border/80 bg-sidebar/50 text-xs flex-wrap">
-          <div className="flex items-center gap-1.5 font-medium text-foreground text-[11px] shrink-0">
-            <Sparkles className="h-3.5 w-3.5 text-primary" />
-            <span>Tables with captured mutations:</span>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {Array.from(temporalTablesSet).map((tbl) => {
-              const isActive = tableName === tbl;
-              return (
-                <button
-                  key={tbl}
-                  onClick={() => handleTableChange(tbl)}
-                  className={`px-2.5 py-1 rounded text-xs font-mono border cursor-pointer transition-all flex items-center gap-1.5 ${
-                    isActive
-                      ? "border-primary bg-primary text-primary-foreground font-semibold shadow-xs"
-                      : "border-border bg-panel hover:bg-elevated text-foreground"
-                  }`}
-                >
-                  <span>{tbl}</span>
-                  {isActive && <Check className="h-3 w-3" />}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
       {/* Point-In-Time Query Result (Historical Reconstruction) */}
       {timeTravelResult && (
         <Card className="border-primary/40 bg-panel">
           <CardHeader className="py-2.5">
             <div className="flex items-center justify-between">
               <CardTitle className="text-xs font-mono flex items-center gap-1.5">
-                <Clock className="h-3.5 w-3.5 text-primary" /> State AS OF {timeTravelResult.asOf}
+                <Clock className="h-3.5 w-3.5 text-primary" /> State AS OF{" "}
+                {timeTravelResult.asOf}
               </CardTitle>
               <div className="flex items-center gap-2">
                 {timeTravelResult.status && (
@@ -839,8 +937,8 @@ function TemporalInvestigationView() {
                       timeTravelResult.status === "ACTIVE"
                         ? "success"
                         : timeTravelResult.status === "DELETED"
-                        ? "destructive"
-                        : "warning"
+                          ? "destructive"
+                          : "warning"
                     }
                     className="font-mono text-[10px]"
                   >
@@ -861,7 +959,7 @@ function TemporalInvestigationView() {
             )}
           </CardHeader>
           <CardContent className="p-3">
-            {timeTravelResult.rows ? (
+            {timeTravelResult.rows && timeTravelResult.rows.length > 0 ? (
               <div className="space-y-2">
                 <div className="overflow-x-auto max-h-60 rounded border border-border/70">
                   <table className="w-full text-left text-xs font-mono border-collapse">
@@ -877,10 +975,16 @@ function TemporalInvestigationView() {
                     <tbody className="divide-y divide-border/50 text-[11px]">
                       {timeTravelResult.rows.map((row: any, i) => (
                         <tr key={i} className="hover:bg-elevated/40">
-                          <td className="p-2 font-medium text-foreground">{row._recordId || row.id || "—"}</td>
-                          <td className="p-2 text-muted-foreground">v{row._versionNumber || 1}</td>
-                          <td className="p-2 text-muted-foreground">{row._validFrom ? formatDate(row._validFrom) : "—"}</td>
-                          <td className="p-2 text-muted-foreground truncate max-w-[280px]">
+                          <td className="p-2 font-medium text-foreground">
+                            {row._recordId || row.id || "—"}
+                          </td>
+                          <td className="p-2 text-muted-foreground">
+                            v{row._versionNumber || 1}
+                          </td>
+                          <td className="p-2 text-muted-foreground">
+                            {row._validFrom ? formatDate(row._validFrom) : "—"}
+                          </td>
+                          <td className="p-2 text-muted-foreground truncate max-w-70">
                             {JSON.stringify(row)}
                           </td>
                           <td className="p-2 text-right">
@@ -900,9 +1004,18 @@ function TemporalInvestigationView() {
                   </table>
                 </div>
               </div>
+            ) : timeTravelResult.rows && timeTravelResult.rows.length === 0 ? (
+              <div className="p-6 text-center text-xs text-muted-foreground font-mono">
+                No active records existed in &quot;{timeTravelResult.tableName}
+                &quot; as of {formatDate(timeTravelResult.asOf)}.
+              </div>
             ) : (
               <JsonSyntaxHighlighter
-                data={timeTravelResult.historicalData || timeTravelResult.lastKnownState || {}}
+                data={
+                  timeTravelResult.historicalData ||
+                  timeTravelResult.lastKnownState ||
+                  {}
+                }
               />
             )}
           </CardContent>
@@ -916,13 +1029,35 @@ function TemporalInvestigationView() {
           <CardHeader className="py-2.5 border-b border-border/60">
             <div className="flex items-center justify-between">
               <CardTitle className="text-xs flex items-center gap-1.5">
-                <History className="h-3.5 w-3.5 text-primary" /> Version Timeline ({filteredVersions.length})
+                <History className="h-3.5 w-3.5 text-primary" /> Version
+                Timeline ({filteredVersions.length})
               </CardTitle>
-              {tableName && (
-                <Badge variant="outline" className="text-[10px] font-mono">
-                  {tableName}
-                </Badge>
-              )}
+              <div className="flex items-center gap-1.5">
+                {appliedAsOfTimestamp && (
+                  <Badge
+                    variant="secondary"
+                    className="text-[9px] font-mono flex items-center gap-1"
+                  >
+                    AS OF: {formatDate(appliedAsOfTimestamp)}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAppliedAsOfTimestamp("");
+                        fetchTimeline({ asOf: "" });
+                      }}
+                      className="hover:text-destructive cursor-pointer ml-0.5"
+                      title="Clear AS OF filter"
+                    >
+                      ×
+                    </button>
+                  </Badge>
+                )}
+                {tableName && (
+                  <Badge variant="outline" className="text-[10px] font-mono">
+                    {tableName === "all" ? "All Tables" : tableName}
+                  </Badge>
+                )}
+              </div>
             </div>
 
             {/* Quick Search & Filters */}
@@ -939,11 +1074,15 @@ function TemporalInvestigationView() {
 
               <div className="flex items-center justify-between gap-1 text-[10px] font-mono">
                 <div className="flex items-center gap-1">
-                  {(["ALL", "INSERT", "UPDATE", "DELETE", "RESTORE"] as const).map((op) => {
+                  {(
+                    ["ALL", "INSERT", "UPDATE", "DELETE", "RESTORE"] as const
+                  ).map((op) => {
                     const count =
                       op === "ALL"
                         ? versions.length
-                        : versions.filter((v) => v.operation.toUpperCase() === op).length;
+                        : versions.filter(
+                            (v) => v.operation.toUpperCase() === op,
+                          ).length;
 
                     return (
                       <button
@@ -971,23 +1110,11 @@ function TemporalInvestigationView() {
                     );
                   })}
                 </div>
-
-                <Select value={dateRangeFilter} onValueChange={handleDateRangeFilterChange}>
-                  <SelectTrigger className="h-6 text-[10px] font-mono w-[85px] border-none bg-transparent hover:bg-elevated p-1">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Time</SelectItem>
-                    <SelectItem value="24h">Last 24h</SelectItem>
-                    <SelectItem value="7d">Last 7d</SelectItem>
-                    <SelectItem value="30d">Last 30d</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
             </div>
           </CardHeader>
 
-          <CardContent className="p-2 overflow-y-auto max-h-[620px] space-y-2">
+          <CardContent className="p-2 overflow-y-auto max-h-155 space-y-2">
             {filteredVersions.map((ver) => {
               const isSelected = selectedVersion?.id === ver.id;
               const isCustomBase = customBaseVersion?.id === ver.id;
@@ -1000,39 +1127,54 @@ function TemporalInvestigationView() {
                     isSelected
                       ? "border-primary bg-primary/10 ring-1 ring-primary/40 text-foreground"
                       : isCustomBase
-                      ? "border-warning/60 bg-warning/10 text-foreground"
-                      : "border-border bg-sidebar hover:bg-elevated/70 text-muted-foreground"
+                        ? "border-warning/60 bg-warning/10 text-foreground"
+                        : "border-border bg-sidebar hover:bg-elevated/70 text-muted-foreground"
                   }`}
                 >
                   <div className="flex items-center justify-between font-mono">
                     <div className="flex items-center gap-1.5">
-                      <span className="font-bold text-foreground">v{ver.versionNumber}</span>
+                      <span className="font-bold text-foreground">
+                        v{ver.versionNumber}
+                      </span>
                       <Badge
                         variant={
                           ver.operation === "INSERT"
                             ? "success"
                             : ver.operation === "UPDATE"
-                            ? "info"
-                            : ver.operation === "RESTORE"
-                            ? "warning"
-                            : "destructive"
+                              ? "info"
+                              : ver.operation === "RESTORE"
+                                ? "warning"
+                                : "destructive"
                         }
                         className="text-[9px] px-1 py-0 h-4"
                       >
                         {ver.operation}
                       </Badge>
+                      {ver.tableName && (
+                        <span className="text-[9px] text-muted-foreground font-mono bg-elevated/70 px-1 py-0.5 rounded border border-border/50">
+                          {ver.tableName}
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-1 text-[10px]">
-                      {ver.modifiedCount !== undefined && ver.modifiedCount > 0 && (
-                        <span className="text-warning font-mono">~{ver.modifiedCount}</span>
-                      )}
+                      {ver.modifiedCount !== undefined &&
+                        ver.modifiedCount > 0 && (
+                          <span className="text-warning font-mono">
+                            ~{ver.modifiedCount}
+                          </span>
+                        )}
                       {ver.addedCount !== undefined && ver.addedCount > 0 && (
-                        <span className="text-[#34D399] font-mono">+{ver.addedCount}</span>
+                        <span className="text-[#34D399] font-mono">
+                          +{ver.addedCount}
+                        </span>
                       )}
-                      {ver.removedCount !== undefined && ver.removedCount > 0 && (
-                        <span className="text-destructive font-mono">-{ver.removedCount}</span>
-                      )}
+                      {ver.removedCount !== undefined &&
+                        ver.removedCount > 0 && (
+                          <span className="text-destructive font-mono">
+                            -{ver.removedCount}
+                          </span>
+                        )}
                     </div>
                   </div>
 
@@ -1046,14 +1188,19 @@ function TemporalInvestigationView() {
                   {/* Record ID identifier */}
                   {ver.recordId && (
                     <div className="text-[10px] font-mono text-muted-foreground truncate mt-0.5">
-                      record: <span className="text-foreground">{ver.recordId}</span>
+                      record:{" "}
+                      <span className="text-foreground">{ver.recordId}</span>
                     </div>
                   )}
 
                   {/* Metadata: actor & date */}
                   <div className="text-[10px] text-muted-foreground mt-1 flex items-center justify-between font-mono">
                     <span>{formatDate(ver.validFrom)}</span>
-                    {ver.performedBy && <span className="truncate max-w-[110px]">{ver.performedBy}</span>}
+                    {ver.performedBy && (
+                      <span className="truncate max-w-27.5">
+                        {ver.performedBy}
+                      </span>
+                    )}
                   </div>
 
                   <div className="mt-1.5 pt-1.5 border-t border-border/50 flex justify-between items-center text-[10px]">
@@ -1070,7 +1217,11 @@ function TemporalInvestigationView() {
                         }
                       }}
                       className="text-primary hover:underline font-mono cursor-pointer"
-                      title={isCustomBase ? "Click to clear custom baseline" : "Set this version as baseline for comparisons"}
+                      title={
+                        isCustomBase
+                          ? "Click to clear custom baseline"
+                          : "Set this version as baseline for comparisons"
+                      }
                     >
                       {isCustomBase ? "Selected Base ✓ (Clear)" : "Set As Base"}
                     </button>
@@ -1087,11 +1238,13 @@ function TemporalInvestigationView() {
                   description={
                     operationFilter !== "ALL"
                       ? `No historical ${operationFilter} mutations captured for table "${tableName}".`
-                      : tableName
-                      ? recordId
-                        ? `No historical mutations recorded for record "${recordId}" in table "${tableName}".`
-                        : `No historical mutations captured yet for table "${tableName}" in cluster "${activeClusterName}".`
-                      : "Select a target table above to inspect historical record versions."
+                      : appliedAsOfTimestamp
+                        ? `No historical mutations recorded on or before ${formatDate(appliedAsOfTimestamp)} for table "${tableName}".`
+                        : tableName
+                          ? recordId
+                            ? `No historical mutations recorded for record "${recordId}" in table "${tableName}".`
+                            : `No historical mutations captured yet for table "${tableName}" in cluster "${activeClusterName}".`
+                          : "Select a target table above to inspect historical record versions."
                   }
                   className="py-4"
                 />
@@ -1101,11 +1254,12 @@ function TemporalInvestigationView() {
         </Card>
 
         {/* RIGHT COLUMN: State & Diff Inspector (~65%) */}
-        <Card className="lg:col-span-8 flex flex-col min-h-[500px]">
+        <Card className="lg:col-span-8 flex flex-col min-h-125">
           <CardHeader className="py-2.5 border-b border-border/60 flex flex-row items-center justify-between">
             <div className="flex items-center gap-2">
               <CardTitle className="text-xs flex items-center gap-1.5">
-                <GitCompare className="h-3.5 w-3.5 text-primary" /> State & Diff Inspector
+                <GitCompare className="h-3.5 w-3.5 text-primary" /> State & Diff
+                Inspector
               </CardTitle>
 
               {/* View Switcher: Diff vs JSON */}
@@ -1180,7 +1334,11 @@ function TemporalInvestigationView() {
                   className={`h-7 text-xs border-warning/40 text-warning hover:bg-warning/10 cursor-pointer ${
                     !canRestore ? "opacity-50 cursor-not-allowed" : ""
                   }`}
-                  title={canRestore ? "Restore this version via audited compensating transaction" : "Restoration requires 'history:restore' permission"}
+                  title={
+                    canRestore
+                      ? "Restore this version via audited compensating transaction"
+                      : "Restoration requires 'history:restore' permission"
+                  }
                 >
                   <RotateCcw className="h-3 w-3 mr-1" /> Restore Version
                 </Button>
@@ -1194,20 +1352,47 @@ function TemporalInvestigationView() {
                 {/* Metadata Strip */}
                 <div className="p-2 rounded bg-sidebar border border-border flex flex-wrap items-center justify-between text-[11px] font-mono gap-2 text-muted-foreground">
                   <div className="flex items-center gap-3">
+                    {selectedVersion.tableName && (
+                      <span>
+                        Table:{" "}
+                        <strong className="text-foreground">
+                          {selectedVersion.tableName}
+                        </strong>
+                      </span>
+                    )}
                     <span>
-                      Version: <strong className="text-foreground">v{selectedVersion.versionNumber}</strong>
+                      Version:{" "}
+                      <strong className="text-foreground">
+                        v{selectedVersion.versionNumber}
+                      </strong>
                     </span>
                     <span>
-                      Operation: <strong className="text-foreground">{selectedVersion.operation}</strong>
+                      Operation:{" "}
+                      <strong className="text-foreground">
+                        {selectedVersion.operation}
+                      </strong>
                     </span>
                     <span>
-                      Record: <strong className="text-foreground">{selectedVersion.recordId}</strong>
+                      Record:{" "}
+                      <strong className="text-foreground">
+                        {selectedVersion.recordId}
+                      </strong>
                     </span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span>Valid from: <strong className="text-foreground">{formatDate(selectedVersion.validFrom)}</strong></span>
+                    <span>
+                      Valid from:{" "}
+                      <strong className="text-foreground">
+                        {formatDate(selectedVersion.validFrom)}
+                      </strong>
+                    </span>
                     {selectedVersion.transactionXmin && (
-                      <span>tx: <strong className="text-foreground">{selectedVersion.transactionXmin}</strong></span>
+                      <span>
+                        tx:{" "}
+                        <strong className="text-foreground">
+                          {selectedVersion.transactionXmin}
+                        </strong>
+                      </span>
                     )}
                   </div>
                 </div>
@@ -1260,13 +1445,15 @@ function TemporalInvestigationView() {
                       {activeDiff && (
                         <div className="flex items-center gap-1 text-[11px] font-mono">
                           <Badge variant="outline" className="text-warning">
-                            {Object.keys(activeDiff.modified || {}).length} modified
+                            {Object.keys(activeDiff.modified || {}).length}{" "}
+                            modified
                           </Badge>
                           <Badge variant="outline" className="text-[#34D399]">
                             {Object.keys(activeDiff.added || {}).length} added
                           </Badge>
                           <Badge variant="outline" className="text-destructive">
-                            {Object.keys(activeDiff.removed || {}).length} removed
+                            {Object.keys(activeDiff.removed || {}).length}{" "}
+                            removed
                           </Badge>
                         </div>
                       )}
@@ -1278,17 +1465,25 @@ function TemporalInvestigationView() {
                         {liveCurrentRecord ? (
                           <>
                             <span className="flex h-2 w-2 rounded-full bg-[#34D399] shrink-0" />
-                            <span className="text-foreground font-semibold">Live DB Record Present</span>
+                            <span className="text-foreground font-semibold">
+                              Live DB Record Present
+                            </span>
                             <span className="text-muted-foreground">
-                              — Comparing Version v{selectedVersion.versionNumber} against the live database row.
+                              — Comparing Version v
+                              {selectedVersion.versionNumber} against the live
+                              database row.
                             </span>
                           </>
                         ) : (
                           <>
                             <span className="flex h-2 w-2 rounded-full bg-amber-500 shrink-0" />
-                            <span className="text-warning font-semibold">Not Restored / Deleted in Live DB</span>
+                            <span className="text-warning font-semibold">
+                              Not Restored / Deleted in Live DB
+                            </span>
                             <span className="text-muted-foreground">
-                              — This record is currently not present in the live database. Diff shows attributes that would be recreated upon restore.
+                              — This record is currently not present in the live
+                              database. Diff shows attributes that would be
+                              recreated upon restore.
                             </span>
                           </>
                         )}
@@ -1296,28 +1491,39 @@ function TemporalInvestigationView() {
                     )}
 
                     {/* Informational banner when Custom Base is active */}
-                    {compareTarget === "custom" && customBaseVersion && selectedVersion && (
-                      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-sidebar/90 border border-border text-[11px] font-mono">
-                        <Info className="h-3.5 w-3.5 text-primary shrink-0" />
-                        {selectedVersion.id === customBaseVersion.id ? (
-                          <>
-                            <span className="text-foreground font-semibold">
-                              Comparing Version v{selectedVersion.versionNumber} against itself
-                            </span>
-                            <span className="text-muted-foreground">
-                              — v{customBaseVersion.versionNumber} is set as the custom base. Select another version in the timeline to see changes across versions, or click &quot;This Mutation&quot; to inspect this version&apos;s single-step diff.
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="text-foreground font-semibold">Custom Baseline Active</span>
-                            <span className="text-muted-foreground">
-                              — Comparing Version v{selectedVersion.versionNumber} against Base Version v{customBaseVersion.versionNumber}.
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    )}
+                    {compareTarget === "custom" &&
+                      customBaseVersion &&
+                      selectedVersion && (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-sidebar/90 border border-border text-[11px] font-mono">
+                          <Info className="h-3.5 w-3.5 text-primary shrink-0" />
+                          {selectedVersion.id === customBaseVersion.id ? (
+                            <>
+                              <span className="text-foreground font-semibold">
+                                Comparing Version v
+                                {selectedVersion.versionNumber} against itself
+                              </span>
+                              <span className="text-muted-foreground">
+                                — v{customBaseVersion.versionNumber} is set as
+                                the custom base. Select another version in the
+                                timeline to see changes across versions, or
+                                click &quot;This Mutation&quot; to inspect this
+                                version&apos;s single-step diff.
+                              </span>
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-foreground font-semibold">
+                                Custom Baseline Active
+                              </span>
+                              <span className="text-muted-foreground">
+                                — Comparing Version v
+                                {selectedVersion.versionNumber} against Base
+                                Version v{customBaseVersion.versionNumber}.
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      )}
 
                     {/* Diff Tables */}
                     {activeDiff && (
@@ -1335,7 +1541,9 @@ function TemporalInvestigationView() {
                                 <tr className="border-b border-border/80 text-muted-foreground text-[10px]">
                                   <th className="p-2 w-1/4">Field</th>
                                   <th className="p-2 w-3/8">
-                                    {compareTarget === "current" ? "Current Live DB Value" : "Previous Value"}
+                                    {compareTarget === "current"
+                                      ? "Current Live DB Value"
+                                      : "Previous Value"}
                                   </th>
                                   <th className="p-2 w-3/8">
                                     {compareTarget === "current"
@@ -1345,17 +1553,24 @@ function TemporalInvestigationView() {
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-border/60 text-[11px]">
-                                {Object.entries(activeDiff.modified || {}).map(([key, val]: any) => (
-                                  <tr key={key} className="hover:bg-elevated/30">
-                                    <td className="p-2 font-semibold text-foreground">{key}</td>
-                                    <td className="p-2 text-destructive line-through bg-destructive/5 font-mono">
-                                      {JSON.stringify(val.old)}
-                                    </td>
-                                    <td className="p-2 text-[#34D399] bg-[#34D399]/5 font-mono">
-                                      {JSON.stringify(val.new)}
-                                    </td>
-                                  </tr>
-                                ))}
+                                {Object.entries(activeDiff.modified || {}).map(
+                                  ([key, val]: any) => (
+                                    <tr
+                                      key={key}
+                                      className="hover:bg-elevated/30"
+                                    >
+                                      <td className="p-2 font-semibold text-foreground">
+                                        {key}
+                                      </td>
+                                      <td className="p-2 text-destructive line-through bg-destructive/5 font-mono">
+                                        {JSON.stringify(val.old)}
+                                      </td>
+                                      <td className="p-2 text-[#34D399] bg-[#34D399]/5 font-mono">
+                                        {JSON.stringify(val.new)}
+                                      </td>
+                                    </tr>
+                                  ),
+                                )}
                               </tbody>
                             </table>
                           </div>
@@ -1370,8 +1585,8 @@ function TemporalInvestigationView() {
                                 {compareTarget === "current"
                                   ? `Attributes Removed if Restored (${Object.keys(activeDiff.removed || {}).length})`
                                   : selectedVersion.operation === "DELETE"
-                                  ? `Deleted Record Snapshot Attributes (${Object.keys(activeDiff.removed || {}).length})`
-                                  : `Removed Attributes (${Object.keys(activeDiff.removed || {}).length})`}
+                                    ? `Deleted Record Snapshot Attributes (${Object.keys(activeDiff.removed || {}).length})`
+                                    : `Removed Attributes (${Object.keys(activeDiff.removed || {}).length})`}
                               </span>
                             </div>
                             <table className="w-full text-left text-xs font-mono border-collapse">
@@ -1379,19 +1594,28 @@ function TemporalInvestigationView() {
                                 <tr className="border-b border-border/80 text-muted-foreground text-[10px]">
                                   <th className="p-2 w-1/4">Field</th>
                                   <th className="p-2">
-                                    {compareTarget === "current" ? "Attribute Removed from Live DB" : "Deleted Value"}
+                                    {compareTarget === "current"
+                                      ? "Attribute Removed from Live DB"
+                                      : "Deleted Value"}
                                   </th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-border/60 text-[11px]">
-                                {Object.entries(activeDiff.removed || {}).map(([key, val]: any) => (
-                                  <tr key={key} className="hover:bg-elevated/30">
-                                    <td className="p-2 w-1/4 font-semibold text-foreground">{key}</td>
-                                    <td className="p-2 text-destructive font-mono">
-                                      -{JSON.stringify(val)}
-                                    </td>
-                                  </tr>
-                                ))}
+                                {Object.entries(activeDiff.removed || {}).map(
+                                  ([key, val]: any) => (
+                                    <tr
+                                      key={key}
+                                      className="hover:bg-elevated/30"
+                                    >
+                                      <td className="p-2 w-1/4 font-semibold text-foreground">
+                                        {key}
+                                      </td>
+                                      <td className="p-2 text-destructive font-mono">
+                                        -{JSON.stringify(val)}
+                                      </td>
+                                    </tr>
+                                  ),
+                                )}
                               </tbody>
                             </table>
                           </div>
@@ -1412,17 +1636,29 @@ function TemporalInvestigationView() {
                                 <tr className="border-b border-border/80 text-muted-foreground text-[10px]">
                                   <th className="p-2 w-1/4">Field</th>
                                   <th className="p-2">
-                                    {compareTarget === "current" && !liveCurrentRecord ? "Value to Recreate" : "Value"}
+                                    {compareTarget === "current" &&
+                                    !liveCurrentRecord
+                                      ? "Value to Recreate"
+                                      : "Value"}
                                   </th>
                                 </tr>
                               </thead>
                               <tbody className="divide-y divide-border/60 text-[11px]">
-                                {Object.entries(activeDiff.added || {}).map(([key, val]: any) => (
-                                  <tr key={key} className="hover:bg-elevated/30">
-                                    <td className="p-2 w-1/4 font-semibold text-foreground">{key}</td>
-                                    <td className="p-2 text-[#34D399] font-mono">+{JSON.stringify(val)}</td>
-                                  </tr>
-                                ))}
+                                {Object.entries(activeDiff.added || {}).map(
+                                  ([key, val]: any) => (
+                                    <tr
+                                      key={key}
+                                      className="hover:bg-elevated/30"
+                                    >
+                                      <td className="p-2 w-1/4 font-semibold text-foreground">
+                                        {key}
+                                      </td>
+                                      <td className="p-2 text-[#34D399] font-mono">
+                                        +{JSON.stringify(val)}
+                                      </td>
+                                    </tr>
+                                  ),
+                                )}
                               </tbody>
                             </table>
                           </div>
@@ -1430,17 +1666,23 @@ function TemporalInvestigationView() {
 
                         {Object.keys(activeDiff.modified || {}).length === 0 &&
                           Object.keys(activeDiff.added || {}).length === 0 &&
-                          Object.keys(activeDiff.removed || {}).length === 0 && (
+                          Object.keys(activeDiff.removed || {}).length ===
+                            0 && (
                             <div className="p-8 text-center space-y-2 border rounded-lg bg-sidebar/40 border-border">
                               {compareTarget === "current" ? (
                                 liveCurrentRecord ? (
                                   <>
                                     <CheckCircle2 className="h-6 w-6 text-[#34D399] mx-auto" />
                                     <div className="text-xs font-semibold text-foreground font-mono">
-                                      Live Database Already In Sync with Version v{selectedVersion.versionNumber}
+                                      Live Database Already In Sync with Version
+                                      v{selectedVersion.versionNumber}
                                     </div>
                                     <p className="text-[11px] text-muted-foreground max-w-md mx-auto">
-                                      All attributes in this historical snapshot are already identical to the current row in cluster &quot;{activeClusterName}&quot;. No compensating restoration is required.
+                                      All attributes in this historical snapshot
+                                      are already identical to the current row
+                                      in cluster &quot;{activeClusterName}
+                                      &quot;. No compensating restoration is
+                                      required.
                                     </p>
                                   </>
                                 ) : (
@@ -1450,13 +1692,16 @@ function TemporalInvestigationView() {
                                       Record Deleted in Live Database
                                     </div>
                                     <p className="text-[11px] text-muted-foreground max-w-md mx-auto">
-                                      This record is deleted in the live database. No live data was found to compare against.
+                                      This record is deleted in the live
+                                      database. No live data was found to
+                                      compare against.
                                     </p>
                                   </>
                                 )
                               ) : (
                                 <div className="text-xs text-muted-foreground">
-                                  No attribute differences detected in this comparison.
+                                  No attribute differences detected in this
+                                  comparison.
                                 </div>
                               )}
                             </div>
@@ -1470,11 +1715,24 @@ function TemporalInvestigationView() {
                 {inspectorMode === "json" && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between text-[10px] font-mono uppercase text-muted-foreground">
-                      <span>Full Snapshot Data (v{selectedVersion.versionNumber})</span>
-                      <span>{Object.keys(selectedVersion.newData || selectedVersion.oldData || {}).length} attributes</span>
+                      <span>
+                        Full Snapshot Data (v{selectedVersion.versionNumber})
+                      </span>
+                      <span>
+                        {
+                          Object.keys(
+                            selectedVersion.newData ||
+                              selectedVersion.oldData ||
+                              {},
+                          ).length
+                        }{" "}
+                        attributes
+                      </span>
                     </div>
                     <JsonSyntaxHighlighter
-                      data={selectedVersion.newData || selectedVersion.oldData || {}}
+                      data={
+                        selectedVersion.newData || selectedVersion.oldData || {}
+                      }
                     />
                   </div>
                 )}
@@ -1500,42 +1758,70 @@ function TemporalInvestigationView() {
                 <RotateCcw className="h-4 w-4" /> Confirm Compensating Restore
               </DialogTitle>
               <DialogDescription>
-                Restoration executes a compensating operation in a NEW transaction. All previous versions are preserved in the append-only history.
+                Restoration executes a compensating operation in a NEW
+                transaction. All previous versions are preserved in the
+                append-only history.
               </DialogDescription>
             </DialogHeader>
 
-            <form onSubmit={handleRestoreVersionSubmit(handleRestore)} noValidate className="space-y-3 pt-2">
+            <form
+              onSubmit={handleRestoreVersionSubmit(handleRestore)}
+              noValidate
+              className="space-y-3 pt-2"
+            >
               <div className="p-3 rounded bg-sidebar border border-border space-y-1.5 font-mono text-[11px]">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Target Table:</span>
                   <span className="text-foreground">{tableName}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Record Identifier:</span>
-                  <span className="text-foreground">{selectedVersion.recordId || recordId}</span>
+                  <span className="text-muted-foreground">
+                    Record Identifier:
+                  </span>
+                  <span className="text-foreground">
+                    {selectedVersion.recordId || recordId}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Restore From Version:</span>
-                  <span className="text-foreground font-bold text-primary">v{selectedVersion.versionNumber}</span>
+                  <span className="text-muted-foreground">
+                    Restore From Version:
+                  </span>
+                  <span className="font-bold text-primary">
+                    v{selectedVersion.versionNumber}
+                  </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Original Mutation Time:</span>
-                  <span className="text-foreground">{formatDate(selectedVersion.validFrom)}</span>
+                  <span className="text-muted-foreground">
+                    Original Mutation Time:
+                  </span>
+                  <span className="text-foreground">
+                    {formatDate(selectedVersion.validFrom)}
+                  </span>
                 </div>
               </div>
 
               {/* Side-by-side Current vs Restore Preview */}
               <div className="grid grid-cols-2 gap-2 text-xs font-mono">
                 <div className="p-2 rounded border border-border bg-sidebar/50 space-y-1">
-                  <div className="text-[10px] text-muted-foreground uppercase">Current Live Database State</div>
+                  <div className="text-[10px] text-muted-foreground uppercase">
+                    Current Live Database State
+                  </div>
                   <pre className="text-[10px] max-h-32 overflow-auto text-muted-foreground">
-                    {liveCurrentRecord ? JSON.stringify(liveCurrentRecord, null, 2) : "Record currently deleted or not found"}
+                    {liveCurrentRecord
+                      ? JSON.stringify(liveCurrentRecord, null, 2)
+                      : "Record currently deleted or not found"}
                   </pre>
                 </div>
                 <div className="p-2 rounded border border-primary/40 bg-primary/5 space-y-1">
-                  <div className="text-[10px] text-primary uppercase">State Being Restored (v{selectedVersion.versionNumber})</div>
+                  <div className="text-[10px] text-primary uppercase">
+                    State Being Restored (v{selectedVersion.versionNumber})
+                  </div>
                   <pre className="text-[10px] max-h-32 overflow-auto text-foreground">
-                    {JSON.stringify(selectedVersion.newData || selectedVersion.oldData, null, 2)}
+                    {JSON.stringify(
+                      selectedVersion.newData || selectedVersion.oldData,
+                      null,
+                      2,
+                    )}
                   </pre>
                 </div>
               </div>
@@ -1560,10 +1846,7 @@ function TemporalInvestigationView() {
                 >
                   Cancel
                 </Button>
-                <Button
-                  type="submit"
-                  isLoading={isRestoring}
-                >
+                <Button type="submit" isLoading={isRestoring}>
                   Execute Compensating Restore
                 </Button>
               </DialogFooter>

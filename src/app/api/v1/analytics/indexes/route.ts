@@ -14,9 +14,9 @@ export async function GET(req: Request) {
       return NextResponse.json({ error: "databaseId is required" }, { status: 400 });
     }
 
-    const { database } = await requireDatabaseAccessById(databaseId, "performance:inspect");
+    const { database } = await requireDatabaseAccessById(databaseId, "performance:index_stats");
 
-    const indexes = await AnalyticsService.getIndexStats(database.id);
+    const indexes = await AnalyticsService.getIndexStatistics(database.id);
     return NextResponse.json({ indexes });
   } catch (err) {
     const error = handleApiError(err);
