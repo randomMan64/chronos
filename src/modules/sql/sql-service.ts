@@ -3,6 +3,7 @@ import { queryExecutions, savedQueries, databases } from "@/db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { userDbManager, QueryResult } from "@/db/connections/user-database";
 import { AuditService } from "@/modules/audit/audit-service";
+import { TransactionService } from "@/modules/transactions/transaction-service";
 import { UserContext } from "@/lib/permissions/types";
 
 export interface ExecuteSqlInput {
@@ -89,6 +90,13 @@ export class SqlService {
     const safeMaxRows = Math.min(Math.max(input.maxRows || 1000, 1), 5000);
     const safeTimeoutMs = Math.min(Math.max(input.timeoutMs || 30000, 1000), 60000);
 
+    const traceId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+    const hasExplicitRollback = /\bROLLBACK\b/i.test(trimmedSql);
+    const rawStatements = trimmedSql
+      .split(";")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
     const start = Date.now();
     try {
       const result = await userDbManager.executeQuery(
@@ -115,6 +123,37 @@ export class SqlService {
         status: "success",
       });
 
+      // Record transaction lifecycle event in control plane
+      const status = hasExplicitRollback ? "rolled_back" : "committed";
+      await TransactionService.recordTransaction({
+        databaseId: database.id,
+        transactionId: traceId,
+        actorId: input.context.userId,
+        actorEmail: input.context.email,
+        status,
+        queryText: trimmedSql,
+        durationMs: result.durationMs,
+        startedAt: new Date(start),
+        endedAt: new Date(),
+        metadata: {
+          traceId,
+          workspaceId: input.workspaceId,
+          statementCount: rawStatements.length,
+          rowsAffected: result.rowCount || 0,
+          applicationName: "chronos-sql-gateway",
+          statements: rawStatements.map((stmt, idx) => ({
+            seq: idx + 1,
+            operation: stmt.match(/^\s*([A-Za-z]+)\b/)?.[1]?.toUpperCase() || "SQL",
+            sql: stmt,
+            startedAt: new Date(start).toISOString(),
+            endedAt: new Date().toISOString(),
+            durationMs: Math.round(result.durationMs / (rawStatements.length || 1)),
+            rowsAffected: idx === rawStatements.length - 1 ? result.rowCount : 0,
+            status: "SUCCESS",
+          })),
+        },
+      });
+
       // Audit modifying statements
       if (isModifying) {
         await AuditService.log({
@@ -130,11 +169,12 @@ export class SqlService {
             command: result.command,
             rowCount: result.rowCount,
             durationMs: result.durationMs,
+            transactionId: traceId,
           },
         });
       }
 
-      return result;
+      return { ...result, transactionId: traceId };
     } catch (err: unknown) {
       const errorMsg = err instanceof Error ? err.message : String(err);
       const durationMs = Date.now() - start;
@@ -149,6 +189,39 @@ export class SqlService {
         rowCount: 0,
         status: "error",
         errorMessage: errorMsg,
+      });
+
+      // Persist failure/rollback telemetry trace to control plane (guaranteed never rolled back)
+      const isRollback = hasExplicitRollback || /rollback/i.test(errorMsg);
+      await TransactionService.recordTransaction({
+        databaseId: database.id,
+        transactionId: traceId,
+        actorId: input.context.userId,
+        actorEmail: input.context.email,
+        status: isRollback ? "rolled_back" : "failed",
+        queryText: trimmedSql,
+        durationMs,
+        startedAt: new Date(start),
+        endedAt: new Date(),
+        metadata: {
+          traceId,
+          workspaceId: input.workspaceId,
+          statementCount: rawStatements.length,
+          rowsAffected: 0,
+          applicationName: "chronos-sql-gateway",
+          error: {
+            message: errorMsg,
+          },
+          statements: rawStatements.map((stmt, idx) => ({
+            seq: idx + 1,
+            operation: stmt.match(/^\s*([A-Za-z]+)\b/)?.[1]?.toUpperCase() || "SQL",
+            sql: stmt,
+            startedAt: new Date(start).toISOString(),
+            durationMs: Math.round(durationMs / (rawStatements.length || 1)),
+            status: idx === rawStatements.length - 1 ? "ERROR" : "SUCCESS",
+            errorMessage: idx === rawStatements.length - 1 ? errorMsg : undefined,
+          })),
+        },
       });
 
       throw err;

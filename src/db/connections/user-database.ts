@@ -18,6 +18,7 @@ export interface QueryResult {
   rowCount: number;
   durationMs: number;
   command: string;
+  transactionId?: string;
 }
 
 export interface TableColumnMetadata {

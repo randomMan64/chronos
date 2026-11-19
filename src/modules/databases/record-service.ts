@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { userDbManager, TableColumnMetadata } from "@/db/connections/user-database";
 import { TemporalService } from "@/modules/temporal/temporal-service";
 import { AuditService } from "@/modules/audit/audit-service";
+import { TransactionService } from "@/modules/transactions/transaction-service";
 import { NotFoundError, ForbiddenError } from "@/lib/auth/guards";
 
 export class ConcurrencyConflictError extends Error {
@@ -312,7 +313,8 @@ export class RecordService {
     const updatedRecord = updateRes.rows[0] || currentRecord;
     const pkString = pkCols.map((c) => String(params.primaryKey[c.columnName])).join(":");
 
-    // 6. Time Travel Integration
+    // 6. Time Travel & Transaction Integration
+    const txId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     try {
       await TemporalService.recordRowVersion({
         databaseId: database.id,
@@ -323,6 +325,25 @@ export class RecordService {
         oldData: currentRecord,
         newData: updatedRecord,
         changedBy: params.actor.email,
+        transactionId: txId,
+      });
+
+      await TransactionService.recordTransaction({
+        databaseId: database.id,
+        transactionId: txId,
+        actorId: params.actor.id,
+        actorEmail: params.actor.email,
+        status: "committed",
+        queryText: updateSql,
+        durationMs: updateRes.durationMs,
+        metadata: {
+          traceId: txId,
+          tableName: table,
+          recordId: pkString,
+          operation: "UPDATE",
+          rowsAffected: 1,
+          applicationName: "chronos-record-editor",
+        },
       });
     } catch (temporalErr) {
       console.warn("[RecordService] Warning: Failed to capture temporal row version:", temporalErr);
@@ -343,6 +364,7 @@ export class RecordService {
           table,
           recordId: pkString,
           changedColumns,
+          transactionId: txId,
         },
       });
     } catch (auditErr) {
@@ -420,7 +442,8 @@ export class RecordService {
       ? pkCols.map((c) => String(newRecord[c.columnName])).join(":")
       : String(newRecord.id || newRecord[Object.keys(newRecord)[0]] || "new");
 
-    // Time Travel Record
+    // Time Travel & Transaction Record
+    const insertTxId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     try {
       await TemporalService.recordRowVersion({
         databaseId: database.id,
@@ -431,6 +454,25 @@ export class RecordService {
         oldData: null,
         newData: newRecord,
         changedBy: params.actor.email,
+        transactionId: insertTxId,
+      });
+
+      await TransactionService.recordTransaction({
+        databaseId: database.id,
+        transactionId: insertTxId,
+        actorId: params.actor.id,
+        actorEmail: params.actor.email,
+        status: "committed",
+        queryText: insertSql,
+        durationMs: insertRes.durationMs,
+        metadata: {
+          traceId: insertTxId,
+          tableName: table,
+          recordId: pkString,
+          operation: "INSERT",
+          rowsAffected: 1,
+          applicationName: "chronos-record-editor",
+        },
       });
     } catch (temporalErr) {
       console.warn("[RecordService] Warning: Failed to capture temporal row version:", temporalErr);
@@ -450,6 +492,7 @@ export class RecordService {
           schema,
           table,
           recordId: pkString,
+          transactionId: insertTxId,
         },
       });
     } catch (auditErr) {
@@ -568,7 +611,8 @@ export class RecordService {
     const deletedRecord = deleteRes.rows[0] || currentRecord;
     const pkString = pkCols.map((c) => String(params.primaryKey[c.columnName])).join(":");
 
-    // Time Travel Record
+    // Time Travel & Transaction Record
+    const deleteTxId = `tx_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     try {
       await TemporalService.recordRowVersion({
         databaseId: database.id,
@@ -579,6 +623,25 @@ export class RecordService {
         oldData: deletedRecord,
         newData: null,
         changedBy: params.actor.email,
+        transactionId: deleteTxId,
+      });
+
+      await TransactionService.recordTransaction({
+        databaseId: database.id,
+        transactionId: deleteTxId,
+        actorId: params.actor.id,
+        actorEmail: params.actor.email,
+        status: "committed",
+        queryText: deleteSql,
+        durationMs: deleteRes.durationMs,
+        metadata: {
+          traceId: deleteTxId,
+          tableName: table,
+          recordId: pkString,
+          operation: "DELETE",
+          rowsAffected: 1,
+          applicationName: "chronos-record-editor",
+        },
       });
     } catch (temporalErr) {
       console.warn("[RecordService] Warning: Failed to capture temporal row version:", temporalErr);
@@ -598,6 +661,7 @@ export class RecordService {
           schema,
           table,
           recordId: pkString,
+          transactionId: deleteTxId,
         },
       });
     } catch (auditErr) {
