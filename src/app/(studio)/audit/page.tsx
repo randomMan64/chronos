@@ -779,7 +779,7 @@ export default function AuditCenterPage() {
             <CardContent className="p-3">
               <div className="flex flex-wrap items-center gap-2.5">
                 {/* Search */}
-                <div className="relative flex-1 min-w-[200px]">
+                <div className="relative flex-1 min-w-50">
                   <Search className="h-3.5 w-3.5 text-muted-foreground absolute left-2.5 top-2.5" />
                   <Input
                     placeholder="Search by actor email, action, resource, IP, or Event ID..."
@@ -950,13 +950,13 @@ export default function AuditCenterPage() {
                                 {e.eventCategory}
                               </Badge>
                             </td>
-                            <td className="p-3 text-foreground/90 truncate max-w-[160px]" title={e.actorEmail || "system"}>
+                            <td className="p-3 text-foreground/90 truncate max-w-40" title={e.actorEmail || "system"}>
                               {e.actorEmail || "system"}
                             </td>
                             <td className="p-3">
                               <span className="text-primary font-medium">{e.resourceType}</span>
                               {e.resourceId && (
-                                <span className="text-muted-foreground ml-1 text-[11px] truncate max-w-[120px]" title={e.resourceId}>
+                                <span className="text-muted-foreground ml-1 text-[11px] truncate max-w-30" title={e.resourceId}>
                                   ({e.resourceId.slice(0, 8)}...)
                                 </span>
                               )}

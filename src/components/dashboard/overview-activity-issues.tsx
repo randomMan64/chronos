@@ -128,7 +128,7 @@ export function OverviewRecentActivityTable({
           </CardDescription>
         </div>
         <Link
-          href="/analytics"
+          href="/analyzer"
           className="text-xs font-mono text-primary hover:underline inline-flex items-center gap-1"
         >
           View All Telemetry <ExternalLink className="h-3 w-3" />

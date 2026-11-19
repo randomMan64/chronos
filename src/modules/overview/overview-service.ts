@@ -68,7 +68,7 @@ export interface IssueAlert {
   severity: "critical" | "high" | "medium" | "low";
   title: string;
   description: string;
-  module: "analytics" | "transactions" | "temporal" | "explorer" | "audit";
+  module: "analyzer" | "transactions" | "temporal" | "explorer" | "audit";
   modulePath: string;
   detectedAt: string;
 }
@@ -82,7 +82,7 @@ export interface RecentActivityItem {
   timestamp: string;
   result: "success" | "error";
   relatedTransactionId?: string | null;
-  targetModule: "temporal" | "transactions" | "analytics" | "audit";
+  targetModule: "temporal" | "transactions" | "analyzer" | "audit";
   linkUrl: string;
 }
 
@@ -812,6 +812,9 @@ export class OverviewService {
 
     // 9. Operational Issues & Alerts
     const issues: IssueAlert[] = [];
+    const analyzerPath = selectedDbRecord
+      ? `/analyzer?databaseId=${selectedDbRecord.id}`
+      : "/analyzer";
 
     // Failed queries alert
     if (failedCurrent > 0) {
@@ -824,8 +827,8 @@ export class OverviewService {
         severity: failureRate >= 10 ? "critical" : "high",
         title: `${failedCurrent} Failed SQL Query Execution(s)`,
         description: `${failureRate}% of executed queries resulted in database errors during the selected time window.`,
-        module: "analytics",
-        modulePath: "/analytics",
+        module: "analyzer",
+        modulePath: analyzerPath,
         detectedAt: new Date().toISOString(),
       });
     }
@@ -837,8 +840,8 @@ export class OverviewService {
         severity: slowCurrent > 10 ? "high" : "medium",
         title: `${slowCurrent} Slow Query Execution(s) Detected`,
         description: `Queries exceeded the ${slowThresholdMs}ms latency threshold. Inspect execution plans and index recommendations.`,
-        module: "analytics",
-        modulePath: "/analytics",
+        module: "analyzer",
+        modulePath: analyzerPath,
         detectedAt: new Date().toISOString(),
       });
     }
@@ -850,8 +853,8 @@ export class OverviewService {
         severity: connUtilPct >= 95 ? "critical" : "medium",
         title: `High Connection Utilization (${connUtilPct}%)`,
         description: `Active and idle client connections are approaching max_connections (${activeConnectionsCount + idleConnectionsCount}/${maxConnectionsCount}).`,
-        module: "analytics",
-        modulePath: "/analytics",
+        module: "analyzer",
+        modulePath: analyzerPath,
         detectedAt: new Date().toISOString(),
       });
     }
@@ -863,8 +866,8 @@ export class OverviewService {
         severity: "medium",
         title: `Buffer Cache Hit Ratio Below Target (${cacheHitRatio}%)`,
         description: "Shared buffer cache efficiency is sub-optimal (< 90%). Disk reads are serving queries.",
-        module: "analytics",
-        modulePath: "/analytics",
+        module: "analyzer",
+        modulePath: analyzerPath,
         detectedAt: new Date().toISOString(),
       });
     }
@@ -876,8 +879,8 @@ export class OverviewService {
         severity: "low",
         title: "pg_stat_statements Extension Not Installed",
         description: "Install 'pg_stat_statements' to enable engine-level query planning and buffer hit telemetry.",
-        module: "analytics",
-        modulePath: "/analytics",
+        module: "analyzer",
+        modulePath: `/analyzer?databaseId=${selectedDbRecord.id}`,
         detectedAt: new Date().toISOString(),
       });
     }
@@ -890,6 +893,9 @@ export class OverviewService {
       const opMatch = q.queryText.trim().match(/^([A-Z]+)/i);
       const op = opMatch ? opMatch[1].toUpperCase() : "SQL";
       const dbObj = workspaceDbs.find((d: { id: string }) => d.id === q.databaseId);
+      const qLink = dbObj
+        ? `/analyzer?databaseId=${dbObj.id}`
+        : "/analyzer";
 
       recentActivity.push({
         id: `act-${q.id}`,
@@ -900,8 +906,8 @@ export class OverviewService {
         timestamp: q.executedAt.toISOString(),
         result: q.status === "error" ? "error" : "success",
         relatedTransactionId: null,
-        targetModule: "analytics",
-        linkUrl: "/analytics",
+        targetModule: "analyzer",
+        linkUrl: qLink,
       });
     }
 

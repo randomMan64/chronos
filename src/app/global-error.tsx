@@ -84,7 +84,7 @@ export default function GlobalError({ error, reset }: GlobalErrorProps) {
                 {error?.digest && (
                   <div className="flex justify-between items-center">
                     <span className="text-foreground font-medium">Digest:</span>
-                    <span className="text-muted-foreground font-mono truncate max-w-[200px]" title={error.digest}>
+                    <span className="text-muted-foreground font-mono truncate max-w-50" title={error.digest}>
                       {error.digest}
                     </span>
                   </div>

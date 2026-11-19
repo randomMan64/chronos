@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -65,6 +66,9 @@ import {
 } from "@/modules/analytics/analytics-service";
 
 export default function AnalyzerPage() {
+  const searchParams = useSearchParams();
+  const urlDbId = searchParams.get("databaseId");
+
   const [databases, setDatabases] = React.useState<Array<{ id: string; name: string }>>([]);
   const [selectedDbId, setSelectedDbId] = React.useState<string>("");
   const [activeTab, setActiveTab] = React.useState<string>("overview");
@@ -129,8 +133,13 @@ export default function AnalyzerPage() {
             const dbRes = await fetch(`/api/v1/databases?organizationId=${orgId}`);
             if (dbRes.ok) {
               const data = await dbRes.json();
-              setDatabases(data.databases || []);
-              if (data.databases?.length > 0) setSelectedDbId(data.databases[0].id);
+              const list = data.databases || [];
+              setDatabases(list);
+              if (urlDbId && list.some((d: any) => d.id === urlDbId)) {
+                setSelectedDbId(urlDbId);
+              } else if (list.length > 0) {
+                setSelectedDbId(list[0].id);
+              }
             }
           }
         }

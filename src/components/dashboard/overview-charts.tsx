@@ -1,48 +1,52 @@
 "use client";
 
-import * as React from "react";
+import { Badge } from "@/components/ui/badge";
 import {
-  AreaChart,
-  Area,
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  ReferenceLine,
-} from "recharts";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import {
+  ChartConfig,
   ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
   ChartLegend,
   ChartLegendContent,
-  ChartConfig,
+  ChartTooltip,
+  ChartTooltipContent,
 } from "@/components/ui/chart";
 import {
-  VolumeDataPoint,
   LatencyDataPoint,
   SlowQueryDataPoint,
   StorageDataPoint,
+  VolumeDataPoint,
 } from "@/modules/overview/overview-service";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
   Activity,
-  Clock,
-  ShieldAlert,
-  Cpu,
   BarChart3,
+  CheckCircle2,
+  Clock,
+  Cpu,
   Database,
   HardDrive,
   Layers,
-  CheckCircle2,
+  ShieldAlert,
 } from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 // Palette: Restrained CHRONOS design
 // Primary Blue: #3b82f6 | Success Green: #10b981 | Warning Amber: #f59e0b | Failure Red: #ef4444 | Neutral: #64748b
@@ -79,18 +83,26 @@ export function QueryVolumeChart({ data }: { data: VolumeDataPoint[] }) {
       <CardHeader className="flex flex-row items-center justify-between pb-2 gap-2 min-w-0">
         <div className="min-w-0 flex-1">
           <CardTitle className="flex items-center gap-2 text-sm font-semibold truncate">
-            <Activity className="h-4 w-4 text-primary shrink-0" /> Query Execution Volume
+            <Activity className="h-4 w-4 text-primary shrink-0" /> Query
+            Execution Volume
           </CardTitle>
           <CardDescription className="text-xs truncate">
-            Query traffic over time distinguishing successful executions from errors
+            Query traffic over time distinguishing successful executions from
+            errors
           </CardDescription>
         </div>
         <div className="flex items-center gap-1.5 font-mono text-[10px] shrink-0 whitespace-nowrap">
-          <Badge variant="outline" className="text-emerald-400 border-emerald-900/50 bg-emerald-950/20 shrink-0">
+          <Badge
+            variant="outline"
+            className="text-emerald-400 border-emerald-900/50 bg-emerald-950/20 shrink-0"
+          >
             {totalSuccess.toLocaleString()} OK
           </Badge>
           {totalFailed > 0 && (
-            <Badge variant="outline" className="text-red-400 border-red-900/50 bg-red-950/20 shrink-0">
+            <Badge
+              variant="outline"
+              className="text-red-400 border-red-900/50 bg-red-950/20 shrink-0"
+            >
               {totalFailed.toLocaleString()} ERR
             </Badge>
           )}
@@ -101,12 +113,19 @@ export function QueryVolumeChart({ data }: { data: VolumeDataPoint[] }) {
           <div className="flex flex-col items-center justify-center h-52 text-muted-foreground text-xs font-mono">
             <span>No query execution volume recorded in this time range.</span>
             <span className="text-[10px] text-muted-foreground/60 mt-1">
-              Execute SQL via SQL Gateway or enable pg_stat_statements telemetry.
+              Execute SQL via SQL Gateway or enable pg_stat_statements
+              telemetry.
             </span>
           </div>
         ) : (
-          <ChartContainer config={volumeConfig} className="h-56 w-full aspect-auto">
-            <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <ChartContainer
+            config={volumeConfig}
+            className="h-56 w-full aspect-auto"
+          >
+            <AreaChart
+              data={data}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="timeLabel"
@@ -115,7 +134,12 @@ export function QueryVolumeChart({ data }: { data: VolumeDataPoint[] }) {
                 tickMargin={8}
                 fontSize={11}
               />
-              <YAxis tickLine={false} axisLine={false} tickMargin={8} fontSize={11} />
+              <YAxis
+                tickLine={false}
+                axisLine={false}
+                tickMargin={8}
+                fontSize={11}
+              />
               <ChartTooltip content={<ChartTooltipContent indicator="dot" />} />
               <ChartLegend content={<ChartLegendContent />} />
               <Area
@@ -170,21 +194,31 @@ export function QueryLatencyChart({ data }: { data: LatencyDataPoint[] }) {
       <CardHeader className="flex flex-row items-center justify-between pb-2 gap-2 min-w-0">
         <div className="min-w-0 flex-1">
           <CardTitle className="flex items-center gap-2 text-sm font-semibold truncate">
-            <Clock className="h-4 w-4 text-amber-500 shrink-0" /> Query Latency Percentiles
+            <Clock className="h-4 w-4 text-amber-500 shrink-0" /> Query Latency
+            Percentiles
           </CardTitle>
           <CardDescription className="text-xs truncate">
-            Average, P95, and P99 latency distributions across sampled query executions
+            Average, P95, and P99 latency distributions across sampled query
+            executions
           </CardDescription>
         </div>
       </CardHeader>
       <CardContent className="pt-2">
         {!hasData ? (
           <div className="flex flex-col items-center justify-center h-52 text-muted-foreground text-xs font-mono">
-            <span>No query latency samples recorded in selected time window.</span>
+            <span>
+              No query latency samples recorded in selected time window.
+            </span>
           </div>
         ) : (
-          <ChartContainer config={latencyConfig} className="h-56 w-full aspect-auto">
-            <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <ChartContainer
+            config={latencyConfig}
+            className="h-56 w-full aspect-auto"
+          >
+            <LineChart
+              data={data}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
               <XAxis
                 dataKey="timeLabel"
@@ -200,7 +234,9 @@ export function QueryLatencyChart({ data }: { data: LatencyDataPoint[] }) {
                 fontSize={11}
                 unit="ms"
               />
-              <ChartTooltip content={<ChartTooltipContent indicator="line" />} />
+              <ChartTooltip
+                content={<ChartTooltipContent indicator="line" />}
+              />
               <ChartLegend content={<ChartLegendContent />} />
               <Line
                 type="monotone"
@@ -261,9 +297,24 @@ export function TransactionOutcomesChart({
   };
 }) {
   const chartData = [
-    { name: "committed", label: "Committed", value: data.committed, fill: CHART_COLORS.green },
-    { name: "rolledBack", label: "Rolled Back", value: data.rolledBack, fill: CHART_COLORS.amber },
-    { name: "failed", label: "Failed / Aborted", value: data.failed, fill: CHART_COLORS.red },
+    {
+      name: "committed",
+      label: "Committed",
+      value: data.committed,
+      fill: CHART_COLORS.green,
+    },
+    {
+      name: "rolledBack",
+      label: "Rolled Back",
+      value: data.rolledBack,
+      fill: CHART_COLORS.amber,
+    },
+    {
+      name: "failed",
+      label: "Failed / Aborted",
+      value: data.failed,
+      fill: CHART_COLORS.red,
+    },
   ].filter((d) => d.value > 0);
 
   const commitRate =
@@ -277,7 +328,10 @@ export function TransactionOutcomesChart({
             <Cpu className="h-4 w-4 text-primary shrink-0" />
             <span className="truncate">Transaction Outcomes</span>
           </CardTitle>
-          <Badge variant="outline" className="font-mono text-[10px] shrink-0 whitespace-nowrap">
+          <Badge
+            variant="outline"
+            className="font-mono text-[10px] shrink-0 whitespace-nowrap"
+          >
             {commitRate}% Commit
           </Badge>
         </div>
@@ -290,7 +344,9 @@ export function TransactionOutcomesChart({
           <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-xs font-mono text-center px-2">
             <Cpu className="h-6 w-6 text-muted-foreground/30 mb-2" />
             <span>No transaction lifecycles logged</span>
-            <span className="text-[10px] text-muted-foreground/60 mt-0.5">Zero events in selected period</span>
+            <span className="text-[10px] text-muted-foreground/60 mt-0.5">
+              Zero events in selected period
+            </span>
           </div>
         ) : (
           <ChartContainer config={txConfig} className="h-48 w-full aspect-auto">
@@ -305,7 +361,11 @@ export function TransactionOutcomesChart({
                 paddingAngle={2}
               >
                 {chartData.map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={entry.fill} stroke="transparent" />
+                  <Cell
+                    key={`cell-${index}`}
+                    fill={entry.fill}
+                    stroke="transparent"
+                  />
                 ))}
               </Pie>
               <ChartLegend content={<ChartLegendContent />} />
@@ -353,7 +413,9 @@ export function ConnectionUtilizationChart({
           <Badge
             variant="outline"
             className={`font-mono text-[10px] shrink-0 whitespace-nowrap ${
-              utilizationPct >= 80 ? "text-amber-400 border-amber-900" : "text-foreground"
+              utilizationPct >= 80
+                ? "text-amber-400 border-amber-900"
+                : "text-foreground"
             }`}
           >
             {utilizationPct}% Utilized
@@ -374,7 +436,9 @@ export function ConnectionUtilizationChart({
             <span className="text-slate-400">{idle}</span>
           </div>
           <div className="flex justify-between items-center text-xs">
-            <span className="text-muted-foreground">Server Max Connections:</span>
+            <span className="text-muted-foreground">
+              Server Max Connections:
+            </span>
             <span>{max}</span>
           </div>
 
@@ -382,12 +446,16 @@ export function ConnectionUtilizationChart({
           <div className="w-full bg-secondary/50 rounded-full h-2.5 overflow-hidden flex border border-border/50">
             <div
               className="bg-primary h-full transition-all"
-              style={{ width: `${Math.max(active > 0 ? 1 : 0, Math.min(100, (active / max) * 100))}%` }}
+              style={{
+                width: `${Math.max(active > 0 ? 1 : 0, Math.min(100, (active / max) * 100))}%`,
+              }}
               title={`Active: ${active}`}
             />
             <div
               className="bg-slate-500 h-full transition-all"
-              style={{ width: `${Math.max(idle > 0 ? 1 : 0, Math.min(100, (idle / max) * 100))}%` }}
+              style={{
+                width: `${Math.max(idle > 0 ? 1 : 0, Math.min(100, (idle / max) * 100))}%`,
+              }}
               title={`Idle: ${idle}`}
             />
           </div>
@@ -427,7 +495,10 @@ export function QueryTypeDistributionChart({
             <BarChart3 className="h-4 w-4 text-primary shrink-0" />
             <span className="truncate">Query Breakdown</span>
           </CardTitle>
-          <Badge variant="outline" className="font-mono text-[10px] shrink-0 whitespace-nowrap">
+          <Badge
+            variant="outline"
+            className="font-mono text-[10px] shrink-0 whitespace-nowrap"
+          >
             {total} Total
           </Badge>
         </div>
@@ -440,16 +511,33 @@ export function QueryTypeDistributionChart({
           <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-xs font-mono text-center px-2">
             <BarChart3 className="h-6 w-6 text-muted-foreground/30 mb-2" />
             <span>No query operations captured</span>
-            <span className="text-[10px] text-muted-foreground/60 mt-0.5">Zero queries in selected period</span>
+            <span className="text-[10px] text-muted-foreground/60 mt-0.5">
+              Zero queries in selected period
+            </span>
           </div>
         ) : (
-          <ChartContainer config={queryTypeConfig} className="h-48 w-full aspect-auto">
-            <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <ChartContainer
+            config={queryTypeConfig}
+            className="h-48 w-full aspect-auto"
+          >
+            <BarChart
+              data={data}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="type" tickLine={false} axisLine={false} fontSize={10} />
+              <XAxis
+                dataKey="type"
+                tickLine={false}
+                axisLine={false}
+                fontSize={10}
+              />
               <YAxis tickLine={false} axisLine={false} fontSize={10} />
               <ChartTooltip content={<ChartTooltipContent />} />
-              <Bar dataKey="count" fill={CHART_COLORS.blue} radius={[4, 4, 0, 0]} />
+              <Bar
+                dataKey="count"
+                fill={CHART_COLORS.blue}
+                radius={[4, 4, 0, 0]}
+              />
             </BarChart>
           </ChartContainer>
         )}
@@ -482,7 +570,9 @@ export function SlowQueryTrendChart({ data }: { data: SlowQueryDataPoint[] }) {
           <Badge
             variant="outline"
             className={`font-mono text-[10px] shrink-0 whitespace-nowrap ${
-              totalSlow > 0 ? "text-amber-400 border-amber-900" : "text-emerald-400 border-emerald-900"
+              totalSlow > 0
+                ? "text-amber-400 border-amber-900"
+                : "text-emerald-400 border-emerald-900"
             }`}
           >
             {totalSlow} Slow
@@ -496,16 +586,29 @@ export function SlowQueryTrendChart({ data }: { data: SlowQueryDataPoint[] }) {
         {totalSlow === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-xs font-mono text-center px-2">
             <CheckCircle2 className="h-6 w-6 text-emerald-400/80 mb-2" />
-            <span className="text-emerald-400 font-medium">Zero Slow Queries</span>
+            <span className="text-emerald-400 font-medium">
+              Zero Slow Queries
+            </span>
             <span className="text-[10px] text-muted-foreground mt-0.5">
               All queries executed &lt; 200ms threshold
             </span>
           </div>
         ) : (
-          <ChartContainer config={slowQueryConfig} className="h-48 w-full aspect-auto">
-            <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <ChartContainer
+            config={slowQueryConfig}
+            className="h-48 w-full aspect-auto"
+          >
+            <LineChart
+              data={data}
+              margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+            >
               <CartesianGrid strokeDasharray="3 3" vertical={false} />
-              <XAxis dataKey="timeLabel" tickLine={false} axisLine={false} fontSize={10} />
+              <XAxis
+                dataKey="timeLabel"
+                tickLine={false}
+                axisLine={false}
+                fontSize={10}
+              />
               <YAxis tickLine={false} axisLine={false} fontSize={10} />
               <ChartTooltip content={<ChartTooltipContent indicator="dot" />} />
               <Line
@@ -551,7 +654,10 @@ export function DatabaseStorageChart({
             <HardDrive className="h-4 w-4 text-purple-400 shrink-0" />
             <span className="truncate">Database Storage</span>
           </CardTitle>
-          <Badge variant="outline" className="font-mono text-[10px] shrink-0 whitespace-nowrap text-purple-400 border-purple-900/60">
+          <Badge
+            variant="outline"
+            className="font-mono text-[10px] shrink-0 whitespace-nowrap text-purple-400 border-purple-900/60"
+          >
             {storage.currentFormatted}
           </Badge>
         </div>
@@ -566,17 +672,30 @@ export function DatabaseStorageChart({
           </div>
         ) : (
           <div className="space-y-2">
-            <ChartContainer config={storageConfig} className="h-40 w-full aspect-auto">
-              <AreaChart data={storage.data} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
+            <ChartContainer
+              config={storageConfig}
+              className="h-40 w-full aspect-auto"
+            >
+              <AreaChart
+                data={storage.data}
+                margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="timeLabel" tickLine={false} axisLine={false} fontSize={10} />
+                <XAxis
+                  dataKey="timeLabel"
+                  tickLine={false}
+                  axisLine={false}
+                  fontSize={10}
+                />
                 <YAxis
                   tickLine={false}
                   axisLine={false}
                   fontSize={10}
                   tickFormatter={(val) => {
-                    if (val >= 1073741824) return `${(val / 1073741824).toFixed(1)}GB`;
-                    if (val >= 1048576) return `${(val / 1048576).toFixed(0)}MB`;
+                    if (val >= 1073741824)
+                      return `${(val / 1073741824).toFixed(1)}GB`;
+                    if (val >= 1048576)
+                      return `${(val / 1048576).toFixed(0)}MB`;
                     return `${(val / 1024).toFixed(0)}KB`;
                   }}
                 />
@@ -584,7 +703,9 @@ export function DatabaseStorageChart({
                   content={
                     <ChartTooltipContent
                       formatter={(val, name, item) => (
-                        <span className="font-mono">{item.payload.sizeFormatted}</span>
+                        <span className="font-mono">
+                          {item.payload.sizeFormatted}
+                        </span>
                       )}
                     />
                   }
@@ -643,7 +764,9 @@ export function DatabaseResourceSummaryCard({
                 : "text-foreground"
             }`}
           >
-            {resource.cacheHitRatio !== null ? `${resource.cacheHitRatio}% Cache` : "Cache: N/A"}
+            {resource.cacheHitRatio !== null
+              ? `${resource.cacheHitRatio}% Cache`
+              : "Cache: N/A"}
           </Badge>
         </div>
         <CardDescription className="text-xs truncate">
@@ -664,9 +787,16 @@ export function DatabaseResourceSummaryCard({
             ) : (
               <div className="space-y-1.5">
                 {resource.topRelations.map((rel) => (
-                  <div key={rel.name} className="flex justify-between items-center text-xs">
-                    <span className="truncate max-w-[180px] text-foreground">{rel.name}</span>
-                    <span className="text-muted-foreground text-[11px]">{rel.sizeFormatted}</span>
+                  <div
+                    key={rel.name}
+                    className="flex justify-between items-center text-xs"
+                  >
+                    <span className="truncate max-w-45 text-foreground">
+                      {rel.name}
+                    </span>
+                    <span className="text-muted-foreground text-[11px]">
+                      {rel.sizeFormatted}
+                    </span>
                   </div>
                 ))}
               </div>
