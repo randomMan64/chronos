@@ -23,6 +23,15 @@ export async function GET(req: Request) {
     const startDateStr = searchParams.get("startDate");
     const endDateStr = searchParams.get("endDate");
 
+    // If workspaceId is not explicitly specified, check chronos_active_ws cookie
+    if (!wsId) {
+      const cookieHeader = req.headers.get("cookie") || "";
+      const match = cookieHeader.match(/(?:^|; )chronos_active_ws=([^;]*)/);
+      if (match) {
+        wsId = decodeURIComponent(match[1]);
+      }
+    }
+
     let context;
 
     if (wsId) {

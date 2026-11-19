@@ -57,6 +57,8 @@ const TIME_RANGES: Array<{ label: string; value: TimeRangeKey }> = [
 export default function DashboardPage() {
   const [session, setSession] = React.useState<{
     user?: { fullName: string; email: string };
+    currentOrg?: { id: string; name: string; role: string } | null;
+    currentWorkspace?: { id: string; name: string; environment: string } | null;
     organizations?: Array<{ id: string; name: string; role: string }>;
     workspaces?: Array<{ id: string; name: string; environment: string }>;
   } | null>(null);
@@ -84,7 +86,7 @@ export default function DashboardPage() {
   }, []);
 
   // 2. Fetch Dashboard Telemetry when workspace, db, or time range changes
-  const fetchTelemetry = React.useCallback(async (showRefreshing = false) => {
+  const fetchTelemetry = React.useCallback(async (showRefreshing = false, overrideWsId?: string) => {
     if (showRefreshing) setIsRefreshing(true);
     else setIsLoading(true);
 
@@ -94,6 +96,14 @@ export default function DashboardPage() {
         params.set("databaseId", selectedDbId);
       }
       params.set("range", timeRange);
+      const wsId = overrideWsId || session?.currentWorkspace?.id || session?.workspaces?.[0]?.id;
+      if (wsId) {
+        params.set("workspaceId", wsId);
+      }
+      const orgId = session?.currentOrg?.id || session?.organizations?.[0]?.id;
+      if (orgId) {
+        params.set("organizationId", orgId);
+      }
 
       const res = await fetch(`/api/v1/overview?${params.toString()}`);
       if (res.ok) {
@@ -106,14 +116,36 @@ export default function DashboardPage() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [selectedDbId, timeRange]);
+  }, [selectedDbId, timeRange, session?.currentWorkspace?.id, session?.currentOrg?.id, session?.workspaces, session?.organizations]);
 
   React.useEffect(() => {
     fetchTelemetry();
   }, [fetchTelemetry]);
 
-  const currentOrg = session?.organizations?.[0];
-  const currentWs = session?.workspaces?.[0];
+  // 3. Listen for workspace changes to refetch scoped telemetry
+  React.useEffect(() => {
+    const handleWorkspaceChanged = (e: Event) => {
+      const customEvent = e as CustomEvent<{
+        workspace?: { id: string; name: string; environment: string };
+        database?: { id: string; name: string; status?: string } | null;
+      }>;
+      const ws = customEvent.detail?.workspace;
+      const initialDb = customEvent.detail?.database;
+      if (ws) {
+        setSession((prev: any) => (prev ? { ...prev, currentWorkspace: ws } : prev));
+        setSelectedDbId(initialDb?.id || "all");
+        fetchTelemetry(false, ws.id);
+      }
+    };
+
+    window.addEventListener("chronos:workspace-changed", handleWorkspaceChanged);
+    return () => {
+      window.removeEventListener("chronos:workspace-changed", handleWorkspaceChanged);
+    };
+  }, [fetchTelemetry]);
+
+  const currentOrg = session?.currentOrg || session?.organizations?.[0];
+  const currentWs = session?.currentWorkspace || session?.workspaces?.[0];
   const userRole = telemetry?.effectiveRoleLabel || currentOrg?.role?.toUpperCase() || "MEMBER";
 
   return (
@@ -148,11 +180,21 @@ export default function DashboardPage() {
         {/* Filter Controls & Refresh */}
         <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap shrink-0">
           {/* Database Selector (shadcn Select) */}
-          <Select value={selectedDbId} onValueChange={setSelectedDbId}>
+          <Select
+            value={selectedDbId}
+            onValueChange={setSelectedDbId}
+            disabled={!telemetry?.availableDatabases?.length}
+          >
             <SelectTrigger className="h-8 text-xs font-mono w-45 sm:w-50 bg-secondary/50 border-border">
               <div className="flex items-center gap-1.5 truncate">
                 <Database className="h-3.5 w-3.5 text-primary shrink-0" />
-                <SelectValue placeholder="Select Database" />
+                <SelectValue
+                  placeholder={
+                    !telemetry?.availableDatabases?.length
+                      ? "No database in workspace"
+                      : "Select Database"
+                  }
+                />
               </div>
             </SelectTrigger>
             <SelectContent className="font-mono text-xs">

@@ -348,9 +348,19 @@ export default function SqlEditorPage() {
           {/* Target Cluster selector */}
           <div className="flex items-center gap-1.5 text-xs">
             <Database className="h-3.5 w-3.5 text-primary shrink-0" />
-            <Select value={selectedDbId} onValueChange={setSelectedDbId}>
+            <Select
+              value={selectedDbId}
+              onValueChange={setSelectedDbId}
+              disabled={databases.length === 0}
+            >
               <SelectTrigger className="h-7 text-xs font-mono w-44 sm:w-60">
-                <SelectValue placeholder="Select Database" />
+                <SelectValue
+                  placeholder={
+                    databases.length === 0
+                      ? "No database in workspace"
+                      : "Select Database"
+                  }
+                />
               </SelectTrigger>
               <SelectContent>
                 {databases.map((db) => (

@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
@@ -133,16 +134,18 @@ export default function AnalyzerPage() {
     return { start, end };
   }, [timeRangeKey]);
 
-  // 1. Initial Load: Databases
+  // 1. Initial Load: Databases with Workspace scoping
   React.useEffect(() => {
     async function init() {
       try {
         const meRes = await fetch("/api/v1/auth/me");
         if (meRes.ok) {
           const me = await meRes.json();
-          const orgId = me.organizations?.[0]?.id;
-          if (orgId) {
-            const dbRes = await fetch(`/api/v1/databases?organizationId=${orgId}`);
+          const org = me.currentOrg || me.organizations?.[0];
+          const ws = me.currentWorkspace || me.workspaces?.[0];
+          if (org?.id) {
+            const wsQuery = ws?.id ? `&workspaceId=${ws.id}` : "";
+            const dbRes = await fetch(`/api/v1/databases?organizationId=${org.id}${wsQuery}`);
             if (dbRes.ok) {
               const data = await dbRes.json();
               const list = data.databases || [];
@@ -151,6 +154,8 @@ export default function AnalyzerPage() {
                 setSelectedDbId(urlDbId);
               } else if (list.length > 0) {
                 setSelectedDbId(list[0].id);
+              } else {
+                setSelectedDbId("");
               }
             }
           }
@@ -160,7 +165,55 @@ export default function AnalyzerPage() {
       }
     }
     init();
-  }, []);
+
+    // Listen for workspace switch to reload workspace-specific databases
+    const handleWorkspaceChanged = async (e: Event) => {
+      const customEvent = e as CustomEvent<{
+        workspace?: { id: string; name: string; environment: string };
+        database?: { id: string; name: string; status?: string } | null;
+      }>;
+      const ws = customEvent.detail?.workspace;
+      const initialDb = customEvent.detail?.database;
+
+      setOverview(null);
+      setQueries([]);
+      setIndexes([]);
+      setLiveSessions([]);
+      setBlockedCount(0);
+      setTables([]);
+      setRecommendations([]);
+
+      if (ws) {
+        const meRes = await fetch("/api/v1/auth/me");
+        if (meRes.ok) {
+          const me = await meRes.json();
+          const org = me.currentOrg || me.organizations?.[0];
+          if (org?.id) {
+            const dbRes = await fetch(
+              `/api/v1/databases?organizationId=${org.id}&workspaceId=${ws.id}`
+            );
+            if (dbRes.ok) {
+              const data = await dbRes.json();
+              const list = data.databases || [];
+              setDatabases(list);
+              if (initialDb && list.some((d: any) => d.id === initialDb.id)) {
+                setSelectedDbId(initialDb.id);
+              } else if (list.length > 0) {
+                setSelectedDbId(list[0].id);
+              } else {
+                setSelectedDbId("");
+              }
+            }
+          }
+        }
+      }
+    };
+
+    window.addEventListener("chronos:workspace-changed", handleWorkspaceChanged);
+    return () => {
+      window.removeEventListener("chronos:workspace-changed", handleWorkspaceChanged);
+    };
+  }, [urlDbId]);
 
   // 2. Load Capabilities & Data when DB or TimeRange changes
   const loadData = React.useCallback(async () => {
@@ -396,9 +449,9 @@ export default function AnalyzerPage() {
           {/* Database Selector */}
           <div className="flex items-center gap-1 text-xs">
             <Database className="h-3.5 w-3.5 text-primary shrink-0" />
-            <Select value={selectedDbId} onValueChange={setSelectedDbId}>
+            <Select value={selectedDbId} onValueChange={setSelectedDbId} disabled={databases.length === 0}>
               <SelectTrigger className="h-8 text-xs font-mono w-44 bg-sidebar">
-                <SelectValue placeholder="Select Database" />
+                <SelectValue placeholder={databases.length === 0 ? "No database in workspace" : "Select Database"} />
               </SelectTrigger>
               <SelectContent>
                 {databases.map((db) => (
@@ -450,7 +503,24 @@ export default function AnalyzerPage() {
         </div>
       </div>
 
-      {/* Sensitive Query Masking Warning Banner for Data Analyst / Auditor */}
+      {databases.length === 0 ? (
+        <Card className="border-border bg-panel p-12 text-center">
+          <div className="flex flex-col items-center justify-center space-y-3">
+            <Database className="h-10 w-10 text-muted-foreground/60" />
+            <h3 className="text-sm font-semibold text-foreground">No databases registered in this workspace</h3>
+            <p className="text-xs text-muted-foreground max-w-md">
+              This workspace does not have any active PostgreSQL clusters registered. Switch to another workspace or register a cluster in Database Explorer.
+            </p>
+            <Link href="/explorer">
+              <Button size="sm" variant="outline" className="text-xs font-mono mt-2 cursor-pointer">
+                Go to Database Explorer →
+              </Button>
+            </Link>
+          </div>
+        </Card>
+      ) : (
+        <>
+          {/* Sensitive Query Masking Warning Banner for Data Analyst / Auditor */}
       {policy && !policy.canReadSensitiveQuery && (
         <div className="bg-primary/10 border border-primary/20 rounded-md p-2.5 text-xs flex items-center justify-between text-muted-foreground">
           <div className="flex items-center gap-2">
@@ -1322,6 +1392,8 @@ export default function AnalyzerPage() {
           </TabsContent>
         )}
       </Tabs>
+        </>
+      )}
 
       {/* Confirmation Dialog: EXPLAIN ANALYZE */}
       <Dialog open={analyzeConfirmOpen} onOpenChange={setAnalyzeConfirmOpen}>

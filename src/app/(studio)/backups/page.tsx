@@ -361,9 +361,19 @@ export default function BackupsPage() {
           <span className="font-medium text-foreground">Active Database:</span>
         </div>
         <div className="w-full sm:w-64">
-          <Select value={selectedDbId} onValueChange={handleDatabaseSelect}>
+          <Select
+            value={selectedDbId}
+            onValueChange={handleDatabaseSelect}
+            disabled={databases.length === 0}
+          >
             <SelectTrigger className="h-7 text-xs font-mono">
-              <SelectValue placeholder="Select Database" />
+              <SelectValue
+                placeholder={
+                  databases.length === 0
+                    ? "No database in workspace"
+                    : "Select Database"
+                }
+              />
             </SelectTrigger>
             <SelectContent>
               {databases.map((db) => (

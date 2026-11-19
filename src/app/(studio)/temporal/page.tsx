@@ -787,10 +787,20 @@ function TemporalInvestigationView() {
         <CardContent className="p-3.5 flex flex-wrap items-end gap-3">
           <div className="w-full sm:w-45 space-y-1.5">
             <Label>Cluster</Label>
-            <Select value={selectedDbId} onValueChange={setSelectedDbId}>
+            <Select
+              value={selectedDbId}
+              onValueChange={setSelectedDbId}
+              disabled={databases.length === 0}
+            >
               <SelectTrigger className="h-8 font-mono text-xs w-full">
-                <SelectValue placeholder="Select Cluster">
-                  {activeClusterName}
+                <SelectValue
+                  placeholder={
+                    databases.length === 0
+                      ? "No cluster in workspace"
+                      : "Select Cluster"
+                  }
+                >
+                  {databases.length === 0 ? "No cluster in workspace" : activeClusterName}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>

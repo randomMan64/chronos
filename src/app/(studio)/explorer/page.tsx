@@ -910,9 +910,10 @@ export default function ExplorerPage() {
       setTestResult(null);
       setRegisterError(null);
 
-      // Refresh databases list
+      // Refresh databases list with workspace scoping
+      const wsQuery = activeWsId ? `&workspaceId=${activeWsId}` : "";
       const dbRes = await fetch(
-        `/api/v1/databases?organizationId=${activeOrgId}`,
+        `/api/v1/databases?organizationId=${activeOrgId}${wsQuery}`,
       );
       if (dbRes.ok) {
         const dbData = await dbRes.json();
@@ -969,9 +970,16 @@ export default function ExplorerPage() {
             setSelectedTable(null);
             setOffset(0);
           }}
+          disabled={databases.length === 0}
         >
           <SelectTrigger className="h-8 text-xs font-mono w-full">
-            <SelectValue placeholder="Select Database" />
+            <SelectValue
+              placeholder={
+                databases.length === 0
+                  ? "No database in workspace"
+                  : "Select Database"
+              }
+            />
           </SelectTrigger>
           <SelectContent>
             {databases.map((db) => (

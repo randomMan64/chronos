@@ -187,9 +187,13 @@ export default function AuditCenterPage() {
     initSession();
 
     const handleWsChange = (e: Event) => {
-      const customEvent = e as CustomEvent<{ workspaceId: string }>;
-      if (customEvent.detail?.workspaceId) {
-        setActiveWorkspaceId(customEvent.detail.workspaceId);
+      const customEvent = e as CustomEvent<{
+        workspace?: { id: string; name: string; environment: string };
+        workspaceId?: string;
+      }>;
+      const wsId = customEvent.detail?.workspace?.id || customEvent.detail?.workspaceId;
+      if (wsId) {
+        setActiveWorkspaceId(wsId);
       }
     };
     window.addEventListener("chronos:workspace-changed", handleWsChange);

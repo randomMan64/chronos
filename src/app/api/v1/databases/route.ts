@@ -10,7 +10,7 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const orgId = searchParams.get("organizationId");
-    const wsId = searchParams.get("workspaceId") || undefined;
+    let wsId = searchParams.get("workspaceId") || undefined;
 
     if (!orgId) {
       return NextResponse.json({ error: "organizationId is required" }, { status: 400 });
@@ -18,6 +18,16 @@ export async function GET(req: Request) {
 
     const context = await requireOrganizationAccess(orgId);
     requirePermission(context, "database:read");
+
+    // If workspaceId is not explicitly specified and allWorkspaces is not requested,
+    // automatically scope to the active workspace cookie to prevent cross-workspace leakage
+    if (!wsId && searchParams.get("allWorkspaces") !== "true") {
+      const cookieHeader = req.headers.get("cookie") || "";
+      const match = cookieHeader.match(/(?:^|; )chronos_active_ws=([^;]*)/);
+      if (match) {
+        wsId = decodeURIComponent(match[1]);
+      }
+    }
 
     const dbs = await DatabaseService.getDatabases({
       organizationId: orgId,
