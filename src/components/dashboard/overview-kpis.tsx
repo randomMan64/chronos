@@ -44,18 +44,22 @@ function CompactKpiCard({
   if (changePct !== null && changePct !== 0) {
     if (changePct > 0) {
       TrendIcon = TrendingUp;
-      trendColor = lowerIsBetter ? "text-red-400" : "text-emerald-400";
+      trendColor = lowerIsBetter
+        ? "text-red-600 dark:text-red-400"
+        : "text-emerald-600 dark:text-emerald-400";
     } else {
       TrendIcon = TrendingDown;
-      trendColor = lowerIsBetter ? "text-emerald-400" : "text-muted-foreground";
+      trendColor = lowerIsBetter
+        ? "text-emerald-600 dark:text-emerald-400"
+        : "text-muted-foreground";
     }
   }
 
   return (
-    <div className="rounded-lg border border-border/80 bg-card/60 p-3 flex flex-col justify-between hover:border-border transition-colors">
+    <div className="rounded-lg border border-border bg-card p-3 flex flex-col justify-between hover:border-border/80 transition-colors shadow-xs">
       <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span className="font-medium text-foreground/80 truncate">{label}</span>
-        <div className="p-1 rounded bg-secondary/60 text-foreground/70 shrink-0">
+        <span className="font-medium text-foreground truncate">{label}</span>
+        <div className="p-1 rounded bg-muted text-muted-foreground shrink-0">
           {icon}
         </div>
       </div>
@@ -64,19 +68,19 @@ function CompactKpiCard({
         <span className="text-xl font-bold tracking-tight text-foreground">
           {value}
         </span>
-        {unit && <span className="text-xs text-muted-foreground">{unit}</span>}
+        {unit && <span className="text-xs text-muted-foreground font-sans">{unit}</span>}
       </div>
 
-      <div className="mt-1.5 flex items-center justify-between text-[11px] font-mono border-t border-border/40 pt-1.5">
+      <div className="mt-1.5 flex items-center justify-between text-[11px] font-mono border-t border-border/60 pt-1.5">
         {changePct !== null ? (
-          <div className={`flex items-center gap-1 ${trendColor}`}>
+          <div className={`flex items-center gap-1 font-medium ${trendColor}`}>
             <TrendIcon className="h-3 w-3" />
             <span>
               {changePct > 0 ? `+${changePct}%` : `${changePct}%`}
             </span>
           </div>
         ) : (
-          <span className="text-muted-foreground/70">
+          <span className="text-muted-foreground">
             {previous !== null ? "0% change" : "No prior baseline"}
           </span>
         )}
@@ -86,7 +90,7 @@ function CompactKpiCard({
             {subValue}
           </span>
         ) : previous !== null ? (
-          <span className="text-muted-foreground/60 text-[10px]">
+          <span className="text-muted-foreground text-[10px]">
             prev: {previous}
           </span>
         ) : null}
@@ -125,7 +129,7 @@ export function OverviewKpiGrid({
         value={kpis.avgLatency.current}
         unit="ms"
         comparison={kpis.avgLatency}
-        icon={<Clock className="h-3.5 w-3.5 text-blue-400" />}
+        icon={<Clock className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />}
         lowerIsBetter
       />
 
@@ -135,7 +139,7 @@ export function OverviewKpiGrid({
         value={kpis.p95Latency.current}
         unit="ms"
         comparison={kpis.p95Latency}
-        icon={<Gauge className="h-3.5 w-3.5 text-amber-400" />}
+        icon={<Gauge className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />}
         lowerIsBetter
       />
 
@@ -144,7 +148,7 @@ export function OverviewKpiGrid({
         label="Failed Queries"
         value={kpis.failedQueries.current}
         comparison={kpis.failedQueries}
-        icon={<AlertOctagon className="h-3.5 w-3.5 text-red-400" />}
+        icon={<AlertOctagon className="h-3.5 w-3.5 text-red-600 dark:text-red-400" />}
         lowerIsBetter
       />
 
@@ -162,7 +166,7 @@ export function OverviewKpiGrid({
         label="Active Tx"
         value={kpis.activeTransactions.current}
         comparison={kpis.activeTransactions}
-        icon={<Cpu className="h-3.5 w-3.5 text-purple-400" />}
+        icon={<Cpu className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />}
         subValue="In-flight"
       />
 
@@ -171,7 +175,7 @@ export function OverviewKpiGrid({
         label="Slow Queries"
         value={kpis.slowQueries.current}
         comparison={kpis.slowQueries}
-        icon={<ShieldAlert className="h-3.5 w-3.5 text-amber-500" />}
+        icon={<ShieldAlert className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />}
         subValue=">= 200ms"
         lowerIsBetter
       />
@@ -181,7 +185,7 @@ export function OverviewKpiGrid({
         label="Database Size"
         value={kpis.databaseSize.sizeFormatted}
         comparison={kpis.databaseSize}
-        icon={<HardDrive className="h-3.5 w-3.5 text-purple-400" />}
+        icon={<HardDrive className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />}
         subValue="pg_database_size"
       />
     </div>

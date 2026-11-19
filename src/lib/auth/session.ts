@@ -11,7 +11,7 @@ import {
   databases,
   databasePermissions,
 } from "@/db/schema";
-import { eq, and, gt, isNull } from "drizzle-orm";
+import { eq, and, gt, isNull, desc } from "drizzle-orm";
 import { UserContext, OrganizationRole, WorkspaceRole } from "@/lib/permissions/types";
 import { resolvePermissions } from "@/lib/permissions/resolver";
 import {
@@ -140,6 +140,7 @@ export async function validateSessionState(tokenOverride?: string): Promise<Sess
         .select({
           id: userSessions.id,
           revokedAt: userSessions.revokedAt,
+          revokeReason: userSessions.revokeReason,
           expiresAt: userSessions.expiresAt,
           isEmailVerified: users.isEmailVerified,
         })
@@ -149,14 +150,27 @@ export async function validateSessionState(tokenOverride?: string): Promise<Sess
         .limit(1);
 
       if (!sess || sess.revokedAt !== null || sess.isEmailVerified === false) {
+        if (sess?.isEmailVerified === false) {
+          return {
+            valid: false,
+            user: null,
+            code: "SESSION_REVOKED",
+            message: "Your email address is not verified. Please verify your email.",
+          };
+        }
+        if (sess?.revokeReason === "user_logout") {
+          return {
+            valid: false,
+            user: null,
+            code: "UNAUTHENTICATED",
+            message: "You have signed out. Please sign in.",
+          };
+        }
         return {
           valid: false,
           user: null,
           code: "SESSION_REVOKED",
-          message:
-            sess?.isEmailVerified === false
-              ? "Your email address is not verified. Please verify your email."
-              : "Your session has been signed out because it was revoked from another device.",
+          message: "Your session has been signed out because it was revoked from another device.",
         };
       }
 
@@ -187,6 +201,23 @@ export async function validateSessionState(tokenOverride?: string): Promise<Sess
         .limit(1);
 
       if (activeUserSessions.length === 0) {
+        // Check if the most recent revoked session was a deliberate user_logout
+        const [lastSession] = await db
+          .select({ revokeReason: userSessions.revokeReason })
+          .from(userSessions)
+          .where(eq(userSessions.userId, payload.userId))
+          .orderBy(desc(userSessions.revokedAt))
+          .limit(1);
+
+        if (lastSession?.revokeReason === "user_logout") {
+          return {
+            valid: false,
+            user: null,
+            code: "UNAUTHENTICATED",
+            message: "You have signed out. Please sign in.",
+          };
+        }
+
         return {
           valid: false,
           user: null,

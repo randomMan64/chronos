@@ -4,22 +4,13 @@ import * as React from "react";
 import { AppSidebar } from "@/components/navigation/app-sidebar";
 import { AppHeader } from "@/components/navigation/app-header";
 import { useRouter, usePathname } from "next/navigation";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
-import { getInitials } from "@/lib/utils";
 import type { AuthenticatedSession } from "@/lib/auth/session";
 import {
   installGlobalAuthInterceptor,
   startSessionWatchdog,
+  performLogout,
+  handleSessionRevocation,
 } from "@/lib/auth/auth-client";
 
 interface StudioLayoutProps {
@@ -41,9 +32,6 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
       return false;
     },
   );
-  const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
-  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
-
   const [currentUser, setCurrentUser] = React.useState<{
     email: string;
     fullName: string;
@@ -189,7 +177,7 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
       try {
         const res = await fetch("/api/v1/auth/me", { cache: "no-store" });
         if (res.status === 401) {
-          window.location.href = "/login?reason=SESSION_REVOKED";
+          handleSessionRevocation("SESSION_REVOKED");
           return;
         }
 
@@ -374,17 +362,8 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
     setIsSidebarCollapsed((prev) => !prev);
   }, []);
 
-  const handleTriggerLogout = () => {
-    setShowLogoutDialog(true);
-  };
-
-  const handleConfirmLogout = async () => {
-    setIsLoggingOut(true);
-    try {
-      await fetch("/api/v1/auth/logout", { method: "POST" });
-    } finally {
-      router.push("/login");
-    }
+  const handleLogout = () => {
+    performLogout();
   };
 
   return (
@@ -396,7 +375,7 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
         currentDatabase={currentDatabase}
         workspaces={workspacesList}
         user={currentUser}
-        onLogout={handleTriggerLogout}
+        onLogout={handleLogout}
         onWorkspaceChange={handleWorkspaceChange}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={handleToggleSidebar}
@@ -420,7 +399,7 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
               currentDatabase={currentDatabase}
               workspaces={workspacesList}
               user={currentUser}
-              onLogout={handleTriggerLogout}
+              onLogout={handleLogout}
               onWorkspaceChange={handleWorkspaceChange}
               isMobile={true}
               onClose={() => setIsMobileMenuOpen(false)}
@@ -440,71 +419,6 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
           {children}
         </main>
       </div>
-
-      {/* Logout Confirmation Dialog */}
-      <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
-        <DialogContent className="sm:max-w-sm">
-          <DialogHeader className="space-y-1.5 pb-1">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-destructive/10 text-destructive">
-                <LogOut className="h-4 w-4" />
-              </div>
-              <DialogTitle className="text-base font-semibold text-foreground -mt-1">
-                {t("account.signOut")}
-              </DialogTitle>
-            </div>
-            <DialogDescription className="text-xs text-muted-foreground pt-1 leading-normal">
-              {t("account.signOutConfirm")}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border bg-sidebar/50 my-1">
-            <div className="h-9 w-9 rounded-full bg-elevated border border-border flex items-center justify-center font-mono text-xs font-semibold text-foreground shrink-0 overflow-hidden">
-              {currentUser.avatarUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={currentUser.avatarUrl}
-                  alt={currentUser.fullName}
-                  className="h-full w-full object-cover rounded-full"
-                />
-              ) : (
-                getInitials(currentUser.fullName)
-              )}
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-xs font-semibold text-foreground truncate">
-                {currentUser.fullName}
-              </span>
-              <span className="text-[11px] font-mono text-muted-foreground truncate">
-                {currentUser.email}
-              </span>
-            </div>
-          </div>
-
-          <DialogFooter className="pt-2 gap-2 sm:gap-0">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setShowLogoutDialog(false)}
-              disabled={isLoggingOut}
-              className="h-8 text-xs cursor-pointer"
-            >
-              {t("account.cancel")}
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={handleConfirmLogout}
-              isLoading={isLoggingOut}
-              className="h-8 text-xs gap-1.5 cursor-pointer"
-            >
-              <LogOut className="h-3.5 w-3.5" /> {t("account.signOut")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

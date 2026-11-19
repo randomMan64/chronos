@@ -79,7 +79,7 @@ export function QueryVolumeChart({ data }: { data: VolumeDataPoint[] }) {
   const totalFailed = data.reduce((acc, d) => acc + d.failed, 0);
 
   return (
-    <Card className="col-span-1 lg:col-span-2 border-border/80">
+    <Card className="col-span-1 lg:col-span-2 border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-2 gap-2 min-w-0">
         <div className="min-w-0 flex-1">
           <CardTitle className="flex items-center gap-2 text-sm font-semibold truncate">
@@ -94,14 +94,14 @@ export function QueryVolumeChart({ data }: { data: VolumeDataPoint[] }) {
         <div className="flex items-center gap-1.5 font-mono text-[10px] shrink-0 whitespace-nowrap">
           <Badge
             variant="outline"
-            className="text-emerald-400 border-emerald-900/50 bg-emerald-950/20 shrink-0"
+            className="text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 shrink-0 font-medium"
           >
             {totalSuccess.toLocaleString()} OK
           </Badge>
           {totalFailed > 0 && (
             <Badge
               variant="outline"
-              className="text-red-400 border-red-900/50 bg-red-950/20 shrink-0"
+              className="text-red-700 dark:text-red-400 border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 shrink-0 font-medium"
             >
               {totalFailed.toLocaleString()} ERR
             </Badge>
@@ -111,8 +111,8 @@ export function QueryVolumeChart({ data }: { data: VolumeDataPoint[] }) {
       <CardContent className="pt-2">
         {data.length === 0 || totalVolume === 0 ? (
           <div className="flex flex-col items-center justify-center h-52 text-muted-foreground text-xs font-mono">
-            <span>No query execution volume recorded in this time range.</span>
-            <span className="text-[10px] text-muted-foreground/60 mt-1">
+            <span className="font-medium text-foreground/80">No query execution volume recorded in this time range.</span>
+            <span className="text-[10px] text-muted-foreground mt-1">
               Execute SQL via SQL Gateway or enable pg_stat_statements
               telemetry.
             </span>
@@ -190,7 +190,7 @@ export function QueryLatencyChart({ data }: { data: LatencyDataPoint[] }) {
   const hasData = data.some((d) => d.avgMs > 0 || d.p95Ms > 0 || d.p99Ms > 0);
 
   return (
-    <Card className="col-span-1 lg:col-span-2 border-border/80">
+    <Card className="col-span-1 lg:col-span-2 border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-2 gap-2 min-w-0">
         <div className="min-w-0 flex-1">
           <CardTitle className="flex items-center gap-2 text-sm font-semibold truncate">
@@ -206,7 +206,7 @@ export function QueryLatencyChart({ data }: { data: LatencyDataPoint[] }) {
       <CardContent className="pt-2">
         {!hasData ? (
           <div className="flex flex-col items-center justify-center h-52 text-muted-foreground text-xs font-mono">
-            <span>
+            <span className="font-medium text-foreground/80">
               No query latency samples recorded in selected time window.
             </span>
           </div>
@@ -321,7 +321,7 @@ export function TransactionOutcomesChart({
     data.total > 0 ? Math.round((data.committed / data.total) * 100) : 100;
 
   return (
-    <Card className="col-span-1 border-border/80 flex flex-col justify-between">
+    <Card className="col-span-1 border-border flex flex-col justify-between">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 min-w-0">
           <CardTitle className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold truncate min-w-0">
@@ -330,7 +330,7 @@ export function TransactionOutcomesChart({
           </CardTitle>
           <Badge
             variant="outline"
-            className="font-mono text-[10px] shrink-0 whitespace-nowrap"
+            className="font-mono text-[10px] shrink-0 whitespace-nowrap bg-muted/60 border-border text-foreground"
           >
             {commitRate}% Commit
           </Badge>
@@ -342,9 +342,9 @@ export function TransactionOutcomesChart({
       <CardContent className="pt-2 flex-1 flex flex-col justify-center">
         {data.total === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-xs font-mono text-center px-2">
-            <Cpu className="h-6 w-6 text-muted-foreground/30 mb-2" />
-            <span>No transaction lifecycles logged</span>
-            <span className="text-[10px] text-muted-foreground/60 mt-0.5">
+            <Cpu className="h-6 w-6 text-muted-foreground/40 mb-2" />
+            <span className="font-medium text-foreground/80">No transaction lifecycles logged</span>
+            <span className="text-[10px] text-muted-foreground mt-0.5">
               Zero events in selected period
             </span>
           </div>
@@ -403,7 +403,7 @@ export function ConnectionUtilizationChart({
   utilizationPct: number;
 }) {
   return (
-    <Card className="col-span-1 border-border/80 flex flex-col justify-between">
+    <Card className="col-span-1 border-border flex flex-col justify-between">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 min-w-0">
           <CardTitle className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold truncate min-w-0">
@@ -414,8 +414,8 @@ export function ConnectionUtilizationChart({
             variant="outline"
             className={`font-mono text-[10px] shrink-0 whitespace-nowrap ${
               utilizationPct >= 80
-                ? "text-amber-400 border-amber-900"
-                : "text-foreground"
+                ? "text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30"
+                : "text-foreground bg-muted/60 border-border"
             }`}
           >
             {utilizationPct}% Utilized
@@ -429,21 +429,21 @@ export function ConnectionUtilizationChart({
         <div className="space-y-3 font-mono py-1">
           <div className="flex justify-between items-center text-xs">
             <span className="text-muted-foreground">Active Sessions:</span>
-            <span className="text-primary font-medium">{active}</span>
+            <span className="text-primary font-semibold">{active}</span>
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-muted-foreground">Idle Connections:</span>
-            <span className="text-slate-400">{idle}</span>
+            <span className="text-muted-foreground font-semibold">{idle}</span>
           </div>
           <div className="flex justify-between items-center text-xs">
             <span className="text-muted-foreground">
               Server Max Connections:
             </span>
-            <span>{max}</span>
+            <span className="text-foreground font-semibold">{max}</span>
           </div>
 
           {/* Linear Progress Bar */}
-          <div className="w-full bg-secondary/50 rounded-full h-2.5 overflow-hidden flex border border-border/50">
+          <div className="w-full bg-secondary rounded-full h-2.5 overflow-hidden flex border border-border">
             <div
               className="bg-primary h-full transition-all"
               style={{
@@ -452,7 +452,7 @@ export function ConnectionUtilizationChart({
               title={`Active: ${active}`}
             />
             <div
-              className="bg-slate-500 h-full transition-all"
+              className="bg-slate-400 dark:bg-slate-500 h-full transition-all"
               style={{
                 width: `${Math.max(idle > 0 ? 1 : 0, Math.min(100, (idle / max) * 100))}%`,
               }}
@@ -488,7 +488,7 @@ export function QueryTypeDistributionChart({
   const total = data.reduce((acc, d) => acc + d.count, 0);
 
   return (
-    <Card className="col-span-1 border-border/80 flex flex-col justify-between">
+    <Card className="col-span-1 border-border flex flex-col justify-between">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 min-w-0">
           <CardTitle className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold truncate min-w-0">
@@ -497,7 +497,7 @@ export function QueryTypeDistributionChart({
           </CardTitle>
           <Badge
             variant="outline"
-            className="font-mono text-[10px] shrink-0 whitespace-nowrap"
+            className="font-mono text-[10px] shrink-0 whitespace-nowrap bg-muted/60 border-border text-foreground"
           >
             {total} Total
           </Badge>
@@ -509,9 +509,9 @@ export function QueryTypeDistributionChart({
       <CardContent className="pt-2 flex-1 flex flex-col justify-center">
         {total === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-muted-foreground text-xs font-mono text-center px-2">
-            <BarChart3 className="h-6 w-6 text-muted-foreground/30 mb-2" />
-            <span>No query operations captured</span>
-            <span className="text-[10px] text-muted-foreground/60 mt-0.5">
+            <BarChart3 className="h-6 w-6 text-muted-foreground/40 mb-2" />
+            <span className="font-medium text-foreground/80">No query operations captured</span>
+            <span className="text-[10px] text-muted-foreground mt-0.5">
               Zero queries in selected period
             </span>
           </div>
@@ -560,7 +560,7 @@ export function SlowQueryTrendChart({ data }: { data: SlowQueryDataPoint[] }) {
   const totalSlow = data.reduce((acc, d) => acc + d.slowCount, 0);
 
   return (
-    <Card className="col-span-1 border-border/80 flex flex-col justify-between">
+    <Card className="col-span-1 border-border flex flex-col justify-between">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 min-w-0">
           <CardTitle className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold truncate min-w-0">
@@ -571,8 +571,8 @@ export function SlowQueryTrendChart({ data }: { data: SlowQueryDataPoint[] }) {
             variant="outline"
             className={`font-mono text-[10px] shrink-0 whitespace-nowrap ${
               totalSlow > 0
-                ? "text-amber-400 border-amber-900"
-                : "text-emerald-400 border-emerald-900"
+                ? "text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30"
+                : "text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 font-medium"
             }`}
           >
             {totalSlow} Slow
@@ -585,8 +585,8 @@ export function SlowQueryTrendChart({ data }: { data: SlowQueryDataPoint[] }) {
       <CardContent className="pt-2 flex-1 flex flex-col justify-center">
         {totalSlow === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-xs font-mono text-center px-2">
-            <CheckCircle2 className="h-6 w-6 text-emerald-400/80 mb-2" />
-            <span className="text-emerald-400 font-medium">
+            <CheckCircle2 className="h-6 w-6 text-emerald-600 dark:text-emerald-400 mb-2" />
+            <span className="text-emerald-700 dark:text-emerald-400 font-semibold">
               Zero Slow Queries
             </span>
             <span className="text-[10px] text-muted-foreground mt-0.5">
@@ -647,16 +647,16 @@ export function DatabaseStorageChart({
   };
 }) {
   return (
-    <Card className="col-span-1 border-border/80 flex flex-col justify-between">
+    <Card className="col-span-1 border-border flex flex-col justify-between">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 min-w-0">
           <CardTitle className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold truncate min-w-0">
-            <HardDrive className="h-4 w-4 text-purple-400 shrink-0" />
+            <HardDrive className="h-4 w-4 text-purple-600 dark:text-purple-400 shrink-0" />
             <span className="truncate">Database Storage</span>
           </CardTitle>
           <Badge
             variant="outline"
-            className="font-mono text-[10px] shrink-0 whitespace-nowrap text-purple-400 border-purple-900/60"
+            className="font-mono text-[10px] shrink-0 whitespace-nowrap text-purple-700 dark:text-purple-400 border-purple-300 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30"
           >
             {storage.currentFormatted}
           </Badge>
@@ -721,7 +721,7 @@ export function DatabaseStorageChart({
               </AreaChart>
             </ChartContainer>
             {storage.note && (
-              <p className="text-[10px] text-muted-foreground/70 font-mono italic">
+              <p className="text-[10px] text-muted-foreground font-mono italic">
                 * {storage.note}
               </p>
             )}
@@ -749,7 +749,7 @@ export function DatabaseResourceSummaryCard({
   };
 }) {
   return (
-    <Card className="col-span-1 border-border/80 flex flex-col justify-between">
+    <Card className="col-span-1 border-border flex flex-col justify-between">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between gap-2 min-w-0">
           <CardTitle className="flex items-center gap-1.5 text-xs sm:text-sm font-semibold truncate min-w-0">
@@ -760,8 +760,8 @@ export function DatabaseResourceSummaryCard({
             variant="outline"
             className={`font-mono text-[10px] shrink-0 whitespace-nowrap ${
               resource.cacheHitRatio !== null && resource.cacheHitRatio >= 99
-                ? "text-emerald-400 border-emerald-900"
-                : "text-foreground"
+                ? "text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30 font-medium"
+                : "text-foreground bg-muted/60 border-border"
             }`}
           >
             {resource.cacheHitRatio !== null
@@ -777,7 +777,7 @@ export function DatabaseResourceSummaryCard({
         <div className="space-y-3 font-mono text-xs">
           {/* Top relations */}
           <div>
-            <span className="text-muted-foreground text-[11px] block mb-1 font-sans">
+            <span className="text-muted-foreground text-[11px] block mb-1 font-sans font-medium">
               Top Relations (pg_total_relation_size):
             </span>
             {resource.topRelations.length === 0 ? (
@@ -803,13 +803,13 @@ export function DatabaseResourceSummaryCard({
             )}
           </div>
 
-          <div className="pt-2 border-t border-border/50 flex justify-between items-center text-[11px]">
+          <div className="pt-2 border-t border-border flex justify-between items-center text-[11px]">
             <span className="text-muted-foreground">pg_stat_statements:</span>
             <span
               className={
                 resource.pgStatStatementsActive
-                  ? "text-emerald-400 font-medium"
-                  : "text-amber-400 font-medium"
+                  ? "text-emerald-700 dark:text-emerald-400 font-semibold"
+                  : "text-amber-700 dark:text-amber-400 font-semibold"
               }
             >
               {resource.pgStatStatementsActive ? "ACTIVE" : "NOT INSTALLED"}

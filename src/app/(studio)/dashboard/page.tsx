@@ -129,8 +129,8 @@ export default function DashboardPage() {
               ROLE: {userRole}
             </Badge>
             {telemetry?.selectedDatabase && (
-              <Badge variant="outline" className="font-mono text-[10px] text-emerald-400 border-emerald-900 bg-emerald-950/20">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1 animate-pulse" />
+              <Badge variant="outline" className="font-mono text-[10px] text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/30">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-600 dark:bg-emerald-400 mr-1 animate-pulse" />
                 {telemetry.selectedDatabase.status.toUpperCase()}
               </Badge>
             )}

@@ -25,34 +25,46 @@ export function OverviewIssuesSection({ issues }: { issues: IssueAlert[] }) {
     switch (severity) {
       case "critical":
         return (
-          <Badge variant="outline" className="text-red-400 border-red-800 bg-red-950/30 uppercase text-[10px]">
-            <AlertOctagon className="h-3 w-3 mr-1 text-red-400" /> Critical
+          <Badge
+            variant="outline"
+            className="text-red-700 dark:text-red-400 border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/30 uppercase text-[10px] font-medium"
+          >
+            <AlertOctagon className="h-3 w-3 mr-1 text-red-600 dark:text-red-400" /> Critical
           </Badge>
         );
       case "high":
         return (
-          <Badge variant="outline" className="text-amber-400 border-amber-800 bg-amber-950/30 uppercase text-[10px]">
-            <AlertTriangle className="h-3 w-3 mr-1 text-amber-400" /> High
+          <Badge
+            variant="outline"
+            className="text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 uppercase text-[10px] font-medium"
+          >
+            <AlertTriangle className="h-3 w-3 mr-1 text-amber-600 dark:text-amber-400" /> High
           </Badge>
         );
       case "medium":
         return (
-          <Badge variant="outline" className="text-yellow-400 border-yellow-800 bg-yellow-950/30 uppercase text-[10px]">
-            <Info className="h-3 w-3 mr-1 text-yellow-400" /> Medium
+          <Badge
+            variant="outline"
+            className="text-amber-800 dark:text-yellow-300 border-amber-300 dark:border-yellow-800 bg-amber-50/80 dark:bg-yellow-950/30 uppercase text-[10px] font-medium"
+          >
+            <Info className="h-3 w-3 mr-1 text-amber-600 dark:text-yellow-400" /> Medium
           </Badge>
         );
       case "low":
       default:
         return (
-          <Badge variant="outline" className="text-blue-400 border-blue-800 bg-blue-950/30 uppercase text-[10px]">
-            <Info className="h-3 w-3 mr-1 text-blue-400" /> Low
+          <Badge
+            variant="outline"
+            className="text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 uppercase text-[10px] font-medium"
+          >
+            <Info className="h-3 w-3 mr-1 text-blue-600 dark:text-blue-400" /> Low
           </Badge>
         );
     }
   };
 
   return (
-    <Card className="border-border/80">
+    <Card className="border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <div>
           <CardTitle className="flex items-center gap-2 text-sm font-semibold">
@@ -68,9 +80,9 @@ export function OverviewIssuesSection({ issues }: { issues: IssueAlert[] }) {
       </CardHeader>
       <CardContent>
         {issues.length === 0 ? (
-          <div className="flex items-center gap-3 p-3 rounded-lg border border-emerald-900/40 bg-emerald-950/10 text-emerald-400 text-xs font-mono">
-            <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
-            <span>
+          <div className="flex items-center gap-3 p-3 rounded-lg border border-emerald-200 dark:border-emerald-900/40 bg-emerald-50/80 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-300 text-xs font-mono">
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+            <span className="font-medium">
               All monitored metrics within baseline thresholds. No active query failures, connection exhaustion, or lock contention detected.
             </span>
           </div>
@@ -79,7 +91,7 @@ export function OverviewIssuesSection({ issues }: { issues: IssueAlert[] }) {
             {issues.map((issue) => (
               <div
                 key={issue.id}
-                className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border/70 bg-card/40 hover:bg-card/70 transition-colors"
+                className="flex items-start justify-between gap-3 p-3 rounded-lg border border-border bg-card/60 hover:bg-card transition-colors"
               >
                 <div className="space-y-1">
                   <div className="flex items-center gap-2">
@@ -117,7 +129,7 @@ export function OverviewRecentActivityTable({
   activity: RecentActivityItem[];
 }) {
   return (
-    <Card className="border-border/80">
+    <Card className="border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-3">
         <div>
           <CardTitle className="flex items-center gap-2 text-sm font-semibold">
@@ -138,7 +150,7 @@ export function OverviewRecentActivityTable({
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse font-mono">
             <thead>
-              <tr className="border-b border-border bg-sidebar/50 text-muted-foreground text-[11px]">
+              <tr className="border-b border-border bg-muted/60 text-muted-foreground text-[11px]">
                 <th className="p-3 font-medium">Actor</th>
                 <th className="p-3 font-medium">Operation</th>
                 <th className="p-3 font-medium">Database</th>
@@ -148,7 +160,7 @@ export function OverviewRecentActivityTable({
                 <th className="p-3 font-medium text-right">Module Trace</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border/40">
+            <tbody className="divide-y divide-border/60">
               {activity.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="p-6 text-center text-muted-foreground text-xs">
@@ -159,13 +171,13 @@ export function OverviewRecentActivityTable({
                 activity.map((item) => (
                   <tr
                     key={item.id}
-                    className="hover:bg-muted/30 transition-colors"
+                    className="hover:bg-muted/40 transition-colors"
                   >
                     <td className="p-3 text-foreground font-medium truncate max-w-[140px]">
                       {item.actor}
                     </td>
                     <td className="p-3">
-                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-secondary border border-border/50 text-foreground font-semibold">
+                      <span className="px-1.5 py-0.5 rounded text-[10px] bg-secondary border border-border text-foreground font-semibold">
                         {item.operation}
                       </span>
                     </td>
@@ -176,12 +188,12 @@ export function OverviewRecentActivityTable({
                     </td>
                     <td className="p-3">
                       {item.result === "success" ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-400 text-[11px]">
-                          <CheckCircle2 className="h-3 w-3" /> Success
+                        <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 text-[11px] font-medium">
+                          <CheckCircle2 className="h-3 w-3 text-emerald-600 dark:text-emerald-400" /> Success
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-red-400 text-[11px]">
-                          <AlertOctagon className="h-3 w-3" /> Error
+                        <span className="inline-flex items-center gap-1 text-red-700 dark:text-red-400 text-[11px] font-medium">
+                          <AlertOctagon className="h-3 w-3 text-red-600 dark:text-red-400" /> Error
                         </span>
                       )}
                     </td>

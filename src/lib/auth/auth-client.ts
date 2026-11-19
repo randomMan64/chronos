@@ -99,10 +99,50 @@ export function handleSessionRevocation(reason: "SESSION_REVOKED" | "LOGOUT" = "
 }
 
 /**
+ * Centrally performs user-initiated logout:
+ * - Sets isRedirecting = true so concurrent in-flight 401s do not trigger false SESSION_REVOKED banners
+ * - Calls /api/v1/auth/logout to invalidate the session cookie & database record
+ * - Clears local client storage
+ * - Broadcasts LOGOUT event to other tabs via BroadcastChannel
+ * - Redirects directly and cleanly to /login
+ */
+export async function performLogout() {
+  if (typeof window === "undefined" || isRedirecting) return;
+  isRedirecting = true;
+
+  try {
+    await fetch("/api/v1/auth/logout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch {
+    // ignore
+  }
+
+  clearClientAuthState();
+
+  try {
+    const channel = getBroadcastChannel();
+    if (channel) {
+      const msg: AuthBroadcastMessage = {
+        event: "LOGOUT",
+        reason: "LOGOUT",
+        timestamp: Date.now(),
+      };
+      channel.postMessage(msg);
+    }
+  } catch {
+    // ignore
+  }
+
+  window.location.href = "/login";
+}
+
+/**
  * Global fetch interceptor:
  * - Detects 401 responses with SESSION_REVOKED or unauthorized session
  * - Ignores ordinary 403 Forbidden permission errors (does NOT logout)
- * - Ignores auth entry APIs (/api/v1/auth/login, /api/v1/auth/register)
+ * - Ignores auth entry APIs (/api/v1/auth/login, /api/v1/auth/register, /api/v1/auth/logout)
  */
 export function installGlobalAuthInterceptor() {
   if (typeof window === "undefined") return () => {};
@@ -112,13 +152,14 @@ export function installGlobalAuthInterceptor() {
   window.fetch = async (...args) => {
     const response = await originalFetch(...args);
 
-    if (response.status === 401) {
+    if (response.status === 401 && !isRedirecting) {
       const url = typeof args[0] === "string" ? args[0] : (args[0] as Request)?.url || "";
       const isAuthApi =
         url.includes("/api/v1/auth/login") ||
         url.includes("/api/v1/auth/register") ||
         url.includes("/api/v1/auth/forgot-password") ||
-        url.includes("/api/v1/auth/reset-password");
+        url.includes("/api/v1/auth/reset-password") ||
+        url.includes("/api/v1/auth/logout");
 
       if (!isAuthApi) {
         handleSessionRevocation("SESSION_REVOKED");
