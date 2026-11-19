@@ -49,6 +49,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Info,
 } from "lucide-react";
 import { formatDate } from "@/lib/utils";
 
@@ -186,7 +187,16 @@ function TemporalInvestigationView() {
   // Restore Modal State
   const [showRestoreModal, setShowRestoreModal] = React.useState(false);
   const [isRestoring, setIsRestoring] = React.useState(false);
+  const [userPermissions, setUserPermissions] = React.useState<string[]>([]);
   const [notification, setNotification] = React.useState<{ type: "success" | "error"; text: string } | null>(null);
+
+  const canRestore = React.useMemo(() => {
+    return (
+      userPermissions.includes("history:restore") ||
+      userPermissions.includes("owner") ||
+      userPermissions.includes("dba")
+    );
+  }, [userPermissions]);
 
   const {
     register: registerRestoreVersion,
@@ -207,6 +217,9 @@ function TemporalInvestigationView() {
         const meRes = await fetch("/api/v1/auth/me");
         if (meRes.ok) {
           const me = await meRes.json();
+          if (Array.isArray(me.permissions)) {
+            setUserPermissions(me.permissions);
+          }
           const org = me.currentOrg || me.organizations?.[0];
           const ws = me.currentWorkspace || me.workspaces?.[0];
 
@@ -263,6 +276,9 @@ function TemporalInvestigationView() {
         const meRes = await fetch("/api/v1/auth/me");
         if (meRes.ok) {
           const me = await meRes.json();
+          if (Array.isArray(me.permissions)) {
+            setUserPermissions(me.permissions);
+          }
           const dbs: Array<{ id: string; name: string }> = me.databases || [];
           setDatabases(dbs);
 
@@ -1045,12 +1061,18 @@ function TemporalInvestigationView() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setCustomBaseVersion(ver);
-                        setCompareTarget("custom");
+                        if (isCustomBase) {
+                          setCustomBaseVersion(null);
+                          setCompareTarget("mutation");
+                        } else {
+                          setCustomBaseVersion(ver);
+                          setCompareTarget("custom");
+                        }
                       }}
                       className="text-primary hover:underline font-mono cursor-pointer"
+                      title={isCustomBase ? "Click to clear custom baseline" : "Set this version as baseline for comparisons"}
                     >
-                      {isCustomBase ? "Selected Base ✓" : "Set As Base"}
+                      {isCustomBase ? "Selected Base ✓ (Clear)" : "Set As Base"}
                     </button>
                   </div>
                 </div>
@@ -1144,8 +1166,21 @@ function TemporalInvestigationView() {
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setShowRestoreModal(true)}
-                  className="h-7 text-xs border-warning/40 text-warning hover:bg-warning/10 cursor-pointer"
+                  onClick={() => {
+                    if (!canRestore) {
+                      setNotification({
+                        type: "error",
+                        text: "Permission denied: 'history:restore' permission is required to execute restorations.",
+                      });
+                      return;
+                    }
+                    setShowRestoreModal(true);
+                  }}
+                  disabled={!canRestore}
+                  className={`h-7 text-xs border-warning/40 text-warning hover:bg-warning/10 cursor-pointer ${
+                    !canRestore ? "opacity-50 cursor-not-allowed" : ""
+                  }`}
+                  title={canRestore ? "Restore this version via audited compensating transaction" : "Restoration requires 'history:restore' permission"}
                 >
                   <RotateCcw className="h-3 w-3 mr-1" /> Restore Version
                 </Button>
@@ -1254,6 +1289,30 @@ function TemporalInvestigationView() {
                             <span className="text-warning font-semibold">Not Restored / Deleted in Live DB</span>
                             <span className="text-muted-foreground">
                               — This record is currently not present in the live database. Diff shows attributes that would be recreated upon restore.
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Informational banner when Custom Base is active */}
+                    {compareTarget === "custom" && customBaseVersion && selectedVersion && (
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-sidebar/90 border border-border text-[11px] font-mono">
+                        <Info className="h-3.5 w-3.5 text-primary shrink-0" />
+                        {selectedVersion.id === customBaseVersion.id ? (
+                          <>
+                            <span className="text-foreground font-semibold">
+                              Comparing Version v{selectedVersion.versionNumber} against itself
+                            </span>
+                            <span className="text-muted-foreground">
+                              — v{customBaseVersion.versionNumber} is set as the custom base. Select another version in the timeline to see changes across versions, or click &quot;This Mutation&quot; to inspect this version&apos;s single-step diff.
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="text-foreground font-semibold">Custom Baseline Active</span>
+                            <span className="text-muted-foreground">
+                              — Comparing Version v{selectedVersion.versionNumber} against Base Version v{customBaseVersion.versionNumber}.
                             </span>
                           </>
                         )}

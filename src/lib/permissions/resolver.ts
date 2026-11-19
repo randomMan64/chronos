@@ -141,7 +141,6 @@ export const ROLE_PERMISSIONS: Record<ChronosRole, Permission[]> = {
     "transaction:inspect",
     "performance:inspect",
     "history:read",
-    "audit:read",
     "audit:view_own",
     "audit:view_workspace",
     "audit:view_database",
@@ -222,10 +221,14 @@ function getRoleDdlCapability(role: string | null | undefined): boolean {
   return false;
 }
 
-function getRoleRestoreCapability(role: string | null | undefined): boolean {
+function getRoleRestoreCapability(role: string | null | undefined, grantRole?: string): boolean {
   if (!role) return false;
   const raw = role.trim().toLowerCase();
   if (raw === "owner" || raw === "dba" || raw === "developer" || raw === "admin" || raw === "dev") return true;
+  if (raw === "database_engineer" || raw === "engineer" || raw === "db_engineer") {
+    // Configurable: permitted when explicitly configured for database engineer, not via stale dba registration grant
+    return grantRole !== "dba" && grantRole !== "owner";
+  }
   return false;
 }
 
@@ -284,8 +287,9 @@ export function resolvePermissions(params: {
   const wsCanDdl = getRoleDdlCapability(params.workspaceRole);
   const isDdlCapable = params.workspaceRole ? wsCanDdl : orgCanDdl;
 
-  const orgCanRestore = getRoleRestoreCapability(params.orgRole);
-  const wsCanRestore = getRoleRestoreCapability(params.workspaceRole);
+  const grantRole = params.databaseGrants?.role;
+  const orgCanRestore = getRoleRestoreCapability(params.orgRole, grantRole);
+  const wsCanRestore = getRoleRestoreCapability(params.workspaceRole, grantRole);
   const isRestoreCapable = params.workspaceRole ? wsCanRestore : orgCanRestore;
 
   if (params.databaseGrants) {
