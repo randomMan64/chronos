@@ -17,7 +17,10 @@ import { LogOut } from "lucide-react";
 import { useTranslation } from "@/lib/i18n";
 import { getInitials } from "@/lib/utils";
 import type { AuthenticatedSession } from "@/lib/auth/session";
-import { installGlobalAuthInterceptor, startSessionWatchdog } from "@/lib/auth/auth-client";
+import {
+  installGlobalAuthInterceptor,
+  startSessionWatchdog,
+} from "@/lib/auth/auth-client";
 
 interface StudioLayoutProps {
   children: React.ReactNode;
@@ -30,12 +33,14 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
   const { t } = useTranslation();
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState<boolean>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("chronos_sidebar_pref") === "collapsed";
-    }
-    return false;
-  });
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState<boolean>(
+    () => {
+      if (typeof window !== "undefined") {
+        return localStorage.getItem("chronos_sidebar_pref") === "collapsed";
+      }
+      return false;
+    },
+  );
   const [showLogoutDialog, setShowLogoutDialog] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
 
@@ -61,13 +66,15 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
     environment: initialSession?.currentWorkspace?.environment || "development",
   }));
 
-  const [workspacesList, setWorkspacesList] = React.useState<Array<{
-    id: string;
-    name: string;
-    slug?: string;
-    environment: string;
-    role?: string;
-  }>>(() => initialSession?.workspaces || []);
+  const [workspacesList, setWorkspacesList] = React.useState<
+    Array<{
+      id: string;
+      name: string;
+      slug?: string;
+      environment: string;
+      role?: string;
+    }>
+  >(() => initialSession?.workspaces || []);
 
   const [currentDatabase, setCurrentDatabase] = React.useState(() => ({
     id: initialSession?.currentDatabase?.id || "",
@@ -78,7 +85,7 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
   const handleWorkspaceChange = React.useCallback(
     (
       newWs: { id: string; name: string; environment?: string },
-      newDb?: { id: string; name: string; status?: string } | null
+      newDb?: { id: string; name: string; status?: string } | null,
     ) => {
       setCurrentWorkspace({
         id: newWs.id,
@@ -103,12 +110,12 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
       window.dispatchEvent(
         new CustomEvent("chronos:workspace-changed", {
           detail: { workspace: newWs, database: newDb },
-        })
+        }),
       );
 
       router.refresh();
     },
-    [router]
+    [router],
   );
 
   // Sync state if initialSession updates
@@ -134,7 +141,8 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
       setCurrentWorkspace({
         id: initialSession.currentWorkspace.id,
         name: initialSession.currentWorkspace.name,
-        environment: initialSession.currentWorkspace.environment || "development",
+        environment:
+          initialSession.currentWorkspace.environment || "development",
       });
     }
     if (initialSession?.currentDatabase) {
@@ -247,7 +255,10 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
                 const shouldCollapse = pref.sidebarPreference === "collapsed";
                 setIsSidebarCollapsed(shouldCollapse);
                 try {
-                  localStorage.setItem("chronos_sidebar_pref", pref.sidebarPreference);
+                  localStorage.setItem(
+                    "chronos_sidebar_pref",
+                    pref.sidebarPreference,
+                  );
                 } catch {}
               }
               if (pref?.displayName) {
@@ -257,9 +268,12 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
                 }));
               }
               try {
-                if (pref?.timezone) localStorage.setItem("chronos_timezone", pref.timezone);
-                if (pref?.dateFormat) localStorage.setItem("chronos_date_format", pref.dateFormat);
-                if (pref?.timeFormat) localStorage.setItem("chronos_time_format", pref.timeFormat);
+                if (pref?.timezone)
+                  localStorage.setItem("chronos_timezone", pref.timezone);
+                if (pref?.dateFormat)
+                  localStorage.setItem("chronos_date_format", pref.dateFormat);
+                if (pref?.timeFormat)
+                  localStorage.setItem("chronos_time_format", pref.timeFormat);
                 if (pref?.language) {
                   localStorage.setItem("chronos_language", pref.language);
                   document.documentElement.lang = pref.language;
@@ -324,7 +338,9 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
     window.addEventListener("chronos:settings-updated", handleSettingsChange);
 
     const handleWorkspacesUpdated = (e: Event) => {
-      const customEvent = e as CustomEvent<Array<{ id: string; name: string; slug?: string; environment: string }>>;
+      const customEvent = e as CustomEvent<
+        Array<{ id: string; name: string; slug?: string; environment: string }>
+      >;
       if (customEvent.detail && Array.isArray(customEvent.detail)) {
         setWorkspacesList(customEvent.detail);
       } else if (currentOrg.id) {
@@ -336,12 +352,21 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
           .catch(() => {});
       }
     };
-    window.addEventListener("chronos:workspaces-updated", handleWorkspacesUpdated);
+    window.addEventListener(
+      "chronos:workspaces-updated",
+      handleWorkspacesUpdated,
+    );
 
     return () => {
       window.removeEventListener("chronos:sidebar-pref", handlePrefChange);
-      window.removeEventListener("chronos:settings-updated", handleSettingsChange);
-      window.removeEventListener("chronos:workspaces-updated", handleWorkspacesUpdated);
+      window.removeEventListener(
+        "chronos:settings-updated",
+        handleSettingsChange,
+      );
+      window.removeEventListener(
+        "chronos:workspaces-updated",
+        handleWorkspacesUpdated,
+      );
     };
   }, []);
 
@@ -411,7 +436,7 @@ export function StudioLayout({ children, initialSession }: StudioLayoutProps) {
           role={currentOrg.role?.toUpperCase() || "OWNER"}
           onToggleMobileMenu={() => setIsMobileMenuOpen((prev) => !prev)}
         />
-        <main className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 sm:px-5 sm:py-4 lg:px-8 lg:py-5 xl:px-10 xl:py-6 2xl:px-12 scrollbar-thin">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden px-3 py-3 sm:px-5 sm:py-4 lg:px-8 lg:py-5 xl:py-6 scrollbar-thin">
           {children}
         </main>
       </div>
