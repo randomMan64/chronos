@@ -812,9 +812,16 @@ export class OverviewService {
 
     // 9. Operational Issues & Alerts
     const issues: IssueAlert[] = [];
-    const analyzerPath = selectedDbRecord
-      ? `/analyzer?databaseId=${selectedDbRecord.id}`
-      : "/analyzer";
+    const baseDbParam = selectedDbRecord
+      ? `databaseId=${selectedDbRecord.id}`
+      : "";
+
+    const makeAnalyzerUrl = (tab: string, extraParams?: string) => {
+      const parts = [baseDbParam, `tab=${tab}`];
+      if (extraParams) parts.push(extraParams);
+      const query = parts.filter(Boolean).join("&");
+      return query ? `/analyzer?${query}` : `/analyzer`;
+    };
 
     // Failed queries alert
     if (failedCurrent > 0) {
@@ -828,7 +835,7 @@ export class OverviewService {
         title: `${failedCurrent} Failed SQL Query Execution(s)`,
         description: `${failureRate}% of executed queries resulted in database errors during the selected time window.`,
         module: "analyzer",
-        modulePath: analyzerPath,
+        modulePath: makeAnalyzerUrl("queries"),
         detectedAt: new Date().toISOString(),
       });
     }
@@ -841,7 +848,7 @@ export class OverviewService {
         title: `${slowCurrent} Slow Query Execution(s) Detected`,
         description: `Queries exceeded the ${slowThresholdMs}ms latency threshold. Inspect execution plans and index recommendations.`,
         module: "analyzer",
-        modulePath: analyzerPath,
+        modulePath: makeAnalyzerUrl("queries", "minDuration=100"),
         detectedAt: new Date().toISOString(),
       });
     }
@@ -854,7 +861,7 @@ export class OverviewService {
         title: `High Connection Utilization (${connUtilPct}%)`,
         description: `Active and idle client connections are approaching max_connections (${activeConnectionsCount + idleConnectionsCount}/${maxConnectionsCount}).`,
         module: "analyzer",
-        modulePath: analyzerPath,
+        modulePath: makeAnalyzerUrl("sessions"),
         detectedAt: new Date().toISOString(),
       });
     }
@@ -867,7 +874,7 @@ export class OverviewService {
         title: `Buffer Cache Hit Ratio Below Target (${cacheHitRatio}%)`,
         description: "Shared buffer cache efficiency is sub-optimal (< 90%). Disk reads are serving queries.",
         module: "analyzer",
-        modulePath: analyzerPath,
+        modulePath: makeAnalyzerUrl("overview"),
         detectedAt: new Date().toISOString(),
       });
     }
@@ -880,7 +887,7 @@ export class OverviewService {
         title: "pg_stat_statements Extension Not Installed",
         description: "Install 'pg_stat_statements' to enable engine-level query planning and buffer hit telemetry.",
         module: "analyzer",
-        modulePath: `/analyzer?databaseId=${selectedDbRecord.id}`,
+        modulePath: makeAnalyzerUrl("overview"),
         detectedAt: new Date().toISOString(),
       });
     }
@@ -894,8 +901,8 @@ export class OverviewService {
       const op = opMatch ? opMatch[1].toUpperCase() : "SQL";
       const dbObj = workspaceDbs.find((d: { id: string }) => d.id === q.databaseId);
       const qLink = dbObj
-        ? `/analyzer?databaseId=${dbObj.id}`
-        : "/analyzer";
+        ? `/analyzer?databaseId=${dbObj.id}&tab=queries`
+        : "/analyzer?tab=queries";
 
       recentActivity.push({
         id: `act-${q.id}`,

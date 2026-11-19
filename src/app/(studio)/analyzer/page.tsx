@@ -68,11 +68,15 @@ import {
 export default function AnalyzerPage() {
   const searchParams = useSearchParams();
   const urlDbId = searchParams.get("databaseId");
+  const urlTab = searchParams.get("tab");
+  const urlMinDuration = searchParams.get("minDuration");
+  const urlRange = searchParams.get("range");
+  const urlSearch = searchParams.get("search");
 
   const [databases, setDatabases] = React.useState<Array<{ id: string; name: string }>>([]);
   const [selectedDbId, setSelectedDbId] = React.useState<string>("");
-  const [activeTab, setActiveTab] = React.useState<string>("overview");
-  const [timeRangeKey, setTimeRangeKey] = React.useState<string>("24h");
+  const [activeTab, setActiveTab] = React.useState<string>(urlTab || "overview");
+  const [timeRangeKey, setTimeRangeKey] = React.useState<string>(urlRange || "24h");
 
   // Capabilities & RBAC Policy
   const [capabilities, setCapabilities] = React.useState<DatabaseCapabilities | null>(null);
@@ -103,8 +107,16 @@ export default function AnalyzerPage() {
   const [actionMessage, setActionMessage] = React.useState<{ type: "success" | "error"; text: string } | null>(null);
 
   // Filters & Search
-  const [querySearch, setQuerySearch] = React.useState("");
-  const [minDurationFilter, setMinDurationFilter] = React.useState<string>("0");
+  const [querySearch, setQuerySearch] = React.useState(urlSearch || "");
+  const [minDurationFilter, setMinDurationFilter] = React.useState<string>(urlMinDuration || "0");
+
+  // Sync state if URL search parameters update
+  React.useEffect(() => {
+    if (urlTab) setActiveTab(urlTab);
+    if (urlMinDuration) setMinDurationFilter(urlMinDuration);
+    if (urlSearch) setQuerySearch(urlSearch);
+    if (urlRange) setTimeRangeKey(urlRange);
+  }, [urlTab, urlMinDuration, urlSearch, urlRange]);
   const [indexFilter, setIndexFilter] = React.useState<"all" | "unused" | "invalid" | "high">("all");
   const [recSeverityFilter, setRecSeverityFilter] = React.useState<string>("all");
 
