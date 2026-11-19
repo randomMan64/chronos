@@ -568,7 +568,7 @@ export default function AnalyzerPage() {
                   {capabilities?.pgVersion || "Detecting version..."}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="pt-0 space-y-1 text-xs font-mono">
+              <CardContent className="pt-0 space-y-1 text-xs font-mono mt-2">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">pg_stat_statements:</span>
                   {capabilities?.pgStatStatementsInstalled ? (
@@ -585,7 +585,7 @@ export default function AnalyzerPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Telemetry Source:</span>
-                  <span className="text-foreground text-[10px] truncate max-w-[150px]">
+                  <span className="text-foreground text-[10px] truncate max-w-37.5">
                     {overview?.source || "PostgreSQL Live Catalogs"}
                   </span>
                 </div>
@@ -709,7 +709,7 @@ export default function AnalyzerPage() {
                             <span className="text-muted-foreground text-[10px]">—</span>
                           )}
                         </td>
-                        <td className="p-2.5 text-foreground truncate max-w-[380px]">
+                        <td className="p-2.5 text-foreground truncate max-w-95">
                           {q.normalizedSql}
                         </td>
                         <td className="p-2.5 text-right">
@@ -758,9 +758,16 @@ export default function AnalyzerPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <div>
-                    <label className="text-[11px] text-muted-foreground block mb-1">
-                      SQL Statement
-                    </label>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-[11px] text-muted-foreground block">
+                        SQL Statement
+                      </label>
+                      {/\$\d+/.test(inspectorQuery) && (
+                        <span className="text-[10px] text-primary font-mono">
+                          Normalized ($1 auto-substituted with NULL for EXPLAIN)
+                        </span>
+                      )}
+                    </div>
                     <textarea
                       value={inspectorQuery}
                       onChange={(e) => setInspectorQuery(e.target.value)}
@@ -857,7 +864,7 @@ export default function AnalyzerPage() {
                   )}
 
                   {explainPlan ? (
-                    <div className="bg-sidebar p-3 rounded border border-border overflow-x-auto max-h-[500px]">
+                    <div className="bg-sidebar p-3 rounded border border-border overflow-x-auto max-h-125">
                       <ExecutionPlanTree plan={explainPlan} />
                       <details className="mt-4 pt-2 border-t border-border">
                         <summary className="text-[11px] text-muted-foreground cursor-pointer hover:text-foreground">
@@ -1078,7 +1085,7 @@ export default function AnalyzerPage() {
                               <span className="text-muted-foreground text-[10px]">—</span>
                             )}
                           </td>
-                          <td className="p-2.5 text-foreground truncate max-w-[280px]">
+                          <td className="p-2.5 text-foreground truncate max-w-70">
                             {s.query || "idle"}
                           </td>
                           <td className="p-2.5 text-right">

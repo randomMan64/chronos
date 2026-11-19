@@ -505,28 +505,61 @@ export class AnalyticsService {
       ? "EXPLAIN (ANALYZE, COSTS, BUFFERS, FORMAT JSON) "
       : "EXPLAIN (COSTS, BUFFERS, FORMAT JSON) ";
 
-    const fullExplainSql = `${explainPrefix}${query};`;
+    const cleanQuery = query.trim().replace(/;+\s*$/, "");
+    const containsPlaceholders = /\$\d+/.test(cleanQuery);
+    const targetQuery = containsPlaceholders
+      ? cleanQuery.replace(/\$\d+/g, "NULL")
+      : cleanQuery;
+
+    const fullExplainSql = `${explainPrefix}${targetQuery};`;
     const startTime = Date.now();
 
-    const res = await userDbManager.executeQuery(
-      { id: database.id, connectionStringEncrypted: database.connectionStringEncrypted },
-      fullExplainSql,
-      {
-        isReadOnly: !analyze,
-        timeoutMs: analyze ? 10000 : 5000,
+    let res;
+    let autoSubstituted = containsPlaceholders;
+
+    try {
+      res = await userDbManager.executeQuery(
+        { id: database.id, connectionStringEncrypted: database.connectionStringEncrypted },
+        fullExplainSql,
+        {
+          isReadOnly: !analyze,
+          timeoutMs: analyze ? 10000 : 5000,
+        }
+      );
+    } catch (err: any) {
+      // If the error was due to undefined parameter ($1, $2...) and we hadn't substituted yet, retry with NULL substitution
+      if (!autoSubstituted && (err?.code === "42P02" || String(err?.message).includes("there is no parameter $"))) {
+        const fallbackSql = `${explainPrefix}${cleanQuery.replace(/\$\d+/g, "NULL")};`;
+        res = await userDbManager.executeQuery(
+          { id: database.id, connectionStringEncrypted: database.connectionStringEncrypted },
+          fallbackSql,
+          {
+            isReadOnly: !analyze,
+            timeoutMs: analyze ? 10000 : 5000,
+          }
+        );
+        autoSubstituted = true;
+      } else {
+        throw err;
       }
-    );
+    }
 
     const elapsed = Date.now() - startTime;
     const planOutput = res.rows[0]?.["QUERY PLAN"] || res.rows[0]?.["query plan"] || res.rows[0];
+
+    const warnings: string[] = [];
+    if (analyze) {
+      warnings.push("EXPLAIN ANALYZE executed the underlying statement on the target database with a 10s timeout.");
+    }
+    if (autoSubstituted) {
+      warnings.push("Normalized query template from pg_stat_statements contained parameter placeholders ($1, $2...). Substituted with NULL for execution plan generation.");
+    }
 
     return {
       plan: planOutput,
       executionTimeMs: elapsed,
       analyzed: analyze,
-      warnings: analyze
-        ? ["EXPLAIN ANALYZE executed the underlying statement on the target database with a 10s timeout."]
-        : undefined,
+      warnings: warnings.length > 0 ? warnings : undefined,
     };
   }
 
